@@ -81,9 +81,11 @@ export interface SettleResult {
 export interface PaymentRail {
   type: string
   creditSupported: boolean
+  /** Returns true if this rail can generate a challenge for the given price. */
+  canChallenge?(price: PriceInfo): boolean
   challenge(route: string, price: PriceInfo): Promise<ChallengeFragment>
   detect(req: TollBoothRequest): boolean
-  verify(req: TollBoothRequest, cost?: number): Promise<RailVerifyResult> | RailVerifyResult
+  verify(req: TollBoothRequest): Promise<RailVerifyResult> | RailVerifyResult
   settle?(paymentId: string, amount: number): Promise<SettleResult>
 }
 ```
@@ -223,7 +225,7 @@ describe('L402Rail', () => {
       })
 
       const req = makeRequest({ authorization: `L402 ${macaroon}:${preimage}` })
-      const result = rail.verify(req, 100)
+      const result = rail.verify(req)
 
       expect(result.authenticated).toBe(true)
       expect(result.paymentId).toBe(paymentHash)
@@ -245,7 +247,7 @@ describe('L402Rail', () => {
 
       const badPreimage = randomBytes(32).toString('hex')
       const req = makeRequest({ authorization: `L402 ${macaroon}:${badPreimage}` })
-      const result = rail.verify(req, 100)
+      const result = rail.verify(req)
 
       expect(result.authenticated).toBe(false)
     })
@@ -345,6 +347,10 @@ export function createL402Rail(config: L402RailConfig): PaymentRail {
     type: 'l402',
     creditSupported: true,
 
+    canChallenge(price: PriceInfo): boolean {
+      return price.sats !== undefined
+    },
+
     detect(req: TollBoothRequest): boolean {
       const auth = req.headers.authorization ?? req.headers.Authorization ?? ''
       return /^L402\s/i.test(auth)
@@ -381,7 +387,9 @@ export function createL402Rail(config: L402RailConfig): PaymentRail {
       }
     },
 
-    verify(req: TollBoothRequest, cost?: number): RailVerifyResult {
+    // NOTE: verify() only authenticates — it does NOT debit.
+    // Balance tracking and debit stay in the engine (per spec).
+    verify(req: TollBoothRequest): RailVerifyResult {
       const auth = req.headers.authorization ?? req.headers.Authorization ?? ''
       const token = auth.replace(/^L402\s+/i, '')
       const lastColon = token.lastIndexOf(':')
@@ -393,7 +401,7 @@ export function createL402Rail(config: L402RailConfig): PaymentRail {
       const macaroonBase64 = token.slice(0, lastColon)
       const preimage = token.slice(lastColon + 1)
 
-      const context = req.path ? { route: req.path, ip: req.ip } : undefined
+      const context = req.path ? { path: req.path, ip: req.ip } : undefined
       const verification = verifyMacaroon(rootKey, macaroonBase64, context)
 
       if (!verification.valid) {
@@ -416,7 +424,7 @@ export function createL402Rail(config: L402RailConfig): PaymentRail {
         }
       }
 
-      // First-time settlement
+      // First-time settlement — credits the balance
       if (!storage.isSettled(paymentHash)) {
         const settled = storage.settleWithCredit(paymentHash, creditBalance, preimage)
         if (!settled && !isLightning) {
@@ -424,11 +432,7 @@ export function createL402Rail(config: L402RailConfig): PaymentRail {
         }
       }
 
-      // Debit cost
-      if (cost !== undefined && cost > 0) {
-        storage.debit(paymentHash, cost)
-      }
-
+      // Return current balance — engine will debit and check sufficiency
       const remaining = storage.balance(paymentHash)
 
       return {
@@ -445,8 +449,8 @@ export function createL402Rail(config: L402RailConfig): PaymentRail {
 
 function isValidLightningPreimage(preimage: string, paymentHash: string): boolean {
   if (!/^[0-9a-f]{64}$/i.test(preimage)) return false
-  const hash = createHash('sha256').update(Buffer.from(preimage, 'hex')).digest('hex')
-  return hash === paymentHash
+  const computed = createHash('sha256').update(Buffer.from(preimage, 'hex')).digest()
+  return timingSafeEqual(computed, Buffer.from(paymentHash, 'hex'))
 }
 ```
 
@@ -491,24 +495,58 @@ rails?: PaymentRail[]
 normalisedPricing?: Record<string, PriceInfo>
 ```
 
-- [ ] **Step 2: Refactor engine handle() to iterate rails**
+- [ ] **Step 2: Update TollBoothResult type to allow 401**
 
-In `toll-booth/src/core/toll-booth.ts`, replace the hardcoded L402 auth block (lines 45-92) with a rail iteration loop:
+In `toll-booth/src/core/types.ts`, update the challenge action type:
+
+```typescript
+// Change status: 402 to status: 401 | 402
+{ action: 'challenge'; status: 401 | 402; headers: Record<string, string>; body: Record<string, unknown> }
+```
+
+- [ ] **Step 3: Refactor engine handle() to iterate rails**
+
+In `toll-booth/src/core/toll-booth.ts`, replace the hardcoded L402 auth block (lines 45-92) with a rail iteration loop. **CRITICAL: Debit stays in the engine, not in the rail.** Rails only authenticate. The engine handles balance management uniformly across all rails.
 
 ```typescript
 // Replace hardcoded L402 check with:
 for (const rail of rails) {
   if (rail.detect(req)) {
-    const result = await Promise.resolve(rail.verify(req, cost))
+    const result = await Promise.resolve(rail.verify(req))
     if (result.authenticated) {
-      // Track estimated cost with currency
+      // Engine handles debit for credit mode
+      if (result.mode === 'credit' && result.paymentId && cost > 0) {
+        const debit = storage.debit(result.paymentId, cost, result.currency)
+        if (!debit.success) {
+          return {
+            action: 'challenge' as const,
+            status: 402,
+            headers: {},
+            body: { error: 'Insufficient balance' },
+          }
+        }
+      }
+
+      // Track estimated cost with currency for reconciliation
       if (result.paymentId) {
         estimatedCosts.set(result.paymentId, { cost, ts: Date.now(), currency: result.currency })
       }
-      // Build headers
+
+      // Replay protection for per-request mode
+      if (result.mode === 'per-request') {
+        if (storage.isSettled(result.paymentId)) {
+          return { action: 'challenge' as const, status: 401, headers: {}, body: { error: 'Payment already used' } }
+        }
+        storage.settle(result.paymentId)
+      }
+
+      // Build response headers
       const headers: Record<string, string> = { ...responseHeaders }
-      if (result.creditBalance !== undefined) {
-        headers['X-Credit-Balance'] = String(result.creditBalance)
+      const remaining = result.mode === 'credit'
+        ? storage.balance(result.paymentId, result.currency)
+        : undefined
+      if (remaining !== undefined) {
+        headers['X-Credit-Balance'] = String(remaining)
       }
       if (result.customCaveats) {
         for (const [key, value] of Object.entries(result.customCaveats)) {
@@ -517,8 +555,9 @@ for (const rail of rails) {
           }
         }
       }
+
       // Fire events
-      onPayment?.({ timestamp: new Date().toISOString(), paymentHash: result.paymentId, amountSats: cost })
+      onPayment?.({ timestamp: new Date().toISOString(), paymentHash: result.paymentId, amountSats: cost, currency: result.currency, rail: rail.type })
       onRequest?.({ ... })
       return {
         action: 'proxy' as const,
@@ -526,7 +565,7 @@ for (const rail of rails) {
         headers,
         paymentHash: result.paymentId,
         estimatedCost: cost,
-        creditBalance: result.creditBalance,
+        creditBalance: remaining,
       }
     }
     // Rail detected credentials but verification failed -> 401
@@ -542,7 +581,7 @@ for (const rail of rails) {
 // No rail detected credentials -> check free tier, then issue 402 challenge
 ```
 
-- [ ] **Step 3: Refactor challenge generation to use rails**
+- [ ] **Step 4: Refactor challenge generation to use rails**
 
 Replace the hardcoded invoice/macaroon generation (lines 117-163) with:
 
@@ -554,9 +593,8 @@ const challengeBody: Record<string, unknown> = {}
 const normalisedPrice = normalisedPricing[req.path] ?? { sats: defaultAmount }
 
 for (const rail of rails) {
-  // Skip rail if no price in its currency
-  if (rail.type === 'l402' && normalisedPrice.sats === undefined) continue
-  if (rail.type === 'x402' && normalisedPrice.usd === undefined) continue
+  // Skip rail if it can't handle this price — use canChallenge() if available
+  if (!rail.canChallenge?.(normalisedPrice)) continue
 
   const fragment = await rail.challenge(req.path, normalisedPrice)
   Object.assign(challengeHeaders, fragment.headers)
@@ -601,25 +639,49 @@ export function createTollBooth(config: TollBoothCoreConfig): TollBoothEngine {
   ]
   const normalisedPricing = normalisePricingTable(config.pricing ?? {})
   // ... rest of engine setup uses rails and normalisedPricing
+
+  // Update reconcile() to be currency-aware:
+  function reconcile(paymentHash: string, actualCost: number, currency?: Currency): ReconcileResult {
+    const estimated = estimatedCosts.get(paymentHash)
+    const effectiveCurrency = currency ?? estimated?.currency ?? 'sat'
+    const estimatedCost = estimated?.cost ?? 0
+    const delta = estimatedCost - actualCost
+    if (delta !== 0) {
+      storage.adjustCredits(paymentHash, delta, effectiveCurrency)
+    }
+    // ... cleanup stale entries (existing logic)
+  }
 }
 ```
 
-- [ ] **Step 5: Run ALL existing tests**
+- [ ] **Step 5: Update adapter code that calls reconcile()**
+
+In `toll-booth/src/adapters/express.ts`, `web-standard.ts`, and `hono.ts`, update reconcile calls to pass currency from the context. The currency comes from the `estimatedCosts` map (tracked when the rail verified the request), so adapters do not need to change — the engine's reconcile reads currency from the map internally. Verify this works by running existing tests.
+
+- [ ] **Step 6: Run ALL existing tests**
 
 Run: `cd /Users/darren/WebstormProjects/toll-booth && npx vitest run`
 Expected: ALL existing tests PASS. This is the critical gate — the refactor must be invisible to existing tests.
 
-- [ ] **Step 6: Fix any test failures**
+- [ ] **Step 7: Update test assertions for nested challenge body**
 
-If any tests fail, fix the engine implementation. Do NOT change existing tests — they are the correctness contract. Common issues:
-- Header casing differences
-- Missing event callbacks
-- reconcile() map key changes
-- Challenge body structure changes (existing tests may expect flat body, new structure nests under `l402`)
+The challenge body format intentionally changes from flat (`{ invoice, macaroon, ... }`) to nested (`{ l402: { invoice, macaroon, ... } }`). This is required for multi-rail support. Inventory and update all tests that assert on 402 body structure:
 
-**Important:** The challenge body format changes from flat (`{ invoice, macaroon, ... }`) to nested (`{ l402: { invoice, macaroon, ... } }`). Existing tests checking the 402 body will need updating to match the new structure. This is an intentional wire-format change needed for multi-rail support. Update tests to check `body.l402.invoice` instead of `body.invoice`.
+- `src/core/toll-booth.test.ts` — update `body.invoice` -> `body.l402.invoice`, `body.macaroon` -> `body.l402.macaroon`, etc.
+- `src/adapters/express.test.ts` — update 402 response body assertions
+- `src/adapters/web-standard.test.ts` — same
+- `src/adapters/hono.test.ts` — same
+- `src/e2e/*.integration.test.ts` — update all E2E 402 body checks
+- `src/booth.test.ts` — update all 402 body checks
 
-- [ ] **Step 7: Commit**
+This is a wire-format breaking change for consumers parsing the 402 body.
+
+- [ ] **Step 8: Run ALL tests after body format migration**
+
+Run: `cd /Users/darren/WebstormProjects/toll-booth && npx vitest run`
+Expected: ALL tests PASS
+
+- [ ] **Step 9: Commit**
 
 ```
 cd /Users/darren/WebstormProjects/toll-booth
@@ -862,7 +924,7 @@ Add to `toll-booth/src/storage/sqlite.test.ts`:
 ```typescript
 describe('dual-currency', () => {
   it('tracks sats and usd balances independently', () => {
-    const store = sqliteStorage(':memory:')
+    const store = sqliteStorage({ path: ':memory:' })
     store.settleWithCredit('hash-a', 1000)
     store.settleWithCredit('hash-b', 500, undefined, 'usd')
     expect(store.balance('hash-a')).toBe(1000)
@@ -871,7 +933,7 @@ describe('dual-currency', () => {
   })
 
   it('debits from correct currency column', () => {
-    const store = sqliteStorage(':memory:')
+    const store = sqliteStorage({ path: ':memory:' })
     store.settleWithCredit('hash-a', 1000, undefined, 'usd')
     store.debit('hash-a', 100, 'usd')
     expect(store.balance('hash-a', 'usd')).toBe(900)
@@ -880,7 +942,7 @@ describe('dual-currency', () => {
   })
 
   it('adjustCredits works with usd', () => {
-    const store = sqliteStorage(':memory:')
+    const store = sqliteStorage({ path: ':memory:' })
     store.settleWithCredit('hash-a', 1000, undefined, 'usd')
     store.adjustCredits('hash-a', -200, 'usd')
     expect(store.balance('hash-a', 'usd')).toBe(800)
@@ -1214,6 +1276,10 @@ export function createX402Rail(config: X402RailConfig): PaymentRail {
     type: 'x402',
     creditSupported: true,
 
+    canChallenge(price: PriceInfo): boolean {
+      return price.usd !== undefined
+    },
+
     detect(req: TollBoothRequest): boolean {
       return req.headers['x-payment'] !== undefined
     },
@@ -1400,6 +1466,17 @@ describe('x402 integration flow', () => {
     // Configure x402 with creditMode: false
     // Send valid payment -> success
     // Replay same payment -> rejected
+  })
+
+  it('x402 credit mode: payment -> macaroon -> L402 session (critical path)', async () => {
+    // This tests the spec's "key architectural insight":
+    // 1. Request with no credentials -> 402 with x402 option
+    // 2. Request with x-payment header -> engine settles via facilitator,
+    //    mints macaroon with currency=usd caveat, returns macaroon in response
+    // 3. Subsequent request with L402 macaroon -> debits from USD balance
+    // Verify: macaroon contains currency=usd caveat
+    // Verify: balance is tracked in USD cents
+    // Verify: subsequent L402 requests debit from USD balance
   })
 })
 ```
