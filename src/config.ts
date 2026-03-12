@@ -23,6 +23,8 @@ export interface TokenTollConfig {
   estimatedCostSats: number
   /** Maximum request body size in bytes. */
   maxBodySize: number
+  /** Auto-detected model IDs from upstream. */
+  models?: string[]
 }
 
 export interface CliArgs {
@@ -96,10 +98,11 @@ export function loadConfig(
     ?? file.capacity?.maxConcurrent
     ?? 0
 
-  const trustProxy = args.trustProxy
-    ?? (env.TRUST_PROXY === 'true')
-    ?? file.trustProxy
-    ?? false
+  const trustProxy = args.trustProxy !== undefined
+    ? args.trustProxy
+    : env.TRUST_PROXY !== undefined
+      ? env.TRUST_PROXY === 'true'
+      : file.trustProxy ?? false
 
   const tiers = file.tiers ?? []
 

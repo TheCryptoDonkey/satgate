@@ -27,13 +27,26 @@ function parseArgs(argv: string[]): CliArgs {
 }
 
 function loadFileConfig(path?: string): Record<string, unknown> {
-  const configPath = path ?? (existsSync('token-toll.yaml') ? 'token-toll.yaml' : undefined)
+  const configPath = path
+    ?? (existsSync('token-toll.json') ? 'token-toll.json' : undefined)
+    ?? (existsSync('token-toll.yaml') ? 'token-toll.yaml' : undefined)
   if (!configPath) return {}
   try {
     const content = readFileSync(configPath, 'utf-8')
-    return JSON.parse(content)
+    if (configPath.endsWith('.json')) {
+      return JSON.parse(content)
+    }
+    // YAML config requires js-yaml; fall back to JSON parse for .yaml files
+    // that happen to be valid JSON, otherwise warn
+    try {
+      return JSON.parse(content)
+    } catch {
+      console.warn(`[token-toll] YAML config requires 'js-yaml' package. Use JSON format or install js-yaml.`)
+      console.warn(`[token-toll] Ignoring config file: ${configPath}`)
+      return {}
+    }
   } catch {
-    console.warn(`[token-toll] Could not parse config file: ${configPath}`)
+    console.warn(`[token-toll] Could not read config file: ${configPath}`)
     return {}
   }
 }
@@ -83,11 +96,17 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     console.warn('[token-toll] Could not auto-detect models from upstream')
   }
 
-  const { app } = createTokenTollServer(config)
+  const { app } = createTokenTollServer({ ...config, models })
+
+  let version = '0.1.0'
+  try {
+    const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf-8'))
+    version = pkg.version
+  } catch { /* ignore */ }
 
   serve({ fetch: app.fetch, port: config.port }, () => {
     console.log(`
-  token-toll v0.1.0
+  token-toll v${version}
 
   > Upstream:    ${config.upstream}
   > Models:      ${models.length > 0 ? models.join(', ') : '(none detected)'}

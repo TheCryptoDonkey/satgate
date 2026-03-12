@@ -37,14 +37,33 @@ export function createProxyHandler(deps: ProxyDeps) {
       )
     }
 
+    let streamingResponse = false
     try {
+      // Enforce body size limit
+      const contentLength = req.headers.get('content-length')
+      if (contentLength !== null) {
+        const len = parseInt(contentLength, 10)
+        if (!Number.isFinite(len) || len > deps.maxBodySize) {
+          return new Response(
+            JSON.stringify({ error: 'Request body too large' }),
+            { status: 413, headers: { 'Content-Type': 'application/json' } },
+          )
+        }
+      }
+
       // Parse the request body to extract model name
       const bodyText = await req.text()
+      if (new TextEncoder().encode(bodyText).byteLength > deps.maxBodySize) {
+        return new Response(
+          JSON.stringify({ error: 'Request body too large' }),
+          { status: 413, headers: { 'Content-Type': 'application/json' } },
+        )
+      }
+
       let body: Record<string, unknown>
       try {
         body = JSON.parse(bodyText)
       } catch {
-        deps.capacity.release()
         return new Response(
           JSON.stringify({ error: 'Invalid JSON body' }),
           { status: 400, headers: { 'Content-Type': 'application/json' } },
@@ -98,11 +117,16 @@ export function createProxyHandler(deps: ProxyDeps) {
       // Handle streaming response
       if (isStreaming && upstreamRes.body) {
         const { readable } = createStreamingProxy(upstreamRes.body, (tokenCount) => {
+          // Release capacity slot when stream ends (not in finally)
+          deps.capacity.release()
           if (paymentHash) {
             const satCost = tokenCostToSats(tokenCount, pricePerThousand)
             deps.reconcile(paymentHash, satCost)
           }
         })
+
+        // Mark as streaming so finally doesn't double-release
+        streamingResponse = true
 
         return new Response(readable, {
           status: 200,
@@ -132,7 +156,10 @@ export function createProxyHandler(deps: ProxyDeps) {
         headers: { 'Content-Type': 'application/json' },
       })
     } finally {
-      deps.capacity.release()
+      // Streaming responses release capacity in the onComplete callback
+      if (!streamingResponse) {
+        deps.capacity.release()
+      }
     }
   }
 }

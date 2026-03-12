@@ -3,6 +3,7 @@ import type { Context } from 'hono'
 import {
   createTollBooth,
   memoryStorage,
+  sqliteStorage,
 } from '@thecryptodonkey/toll-booth'
 import { createHonoTollBooth } from '@thecryptodonkey/toll-booth/hono'
 import type { TollBoothEnv } from '@thecryptodonkey/toll-booth/hono'
@@ -23,7 +24,9 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
   const capacity = new CapacityTracker(config.capacity.maxConcurrent)
 
   // Create storage
-  const storage = memoryStorage()
+  const storage = config.storage === 'sqlite'
+    ? sqliteStorage({ path: config.dbPath })
+    : memoryStorage()
 
   // Create toll-booth engine
   const engine = createTollBooth({
@@ -52,7 +55,7 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
   app.route('/', paymentApp)
 
   // Discoverability endpoints (no auth required)
-  const models: string[] = []
+  const models: string[] = config.models ?? []
 
   app.get('/.well-known/l402', (c) => {
     return c.json(generateWellKnown({
