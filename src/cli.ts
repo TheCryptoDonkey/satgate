@@ -131,13 +131,14 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     }
   }
 
-  let config = loadConfig(args, process.env as Record<string, string>, fileConfig)
-
+  // Load allowlist file before config validation so --allowlist-file works standalone
   if (args.allowlistFile) {
     const content = readFileSync(args.allowlistFile, 'utf-8')
     const entries = content.split('\n').map(l => l.trim()).filter(Boolean)
-    config = { ...config, allowlist: [...config.allowlist, ...entries] }
+    args.allowlist = [...(args.allowlist ?? []), ...entries]
   }
+
+  const config = loadConfig(args, process.env as Record<string, string>, fileConfig)
 
   // Auto-detect models from upstream
   let models: string[] = []
