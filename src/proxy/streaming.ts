@@ -13,6 +13,13 @@ export function createStreamingProxy(
 ): { readable: ReadableStream<Uint8Array> } {
   const counter = new TokenCounter()
   const decoder = new TextDecoder()
+  let completed = false
+
+  function finish() {
+    if (completed) return
+    completed = true
+    onComplete(counter.finalCount())
+  }
 
   const transform = new TransformStream<Uint8Array, Uint8Array>({
     transform(chunk, controller) {
@@ -21,12 +28,13 @@ export function createStreamingProxy(
       counter.ingestSSEChunk(text)
     },
     flush() {
-      onComplete(counter.finalCount())
+      finish()
     },
   })
 
   upstream.pipeTo(transform.writable).catch(() => {
-    // Upstream closed or errored - flush will still be called
+    // Upstream errored before flush — still release resources (capacity slots, reconciliation).
+    finish()
   })
 
   return { readable: transform.readable }

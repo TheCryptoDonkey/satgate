@@ -244,6 +244,68 @@ describe('AI proxy handler', () => {
     expect(res.status).toBe(413)
   })
 
+  it('rejects JSON array body', async () => {
+    const deps: ProxyDeps = {
+      upstream: upstreamUrl,
+      pricing,
+      capacity: new CapacityTracker(0),
+      reconcile: vi.fn(),
+      maxBodySize: 10 * 1024 * 1024,
+    }
+
+    const handler = createProxyHandler(deps)
+    const req = new Request(`${upstreamUrl}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify([{ model: 'llama3' }]),
+    })
+
+    const res = await handler(req, undefined)
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toContain('JSON object')
+  })
+
+  it('rejects JSON null body', async () => {
+    const deps: ProxyDeps = {
+      upstream: upstreamUrl,
+      pricing,
+      capacity: new CapacityTracker(0),
+      reconcile: vi.fn(),
+      maxBodySize: 10 * 1024 * 1024,
+    }
+
+    const handler = createProxyHandler(deps)
+    const req = new Request(`${upstreamUrl}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: 'null',
+    })
+
+    const res = await handler(req, undefined)
+    expect(res.status).toBe(400)
+  })
+
+  it('rejects JSON string body', async () => {
+    const deps: ProxyDeps = {
+      upstream: upstreamUrl,
+      pricing,
+      capacity: new CapacityTracker(0),
+      reconcile: vi.fn(),
+      maxBodySize: 10 * 1024 * 1024,
+    }
+
+    const handler = createProxyHandler(deps)
+    const req = new Request(`${upstreamUrl}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '"hello"',
+    })
+
+    const res = await handler(req, undefined)
+    expect(res.status).toBe(400)
+  })
+
   it('skips reconciliation when flatPricing is true (streaming)', async () => {
     let reconcileCalled = false
     const capacity = new CapacityTracker(0)

@@ -105,8 +105,21 @@ export function loadConfig(
   if (!upstream) {
     throw new Error('upstream URL is required (--upstream or UPSTREAM_URL)')
   }
+  try {
+    const parsed = new URL(upstream)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      throw new Error('upstream URL must use http or https')
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('http or https')) throw e
+    throw new Error(`upstream URL is not a valid URL: ${upstream}`)
+  }
 
-  const port = args.port ?? (env.PORT ? parseInt(env.PORT, 10) : undefined) ?? file.port ?? 3000
+  const portRaw = args.port ?? (env.PORT ? parseInt(env.PORT, 10) : undefined) ?? file.port ?? 3000
+  if (!Number.isFinite(portRaw) || portRaw < 0 || portRaw > 65535) {
+    throw new Error(`Invalid port: ${portRaw} (must be 0–65535)`)
+  }
+  const port = portRaw
 
   const rootKeyRaw = args.rootKey ?? env.ROOT_KEY ?? file.rootKey
   const rootKeyGenerated = !rootKeyRaw
@@ -146,6 +159,9 @@ export function loadConfig(
   // (b) no pricing config exists at all (quick-start default).
   // Any file `pricing` block (even just `pricing.default`) opts into per-token mode.
   const flatPrice = args.price ?? file.price
+  if (flatPrice !== undefined && (!Number.isFinite(flatPrice) || flatPrice < 0)) {
+    throw new Error(`Invalid price: ${flatPrice} (must be a non-negative number)`)
+  }
   const hasPricingConfig = file.pricing !== undefined
   const flatPricing = flatPrice !== undefined || !hasPricingConfig
   const price = flatPrice ?? 1
@@ -154,11 +170,17 @@ export function loadConfig(
     ?? (env.FREE_TIER_REQUESTS ? parseInt(env.FREE_TIER_REQUESTS, 10) : undefined)
     ?? file.freeTier?.requestsPerDay
     ?? 0
+  if (!Number.isFinite(freeTierRequests) || freeTierRequests < 0) {
+    throw new Error(`Invalid free tier value: ${freeTierRequests} (must be a non-negative integer)`)
+  }
 
   const maxConcurrent = args.maxConcurrent
     ?? (env.MAX_CONCURRENT ? parseInt(env.MAX_CONCURRENT, 10) : undefined)
     ?? file.capacity?.maxConcurrent
     ?? 0
+  if (!Number.isFinite(maxConcurrent) || maxConcurrent < 0) {
+    throw new Error(`Invalid max concurrent value: ${maxConcurrent} (must be a non-negative integer)`)
+  }
 
   const trustProxy = args.trustProxy !== undefined
     ? args.trustProxy

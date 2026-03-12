@@ -12,6 +12,8 @@ export interface ProxyDeps {
   maxBodySize: number
   /** When true, skip token-based reconciliation — a flat per-request fee was charged upfront. */
   flatPricing?: boolean
+  /** Timeout in ms for upstream requests (default: 120_000). */
+  upstreamTimeout?: number
 }
 
 /**
@@ -73,7 +75,14 @@ export function createProxyHandler(deps: ProxyDeps) {
 
       let body: Record<string, unknown>
       try {
-        body = JSON.parse(bodyText)
+        const parsed = JSON.parse(bodyText)
+        if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+          return new Response(
+            JSON.stringify({ error: 'Request body must be a JSON object' }),
+            { status: 400, headers: { 'Content-Type': 'application/json' } },
+          )
+        }
+        body = parsed
       } catch {
         return new Response(
           JSON.stringify({ error: 'Invalid JSON body' }),
@@ -95,12 +104,14 @@ export function createProxyHandler(deps: ProxyDeps) {
       const upstreamUrl = `${deps.upstream}${url.pathname}`
 
       // Fetch from upstream
+      const timeout = deps.upstreamTimeout ?? 120_000
       let upstreamRes: Response
       try {
         upstreamRes = await fetch(upstreamUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
+          signal: AbortSignal.timeout(timeout),
         })
       } catch (err) {
         // Upstream unreachable - refund estimated cost

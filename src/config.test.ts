@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { loadConfig, type TokenTollConfig } from './config.js'
+import { loadConfig } from './config.js'
 
 describe('loadConfig', () => {
   it('returns defaults when no config provided', () => {
@@ -249,6 +249,53 @@ describe('loadConfig', () => {
       upstream: 'http://localhost:11434',
       authMode: 'magic',
     })).toThrow(/Invalid auth mode/)
+  })
+
+  it('rejects invalid upstream URL scheme', () => {
+    expect(() => loadConfig({
+      upstream: 'ftp://localhost:11434',
+    })).toThrow(/http or https/)
+  })
+
+  it('rejects non-URL upstream', () => {
+    expect(() => loadConfig({
+      upstream: 'not a url',
+    })).toThrow(/not a valid URL/)
+  })
+
+  it('rejects NaN port', () => {
+    expect(() => loadConfig({
+      upstream: 'http://localhost:11434',
+      port: NaN,
+    })).toThrow(/Invalid port/)
+  })
+
+  it('rejects port out of range', () => {
+    expect(() => loadConfig({
+      upstream: 'http://localhost:11434',
+      port: 70000,
+    })).toThrow(/Invalid port/)
+  })
+
+  it('rejects negative price', () => {
+    expect(() => loadConfig({
+      upstream: 'http://localhost:11434',
+      price: -5,
+    })).toThrow(/Invalid price/)
+  })
+
+  it('rejects NaN free tier', () => {
+    expect(() => loadConfig({
+      upstream: 'http://localhost:11434',
+      freeTier: NaN,
+    })).toThrow(/Invalid free tier/)
+  })
+
+  it('rejects NaN max concurrent', () => {
+    expect(() => loadConfig({
+      upstream: 'http://localhost:11434',
+      maxConcurrent: NaN,
+    })).toThrow(/Invalid max concurrent/)
   })
 
   it('reads tunnel config from env and CLI', () => {

@@ -70,4 +70,39 @@ describe('createStreamingProxy', () => {
     await collectStream(readable)
     expect(onComplete).toHaveBeenCalledWith(0)
   })
+
+  it('calls onComplete even when upstream stream errors', async () => {
+    const errorStream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"hi"}}]}\n\n'))
+        controller.error(new Error('upstream died'))
+      },
+    })
+    const onComplete = vi.fn()
+    const { readable } = createStreamingProxy(errorStream, onComplete)
+
+    // The readable side will error, but onComplete should still fire
+    try {
+      await collectStream(readable)
+    } catch {
+      // expected
+    }
+
+    // Give the catch handler time to fire
+    await new Promise((r) => setTimeout(r, 50))
+    expect(onComplete).toHaveBeenCalledTimes(1)
+  })
+
+  it('calls onComplete exactly once on normal completion', async () => {
+    const events = [
+      'data: {"choices":[{"delta":{"content":"ok"}}]}\n\n',
+      'data: [DONE]\n\n',
+    ]
+    const onComplete = vi.fn()
+    const { readable } = createStreamingProxy(makeSSEStream(events), onComplete)
+    await collectStream(readable)
+    // Small delay to ensure no double-call from catch
+    await new Promise((r) => setTimeout(r, 50))
+    expect(onComplete).toHaveBeenCalledTimes(1)
+  })
 })
