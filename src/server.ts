@@ -88,14 +88,19 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
     })
   })
 
-  // /v1/models passes through without auth
+  // /v1/models passes through without auth — cached for 60s to prevent upstream amplification
+  let modelsCache: { data: Record<string, unknown>; expires: number } | undefined
   app.get('/v1/models', async (c) => {
+    if (modelsCache && Date.now() < modelsCache.expires) {
+      return c.json(modelsCache.data)
+    }
     try {
       const res = await fetch(`${config.upstream}/v1/models`, {
         signal: AbortSignal.timeout(10_000),
       })
-      const body = await res.json()
-      return c.json(body as Record<string, unknown>)
+      const body = await res.json() as Record<string, unknown>
+      modelsCache = { data: body, expires: Date.now() + 60_000 }
+      return c.json(body)
     } catch {
       return c.json({ data: [] })
     }

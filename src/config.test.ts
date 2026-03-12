@@ -16,6 +16,12 @@ describe('loadConfig', () => {
     expect(() => loadConfig({})).toThrow(/upstream/)
   })
 
+  it('rejects non-HTTP upstream URL', () => {
+    expect(() => loadConfig({ upstream: 'ftp://example.com' })).toThrow(/Invalid upstream URL/)
+    expect(() => loadConfig({ upstream: 'file:///etc/passwd' })).toThrow(/Invalid upstream URL/)
+    expect(() => loadConfig({ upstream: 'not-a-url' })).toThrow(/Invalid upstream URL/)
+  })
+
   it('CLI args override env vars', () => {
     const config = loadConfig(
       { upstream: 'http://cli', port: 4000 },

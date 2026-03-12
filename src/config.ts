@@ -104,6 +104,9 @@ export function loadConfig(
   if (!upstream) {
     throw new Error('upstream URL is required (--upstream or UPSTREAM_URL)')
   }
+  if (!/^https?:\/\//i.test(upstream)) {
+    throw new Error(`Invalid upstream URL: ${upstream} (must start with http:// or https://)`)
+  }
 
   const port = args.port ?? (env.PORT ? parseInt(env.PORT, 10) : undefined) ?? file.port ?? 3000
 
