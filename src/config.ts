@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto'
+import { resolve, relative } from 'node:path'
 import type { LightningBackend } from '@thecryptodonkey/toll-booth'
 
 export interface ModelPricing {
@@ -111,8 +112,19 @@ export function loadConfig(
   const rootKeyGenerated = !rootKeyRaw
   const rootKey = rootKeyRaw ?? randomBytes(32).toString('hex')
 
-  const storage = (args.storage ?? env.STORAGE ?? file.storage ?? 'memory') as 'memory' | 'sqlite'
-  const dbPath = args.dbPath ?? env.TOKEN_TOLL_DB_PATH ?? file.dbPath ?? './token-toll.db'
+  const storageRaw = args.storage ?? env.STORAGE ?? file.storage ?? 'memory'
+  if (storageRaw !== 'memory' && storageRaw !== 'sqlite') {
+    throw new Error(`Invalid storage type: ${storageRaw} (must be 'memory' or 'sqlite')`)
+  }
+  const storage = storageRaw as 'memory' | 'sqlite'
+
+  const dbPathRaw = args.dbPath ?? env.TOKEN_TOLL_DB_PATH ?? file.dbPath ?? './token-toll.db'
+  const resolvedDbPath = resolve(dbPathRaw)
+  const relFromCwd = relative(process.cwd(), resolvedDbPath)
+  if (relFromCwd.startsWith('..')) {
+    throw new Error(`dbPath must be within the working directory (got: ${dbPathRaw})`)
+  }
+  const dbPath = dbPathRaw
 
   // Pricing: two separate concerns
   // 1. pricing.default / pricing.models — per-token pricing (config file users)
@@ -160,13 +172,22 @@ export function loadConfig(
   const maxBodySize = file.maxBodySize ?? 10 * 1024 * 1024 // 10 MiB
 
   // Lightning backend config
-  const lightning = (args.lightning ?? env.LIGHTNING_BACKEND ?? file.lightning) as TokenTollConfig['lightning']
+  const VALID_BACKENDS = ['phoenixd', 'lnbits', 'lnd', 'cln'] as const
+  const lightningRaw = args.lightning ?? env.LIGHTNING_BACKEND ?? file.lightning
+  if (lightningRaw && !VALID_BACKENDS.includes(lightningRaw as any)) {
+    throw new Error(`Invalid lightning backend: ${lightningRaw} (must be one of: ${VALID_BACKENDS.join(', ')})`)
+  }
+  const lightning = lightningRaw as TokenTollConfig['lightning']
   const lightningUrl = args.lightningUrl ?? env.LIGHTNING_URL ?? file.lightningUrl
     ?? (lightning ? LIGHTNING_URL_DEFAULTS[lightning] : undefined)
   const lightningKey = args.lightningKey ?? env.LIGHTNING_KEY ?? file.lightningKey
 
   // Auth mode inference
+  const VALID_AUTH_MODES = ['open', 'lightning', 'allowlist'] as const
   const explicitAuth = args.authMode ?? env.AUTH_MODE ?? file.auth
+  if (explicitAuth && !VALID_AUTH_MODES.includes(explicitAuth as any)) {
+    throw new Error(`Invalid auth mode: ${explicitAuth} (must be one of: ${VALID_AUTH_MODES.join(', ')})`)
+  }
   let authMode: TokenTollConfig['authMode']
   if (explicitAuth) {
     authMode = explicitAuth as TokenTollConfig['authMode']

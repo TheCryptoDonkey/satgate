@@ -132,4 +132,98 @@ describe('NIP-98 allowlist', () => {
     const result = checkAllowlist('Nostr !!!invalid!!!', ['a'.repeat(64)], { url, method }, now)
     expect(result.allowed).toBe(false)
   })
+
+  it('rejects NIP-98 event with tampered signature', () => {
+    const privKey = schnorr.utils.randomSecretKey()
+    const pubkey = bytesToHex(schnorr.getPublicKey(privKey))
+    const token = createNip98Token(privKey, url, method, now)
+    const decoded = JSON.parse(atob(token))
+    // Flip a byte in the signature
+    decoded.sig = 'ff' + decoded.sig.slice(2)
+    const tampered = btoa(JSON.stringify(decoded))
+
+    const result = checkAllowlist(`Nostr ${tampered}`, [pubkey], { url, method }, now)
+    expect(result.allowed).toBe(false)
+  })
+
+  it('rejects NIP-98 event with tampered id', () => {
+    const privKey = schnorr.utils.randomSecretKey()
+    const pubkey = bytesToHex(schnorr.getPublicKey(privKey))
+    const token = createNip98Token(privKey, url, method, now)
+    const decoded = JSON.parse(atob(token))
+    // Tamper with the id
+    decoded.id = 'ff' + decoded.id.slice(2)
+    const tampered = btoa(JSON.stringify(decoded))
+
+    const result = checkAllowlist(`Nostr ${tampered}`, [pubkey], { url, method }, now)
+    expect(result.allowed).toBe(false)
+  })
+
+  it('rejects NIP-98 event with wrong kind', () => {
+    const privKey = schnorr.utils.randomSecretKey()
+    const pubkey = bytesToHex(schnorr.getPublicKey(privKey))
+    // Build event with wrong kind
+    const event = {
+      pubkey,
+      created_at: now,
+      kind: 1, // not 27235
+      tags: [['u', url], ['method', method]],
+      content: '',
+    }
+    const serialised = JSON.stringify([0, event.pubkey, event.created_at, event.kind, event.tags, event.content])
+    const id = createHash('sha256').update(serialised).digest('hex')
+    const sig = bytesToHex(schnorr.sign(hexToBytes(id), privKey))
+    const token = btoa(JSON.stringify({ ...event, id, sig }))
+
+    const result = checkAllowlist(`Nostr ${token}`, [pubkey], { url, method }, now)
+    expect(result.allowed).toBe(false)
+  })
+
+  it('rejects NIP-98 event with missing u tag', () => {
+    const privKey = schnorr.utils.randomSecretKey()
+    const pubkey = bytesToHex(schnorr.getPublicKey(privKey))
+    const event = {
+      pubkey,
+      created_at: now,
+      kind: 27235,
+      tags: [['method', method]], // no 'u' tag
+      content: '',
+    }
+    const serialised = JSON.stringify([0, event.pubkey, event.created_at, event.kind, event.tags, event.content])
+    const id = createHash('sha256').update(serialised).digest('hex')
+    const sig = bytesToHex(schnorr.sign(hexToBytes(id), privKey))
+    const token = btoa(JSON.stringify({ ...event, id, sig }))
+
+    const result = checkAllowlist(`Nostr ${token}`, [pubkey], { url, method }, now)
+    expect(result.allowed).toBe(false)
+  })
+
+  it('rejects NIP-98 event with missing method tag', () => {
+    const privKey = schnorr.utils.randomSecretKey()
+    const pubkey = bytesToHex(schnorr.getPublicKey(privKey))
+    const event = {
+      pubkey,
+      created_at: now,
+      kind: 27235,
+      tags: [['u', url]], // no 'method' tag
+      content: '',
+    }
+    const serialised = JSON.stringify([0, event.pubkey, event.created_at, event.kind, event.tags, event.content])
+    const id = createHash('sha256').update(serialised).digest('hex')
+    const sig = bytesToHex(schnorr.sign(hexToBytes(id), privKey))
+    const token = btoa(JSON.stringify({ ...event, id, sig }))
+
+    const result = checkAllowlist(`Nostr ${token}`, [pubkey], { url, method }, now)
+    expect(result.allowed).toBe(false)
+  })
+
+  it('uses timing-safe comparison for Bearer tokens', () => {
+    // This test verifies the function works correctly — timing safety
+    // is ensured by the implementation using crypto.timingSafeEqual
+    const secrets = ['my-secret-token-abc']
+    const allowed = checkAllowlist('Bearer my-secret-token-abc', secrets, { url: '', method: '' })
+    expect(allowed.allowed).toBe(true)
+    const denied = checkAllowlist('Bearer my-secret-token-abd', secrets, { url: '', method: '' })
+    expect(denied.allowed).toBe(false)
+  })
 })

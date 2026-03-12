@@ -1,7 +1,7 @@
 import { schnorr } from '@noble/curves/secp256k1.js'
 import { hexToBytes } from '@noble/curves/utils.js'
 import { bech32 } from '@scure/base'
-import { createHash } from 'node:crypto'
+import { createHash, timingSafeEqual } from 'node:crypto'
 
 export interface AllowlistResult {
   allowed: boolean
@@ -57,6 +57,20 @@ function extractPubkeys(allowlist: string[]): string[] {
 }
 
 /**
+ * Constant-time string comparison to prevent timing attacks on Bearer tokens.
+ */
+function constantTimeEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a)
+  const bufB = Buffer.from(b)
+  if (bufA.length !== bufB.length) {
+    // Compare against self to keep constant time even on length mismatch
+    timingSafeEqual(bufA, bufA)
+    return false
+  }
+  return timingSafeEqual(bufA, bufB)
+}
+
+/**
  * Checks whether the Authorization header matches an entry in the allowlist.
  *
  * Identity types:
@@ -91,7 +105,8 @@ export function checkAllowlist(
     const secrets = allowlist.filter(
       entry => !entry.startsWith('npub1') && !HEX_PUBKEY_RE.test(entry),
     )
-    if (secrets.includes(credential)) {
+    const match = secrets.find(s => constantTimeEqual(s, credential))
+    if (match) {
       return { allowed: true, identity: credential.slice(0, 8) + '...' }
     }
     return { allowed: false }

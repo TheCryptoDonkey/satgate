@@ -182,6 +182,68 @@ describe('AI proxy handler', () => {
     expect(reconcileCalled).toBe(false)
   })
 
+  it('rejects request with missing Content-Type', async () => {
+    const deps: ProxyDeps = {
+      upstream: upstreamUrl,
+      pricing,
+      capacity: new CapacityTracker(0),
+      reconcile: vi.fn(),
+      maxBodySize: 10 * 1024 * 1024,
+    }
+
+    const handler = createProxyHandler(deps)
+    const req = new Request(`${upstreamUrl}/v1/chat/completions`, {
+      method: 'POST',
+      body: JSON.stringify({ model: 'llama3', messages: [] }),
+    })
+
+    const res = await handler(req, undefined)
+    expect(res.status).toBe(415)
+    const body = await res.json()
+    expect(body.error).toContain('Content-Type')
+  })
+
+  it('rejects request with wrong Content-Type', async () => {
+    const deps: ProxyDeps = {
+      upstream: upstreamUrl,
+      pricing,
+      capacity: new CapacityTracker(0),
+      reconcile: vi.fn(),
+      maxBodySize: 10 * 1024 * 1024,
+    }
+
+    const handler = createProxyHandler(deps)
+    const req = new Request(`${upstreamUrl}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ model: 'llama3', messages: [] }),
+    })
+
+    const res = await handler(req, undefined)
+    expect(res.status).toBe(415)
+  })
+
+  it('rejects request body exceeding maxBodySize', async () => {
+    const deps: ProxyDeps = {
+      upstream: upstreamUrl,
+      pricing,
+      capacity: new CapacityTracker(0),
+      reconcile: vi.fn(),
+      maxBodySize: 100, // very small
+    }
+
+    const handler = createProxyHandler(deps)
+    const largeBody = JSON.stringify({ model: 'llama3', messages: [{ role: 'user', content: 'x'.repeat(200) }] })
+    const req = new Request(`${upstreamUrl}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: largeBody,
+    })
+
+    const res = await handler(req, undefined)
+    expect(res.status).toBe(413)
+  })
+
   it('skips reconciliation when flatPricing is true (streaming)', async () => {
     let reconcileCalled = false
     const capacity = new CapacityTracker(0)

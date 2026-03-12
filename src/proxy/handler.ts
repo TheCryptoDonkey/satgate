@@ -41,6 +41,15 @@ export function createProxyHandler(deps: ProxyDeps) {
 
     let streamingResponse = false
     try {
+      // Validate Content-Type
+      const contentType = req.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        return new Response(
+          JSON.stringify({ error: 'Content-Type must be application/json' }),
+          { status: 415, headers: { 'Content-Type': 'application/json' } },
+        )
+      }
+
       // Enforce body size limit
       const contentLength = req.headers.get('content-length')
       if (contentLength !== null) {

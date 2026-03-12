@@ -207,6 +207,50 @@ describe('loadConfig', () => {
     expect(config.authMode).toBe('open')
   })
 
+  it('rejects invalid storage type', () => {
+    expect(() => loadConfig({
+      upstream: 'http://localhost:11434',
+      storage: 'redis',
+    })).toThrow(/Invalid storage type/)
+  })
+
+  it('rejects dbPath outside working directory', () => {
+    expect(() => loadConfig({
+      upstream: 'http://localhost:11434',
+      dbPath: '/etc/token-toll.db',
+    })).toThrow(/dbPath must be within the working directory/)
+  })
+
+  it('rejects dbPath with traversal', () => {
+    expect(() => loadConfig({
+      upstream: 'http://localhost:11434',
+      dbPath: '../../etc/token-toll.db',
+    })).toThrow(/dbPath must be within the working directory/)
+  })
+
+  it('accepts dbPath within cwd', () => {
+    const config = loadConfig({
+      upstream: 'http://localhost:11434',
+      dbPath: './data/token-toll.db',
+    })
+    expect(config.dbPath).toBe('./data/token-toll.db')
+  })
+
+  it('rejects invalid lightning backend', () => {
+    expect(() => loadConfig({
+      upstream: 'http://localhost:11434',
+      lightning: 'fakend',
+      lightningKey: 'key',
+    })).toThrow(/Invalid lightning backend/)
+  })
+
+  it('rejects invalid auth mode', () => {
+    expect(() => loadConfig({
+      upstream: 'http://localhost:11434',
+      authMode: 'magic',
+    })).toThrow(/Invalid auth mode/)
+  })
+
   it('reads tunnel config from env and CLI', () => {
     const withEnv = loadConfig(
       { upstream: 'http://localhost:11434' },
