@@ -47,5 +47,10 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/TheCryptoDonkey/token-toll"
+  },
+  "homepage": "https://github.com/TheCryptoDonkey/token-toll",
+  "author": "TheCryptoDonkey",
+  "bugs": {
+    "url": "https://github.com/TheCryptoDonkey/token-toll/issues"
   }
 }
