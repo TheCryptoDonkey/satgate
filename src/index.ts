@@ -1,1 +1,10 @@
-// Public API - populated as modules are implemented
+export { createTokenTollServer, type TokenTollServer } from './server.js'
+export { loadConfig, type TokenTollConfig, type CliArgs, type FileConfig, type ModelPricing } from './config.js'
+export { createProxyHandler, type ProxyDeps } from './proxy/handler.js'
+export { CapacityTracker } from './proxy/capacity.js'
+export { TokenCounter } from './proxy/token-counter.js'
+export { resolveModelPrice, tokenCostToSats } from './proxy/pricing.js'
+export { createStreamingProxy } from './proxy/streaming.js'
+export { generateWellKnown, type WellKnownInput } from './discovery/well-known.js'
+export { generateLlmsTxt, type LlmsTxtInput } from './discovery/llms-txt.js'
+export { generateOpenApiSpec, type OpenApiInput } from './discovery/openapi.js'
