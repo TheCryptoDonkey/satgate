@@ -5,6 +5,7 @@ import {
   memoryStorage,
   sqliteStorage,
 } from '@thecryptodonkey/toll-booth'
+import type { LightningBackend } from '@thecryptodonkey/toll-booth'
 import { createHonoTollBooth } from '@thecryptodonkey/toll-booth/hono'
 import type { TollBoothEnv } from '@thecryptodonkey/toll-booth/hono'
 import type { TokenTollConfig } from './config.js'
@@ -33,6 +34,7 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
     rootKey: config.rootKey,
     storage,
     upstream: config.upstream,
+    backend: config.backend,
     pricing: {
       '/v1/chat/completions': config.estimatedCostSats,
       '/v1/completions': config.estimatedCostSats,
@@ -51,6 +53,7 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
     rootKey: config.rootKey,
     tiers: config.tiers,
     defaultAmount: config.tiers[0]?.amountSats ?? 1000,
+    backend: config.backend,
   })
   app.route('/', paymentApp)
 
@@ -102,6 +105,7 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
     capacity,
     reconcile: (paymentHash, actualCost) => engine.reconcile(paymentHash, actualCost),
     maxBodySize: config.maxBodySize,
+    flatPricing: config.flatPricing,
   })
 
   app.use('/v1/*', tollBooth.authMiddleware)

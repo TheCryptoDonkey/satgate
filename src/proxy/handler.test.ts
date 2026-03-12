@@ -159,4 +159,54 @@ describe('AI proxy handler', () => {
     expect(res.status).toBe(502)
     expect(reconcile).toHaveBeenCalledWith('test-payment-hash', 0)
   })
+
+  it('skips reconciliation when flatPricing is true (non-streaming)', async () => {
+    let reconcileCalled = false
+    const capacity = new CapacityTracker(0)
+    const handler = createProxyHandler({
+      upstream: upstreamUrl,
+      pricing: { default: 1, models: {} },
+      capacity,
+      reconcile: () => { reconcileCalled = true; return { adjusted: false, newBalance: 0, delta: 0 } },
+      maxBodySize: 10 * 1024 * 1024,
+      flatPricing: true,
+    })
+
+    const req = new Request(`http://test/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'test', messages: [] }),
+    })
+    await handler(req, 'a'.repeat(64))
+
+    expect(reconcileCalled).toBe(false)
+  })
+
+  it('skips reconciliation when flatPricing is true (streaming)', async () => {
+    let reconcileCalled = false
+    const capacity = new CapacityTracker(0)
+    const handler = createProxyHandler({
+      upstream: upstreamUrl,
+      pricing: { default: 1, models: {} },
+      capacity,
+      reconcile: () => { reconcileCalled = true; return { adjusted: false, newBalance: 0, delta: 0 } },
+      maxBodySize: 10 * 1024 * 1024,
+      flatPricing: true,
+    })
+
+    const req = new Request(`http://test/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'test', messages: [], stream: true }),
+    })
+    const res = await handler(req, 'a'.repeat(64))
+
+    // Consume stream to trigger onComplete
+    if (res.body) {
+      const reader = res.body.getReader()
+      while (!(await reader.read()).done) { /* drain */ }
+    }
+
+    expect(reconcileCalled).toBe(false)
+  })
 })

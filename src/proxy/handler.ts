@@ -10,6 +10,8 @@ export interface ProxyDeps {
   capacity: CapacityTracker
   reconcile: (paymentHash: string, actualCost: number) => { adjusted: boolean; newBalance: number; delta: number }
   maxBodySize: number
+  /** When true, skip token-based reconciliation — a flat per-request fee was charged upfront. */
+  flatPricing?: boolean
 }
 
 /**
@@ -119,7 +121,7 @@ export function createProxyHandler(deps: ProxyDeps) {
         const { readable } = createStreamingProxy(upstreamRes.body, (tokenCount) => {
           // Release capacity slot when stream ends (not in finally)
           deps.capacity.release()
-          if (paymentHash) {
+          if (!deps.flatPricing && paymentHash) {
             const satCost = tokenCostToSats(tokenCount, pricePerThousand)
             deps.reconcile(paymentHash, satCost)
           }
@@ -147,7 +149,7 @@ export function createProxyHandler(deps: ProxyDeps) {
       const tokenCount = counter.finalCount()
       const satCost = tokenCostToSats(tokenCount, pricePerThousand)
 
-      if (paymentHash) {
+      if (!deps.flatPricing && paymentHash) {
         deps.reconcile(paymentHash, satCost)
       }
 
