@@ -1,0 +1,122 @@
+# token-toll
+
+> token-toll is a pay-per-token inference proxy for any OpenAI-compatible endpoint — Ollama, vLLM, llama.cpp, or any API that speaks the OpenAI format. Clients pay per token using Lightning, Cashu, or NWC (Nostr Wallet Connect); no accounts, no API keys, instant settlement. Stablecoin payments via x402 are coming. Powered by toll-booth under the hood.
+
+One command turns a local inference server into a billable API endpoint. token-toll auto-detects your models, issues L402 payment challenges, proxies requests once paid, counts actual tokens from the response, and reconciles any overpayment back to the client's credit balance.
+
+## Getting Started
+
+```bash
+npx token-toll --upstream http://localhost:11434
+```
+
+That's all that's needed. token-toll queries `/v1/models` on startup, begins accepting payments, and proxies inference traffic to your backend. For production, create `token-toll.yaml`:
+
+```yaml
+upstream: http://localhost:11434
+port: 3000
+storage: sqlite
+dbPath: ./token-toll.db
+
+pricing:
+  default: 1          # sats per 1k tokens for unlisted models
+  models:
+    llama3: 1
+    deepseek-r1: 5
+    mixtral-8x22b: 3
+
+freeTier:
+  requestsPerDay: 5
+
+capacity:
+  maxConcurrent: 4
+
+tiers:
+  - amountSats: 1000
+    creditSats: 1000
+    label: "1,000 sats"
+  - amountSats: 5000
+    creditSats: 5500
+    label: "5,000 sats (10% bonus)"
+  - amountSats: 10000
+    creditSats: 11100
+    label: "10,000 sats (11% bonus)"
+```
+
+## Key Concepts
+
+- **Model pricing** — per-model rates in sats per 1,000 tokens. Unlisted models fall back to the `default` rate. Resolution order: exact match → case-insensitive match → Ollama tag stripping (`llama3:latest` → `llama3`) → default. Token costs always round up so the operator is never short-changed.
+- **Token counting** — three priority sources. Priority 1: usage field from a buffered (non-streaming) JSON response. Priority 2: usage field from the final SSE chunk when `stream_options: { include_usage: true }` is set. Priority 3: content chunk count (1 chunk ≈ 1 token) as a fallback for streams that omit usage data.
+- **Capacity management** — `maxConcurrent` limits how many inference requests run simultaneously. Requests that arrive when all slots are occupied receive a 503. Set to `0` to disable the limit.
+- **Free tier** — optional per-IP daily allowance. Requests within the daily limit pass through without any payment challenge. Resets at midnight UTC.
+- **Payment tiers with volume discounts** — clients choose a tier amount when funding their balance. Each tier can grant bonus credit (e.g. pay 5,000 sats, receive 5,500 in credit), incentivising larger upfront payments.
+- **Cost reconciliation** — when a request arrives, an estimated sat amount is deducted from the client's balance upfront (based on model price and a configurable estimate). After the response completes and tokens are counted, the actual cost is reconciled. Any overpayment is credited back immediately.
+
+## Supported Inference Endpoints
+
+These endpoints require a valid L402 credential (pay once, use until credit runs out):
+
+- `POST /v1/chat/completions` — chat completions, streaming and buffered
+- `POST /v1/completions` — legacy text completions
+- `POST /v1/embeddings` — embedding generation
+
+## Discovery Endpoints
+
+These endpoints require no authentication and are designed for machine consumption:
+
+- `GET /.well-known/l402` — machine-readable service descriptor: pricing per model, available tiers, payment methods, and model list
+- `GET /llms.txt` — this file, served dynamically with live pricing and model data
+- `GET /openapi.json` — OpenAPI 3.1 specification for client code generation
+- `GET /v1/models` — standard OpenAI model listing, proxied transparently from upstream
+
+## Configuration
+
+Configuration precedence: **CLI flags > environment variables > config file > defaults**.
+
+### CLI flags
+
+| Flag | Description |
+|------|-------------|
+| `--upstream <url>` | Upstream inference URL (required) |
+| `--port <n>` | Port to listen on (default: 3000) |
+| `--config <path>` | Path to YAML config file |
+| `--price <n>` | Default sats per 1k tokens (default: 1) |
+| `--max-concurrent <n>` | Max concurrent requests (default: 0 = unlimited) |
+| `--storage <type>` | `memory` or `sqlite` (default: memory) |
+| `--free-tier <n>` | Free requests per IP per day (default: 0) |
+| `--root-key <hex>` | Root key for macaroon signing (auto-generated if omitted) |
+
+### Environment variables
+
+| Variable | Description |
+|----------|-------------|
+| `UPSTREAM_URL` | Upstream inference URL |
+| `ROOT_KEY` | Root key for macaroon signing |
+| `PORT` | Port to listen on |
+| `STORAGE` | `memory` or `sqlite` |
+| `DEFAULT_PRICE` | Default sats per 1k tokens |
+| `FREE_TIER_REQUESTS` | Free requests per IP per day |
+| `MAX_CONCURRENT` | Max concurrent inference requests |
+
+### YAML config file
+
+The config file (default: `token-toll.yaml` in the working directory) accepts all of the above plus:
+
+- `dbPath` — path to the SQLite database file
+- `tiers` — array of `{ amountSats, creditSats, label }` objects for volume discount tiers
+- `trustProxy` — set `true` when running behind a reverse proxy (uses `X-Forwarded-For` for free tier tracking)
+- `estimatedCostSats` — sat amount to hold per request before token count is known (default: `max(defaultPrice * 10, 10)`)
+- `maxBodySize` — maximum request body size in bytes (default: 10 MiB)
+
+## Ecosystem
+
+token-toll is built on top of **toll-booth** — L402 payment middleware that handles the full invoice → credential → credit flow. toll-booth is payment-rail agnostic and supports Lightning (Phoenixd, LND, Core Lightning, LNbits, Alby), Cashu ecash, and NWC. token-toll adds the inference-specific layer: model detection, token counting, cost reconciliation, and capacity management.
+
+The natural client counterpart is **l402-mcp** — an MCP server that lets AI agents discover L402 APIs (via `/.well-known/l402`), pay invoices from a connected wallet, and consume the API — all autonomously, with no human in the loop.
+
+```
+AI Agent -> l402-mcp -> token-toll -> Your inference backend
+```
+
+- toll-booth: https://github.com/TheCryptoDonkey/toll-booth
+- l402-mcp: https://github.com/TheCryptoDonkey/l402-mcp
