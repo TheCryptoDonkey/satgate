@@ -18,8 +18,12 @@
     "build": "tsc",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "dev": "tsx src/cli.ts"
+    "dev": "tsx src/cli.ts",
+    "prepublishOnly": "npm run build"
   },
+  "files": [
+    "dist"
+  ],
   "engines": {
     "node": ">=22.0.0"
   },
