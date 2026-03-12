@@ -67,4 +67,157 @@ describe('loadConfig', () => {
     expect(config.rootKey).toBe(key)
     expect(config.rootKeyGenerated).toBe(false)
   })
+
+  it('accepts lightning config from CLI args', () => {
+    const config = loadConfig({
+      upstream: 'http://localhost:11434',
+      lightning: 'phoenixd',
+      lightningKey: 'mypassword',
+    })
+    expect(config.lightning).toBe('phoenixd')
+    expect(config.lightningUrl).toBe('http://localhost:9740')
+    expect(config.lightningKey).toBe('mypassword')
+  })
+
+  it('defaults lightning URL per backend', () => {
+    const phoenixd = loadConfig({ upstream: 'http://x', lightning: 'phoenixd', lightningKey: 'pw' })
+    expect(phoenixd.lightningUrl).toBe('http://localhost:9740')
+
+    const lnbits = loadConfig({ upstream: 'http://x', lightning: 'lnbits', lightningKey: 'k' })
+    expect(lnbits.lightningUrl).toBe('https://legend.lnbits.com')
+
+    const lnd = loadConfig({ upstream: 'http://x', lightning: 'lnd', lightningKey: 'mac' })
+    expect(lnd.lightningUrl).toBe('https://localhost:8080')
+
+    const cln = loadConfig({ upstream: 'http://x', lightning: 'cln', lightningKey: 'rune' })
+    expect(cln.lightningUrl).toBe('http://localhost:3010')
+  })
+
+  it('infers auth mode from lightning flag', () => {
+    const config = loadConfig({
+      upstream: 'http://localhost:11434',
+      lightning: 'phoenixd',
+      lightningKey: 'pw',
+    })
+    expect(config.authMode).toBe('lightning')
+  })
+
+  it('defaults auth mode to open when no lightning', () => {
+    const config = loadConfig({ upstream: 'http://localhost:11434' })
+    expect(config.authMode).toBe('open')
+  })
+
+  it('allows explicit auth mode override', () => {
+    const config = loadConfig({
+      upstream: 'http://localhost:11434',
+      lightning: 'phoenixd',
+      lightningKey: 'pw',
+      authMode: 'open',
+    })
+    expect(config.authMode).toBe('open')
+  })
+
+  it('errors when auth is lightning but no lightning backend', () => {
+    expect(() => loadConfig({
+      upstream: 'http://localhost:11434',
+      authMode: 'lightning',
+    })).toThrow(/auth mode 'lightning' requires --lightning/)
+  })
+
+  it('errors when auth is allowlist but allowlist is empty', () => {
+    expect(() => loadConfig({
+      upstream: 'http://localhost:11434',
+      authMode: 'allowlist',
+    })).toThrow(/auth mode 'allowlist' requires --allowlist/)
+  })
+
+  it('accepts allowlist config', () => {
+    const config = loadConfig({
+      upstream: 'http://localhost:11434',
+      authMode: 'allowlist',
+      allowlist: ['npub1abc', 'secret123'],
+    })
+    expect(config.authMode).toBe('allowlist')
+    expect(config.allowlist).toEqual(['npub1abc', 'secret123'])
+  })
+
+  it('sets flatPricing true when price is set via CLI args', () => {
+    const config = loadConfig({ upstream: 'http://localhost:11434', price: 5 })
+    expect(config.flatPricing).toBe(true)
+    expect(config.price).toBe(5)
+    // pricing.default should NOT be affected by flat price
+    expect(config.pricing.default).toBe(1)
+  })
+
+  it('sets flatPricing false when pricing.models is in file config', () => {
+    const config = loadConfig(
+      { upstream: 'http://localhost:11434' },
+      {},
+      { pricing: { default: 2, models: { llama3: 3 } } },
+    )
+    expect(config.flatPricing).toBe(false)
+    // pricing.default should come from file config
+    expect(config.pricing.default).toBe(2)
+  })
+
+  it('sets flatPricing false when pricing.default is in file config (no models)', () => {
+    const config = loadConfig(
+      { upstream: 'http://localhost:11434' },
+      {},
+      { pricing: { default: 2 } },
+    )
+    expect(config.flatPricing).toBe(false)
+    expect(config.pricing.default).toBe(2)
+  })
+
+  it('CLI --price wins over file pricing.models (flat mode)', () => {
+    const config = loadConfig(
+      { upstream: 'http://localhost:11434', price: 5 },
+      {},
+      { pricing: { default: 2, models: { llama3: 3 } } },
+    )
+    expect(config.flatPricing).toBe(true)
+    expect(config.price).toBe(5)
+    // per-token pricing still populated for advanced use
+    expect(config.pricing.default).toBe(2)
+    expect(config.pricing.models.llama3).toBe(3)
+  })
+
+  it('defaults to flat pricing with price=1 when no pricing configured', () => {
+    const config = loadConfig({ upstream: 'http://localhost:11434' })
+    expect(config.flatPricing).toBe(true)
+    expect(config.price).toBe(1)
+  })
+
+  it('reads lightning config from env vars', () => {
+    const config = loadConfig(
+      { upstream: 'http://localhost:11434' },
+      { LIGHTNING_BACKEND: 'lnbits', LIGHTNING_KEY: 'apikey', LIGHTNING_URL: 'https://my.lnbits.com' },
+    )
+    expect(config.lightning).toBe('lnbits')
+    expect(config.lightningKey).toBe('apikey')
+    expect(config.lightningUrl).toBe('https://my.lnbits.com')
+  })
+
+  it('reads auth mode from env var', () => {
+    const config = loadConfig(
+      { upstream: 'http://localhost:11434' },
+      { AUTH_MODE: 'open' },
+    )
+    expect(config.authMode).toBe('open')
+  })
+
+  it('reads tunnel config from env and CLI', () => {
+    const withEnv = loadConfig(
+      { upstream: 'http://localhost:11434' },
+      { TUNNEL: 'false' },
+    )
+    expect(withEnv.tunnel).toBe(false)
+
+    const withCli = loadConfig({
+      upstream: 'http://localhost:11434',
+      noTunnel: true,
+    })
+    expect(withCli.tunnel).toBe(false)
+  })
 })
