@@ -207,6 +207,31 @@ describe('loadConfig', () => {
     expect(config.authMode).toBe('open')
   })
 
+  it('rejects invalid port', () => {
+    expect(() => loadConfig({ upstream: 'http://x', port: -1 })).toThrow(/Invalid port/)
+    expect(() => loadConfig({ upstream: 'http://x', port: 70000 })).toThrow(/Invalid port/)
+    expect(() => loadConfig({ upstream: 'http://x', port: NaN })).toThrow(/Invalid port/)
+  })
+
+  it('rejects negative price', () => {
+    expect(() => loadConfig({ upstream: 'http://x', price: -5 })).toThrow(/Invalid price/)
+  })
+
+  it('rejects negative max-concurrent', () => {
+    expect(() => loadConfig({ upstream: 'http://x', maxConcurrent: -1 })).toThrow(/Invalid max-concurrent/)
+  })
+
+  it('rejects negative free-tier', () => {
+    expect(() => loadConfig({ upstream: 'http://x', freeTier: -1 })).toThrow(/Invalid free-tier/)
+  })
+
+  it('rejects NaN pricing default from env', () => {
+    expect(() => loadConfig(
+      { upstream: 'http://x' },
+      { DEFAULT_PRICE: 'not-a-number' },
+    )).toThrow(/Invalid pricing default/)
+  })
+
   it('reads tunnel config from env and CLI', () => {
     const withEnv = loadConfig(
       { upstream: 'http://localhost:11434' },

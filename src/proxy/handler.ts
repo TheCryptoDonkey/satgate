@@ -4,6 +4,11 @@ import { resolveModelPrice, tokenCostToSats } from './pricing.js'
 import type { CapacityTracker } from './capacity.js'
 import type { ModelPricing } from '../config.js'
 
+/** Maximum time to wait for the upstream to respond (connect + first byte). */
+const UPSTREAM_TIMEOUT_MS = 30_000
+/** Maximum size for non-streaming upstream response bodies (5 MiB). */
+const MAX_RESPONSE_SIZE = 5 * 1024 * 1024
+
 export interface ProxyDeps {
   upstream: string
   pricing: ModelPricing
@@ -12,6 +17,8 @@ export interface ProxyDeps {
   maxBodySize: number
   /** When true, skip token-based reconciliation — a flat per-request fee was charged upfront. */
   flatPricing?: boolean
+  /** Upstream request timeout in ms. Defaults to 30s. */
+  upstreamTimeoutMs?: number
 }
 
 /**
@@ -86,12 +93,14 @@ export function createProxyHandler(deps: ProxyDeps) {
       const upstreamUrl = `${deps.upstream}${url.pathname}`
 
       // Fetch from upstream
+      const timeoutMs = deps.upstreamTimeoutMs ?? UPSTREAM_TIMEOUT_MS
       let upstreamRes: Response
       try {
         upstreamRes = await fetch(upstreamUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
+          signal: AbortSignal.timeout(timeoutMs),
         })
       } catch (err) {
         // Upstream unreachable - refund estimated cost
@@ -105,12 +114,16 @@ export function createProxyHandler(deps: ProxyDeps) {
         )
       }
 
-      // If upstream returned an error, refund and forward the error
+      // If upstream returned an error, refund and forward a size-limited error body
       if (!upstreamRes.ok) {
         if (paymentHash) {
           deps.reconcile(paymentHash, 0)
         }
-        return new Response(upstreamRes.body, {
+        const errorBody = await upstreamRes.text()
+        const truncated = errorBody.length > MAX_RESPONSE_SIZE
+          ? errorBody.slice(0, MAX_RESPONSE_SIZE)
+          : errorBody
+        return new Response(truncated, {
           status: upstreamRes.status,
           headers: { 'Content-Type': upstreamRes.headers.get('content-type') ?? 'application/json' },
         })

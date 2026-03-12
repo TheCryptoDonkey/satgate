@@ -62,6 +62,35 @@ describe('checkAllowlist', () => {
   })
 })
 
+describe('timing-safe Bearer comparison', () => {
+  it('allows valid secret with timing-safe comparison', () => {
+    const result = checkAllowlist('Bearer my-secret-key', ['my-secret-key'], { url: '', method: '' })
+    expect(result.allowed).toBe(true)
+  })
+
+  it('rejects similar but different secret', () => {
+    const result = checkAllowlist('Bearer my-secret-kex', ['my-secret-key'], { url: '', method: '' })
+    expect(result.allowed).toBe(false)
+  })
+
+  it('rejects secret that is a prefix of the allowlist entry', () => {
+    const result = checkAllowlist('Bearer my-secret', ['my-secret-key'], { url: '', method: '' })
+    expect(result.allowed).toBe(false)
+  })
+
+  it('rejects secret that is a superstring of the allowlist entry', () => {
+    const result = checkAllowlist('Bearer my-secret-key-extra', ['my-secret-key'], { url: '', method: '' })
+    expect(result.allowed).toBe(false)
+  })
+
+  it('matches correct secret among multiple entries', () => {
+    const allowlist = ['secret-one', 'secret-two', 'secret-three']
+    const result = checkAllowlist('Bearer secret-two', allowlist, { url: '', method: '' })
+    expect(result.allowed).toBe(true)
+    expect(result.identity).toBe('secret-t...')
+  })
+})
+
 describe('NIP-98 allowlist', () => {
   const url = 'http://localhost:3000/v1/chat/completions'
   const method = 'POST'

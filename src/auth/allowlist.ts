@@ -1,7 +1,7 @@
 import { schnorr } from '@noble/curves/secp256k1.js'
 import { hexToBytes } from '@noble/curves/utils.js'
 import { bech32 } from '@scure/base'
-import { createHash } from 'node:crypto'
+import { createHash, timingSafeEqual } from 'node:crypto'
 
 export interface AllowlistResult {
   allowed: boolean
@@ -14,6 +14,16 @@ export interface RequestContext {
 }
 
 const HEX_PUBKEY_RE = /^[0-9a-f]{64}$/
+
+/**
+ * Constant-time string comparison to prevent timing attacks.
+ * Handles variable-length strings safely by comparing fixed-length SHA-256 hashes.
+ */
+function timingSafeCompare(a: string, b: string): boolean {
+  const hashA = createHash('sha256').update(a).digest()
+  const hashB = createHash('sha256').update(b).digest()
+  return timingSafeEqual(hashA, hashB)
+}
 
 interface NostrEvent {
   id: string
@@ -91,8 +101,10 @@ export function checkAllowlist(
     const secrets = allowlist.filter(
       entry => !entry.startsWith('npub1') && !HEX_PUBKEY_RE.test(entry),
     )
-    if (secrets.includes(credential)) {
-      return { allowed: true, identity: credential.slice(0, 8) + '...' }
+    for (const secret of secrets) {
+      if (timingSafeCompare(credential, secret)) {
+        return { allowed: true, identity: credential.slice(0, 8) + '...' }
+      }
     }
     return { allowed: false }
   }

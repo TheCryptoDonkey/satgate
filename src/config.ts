@@ -187,6 +187,23 @@ export function loadConfig(
   const tunnelEnv = env.TUNNEL !== undefined ? env.TUNNEL !== 'false' : undefined
   const tunnel = args.noTunnel === true ? false : (tunnelEnv ?? file.tunnel ?? true)
 
+  // Validate numeric ranges
+  if (!Number.isFinite(port) || port < 0 || port > 65535) {
+    throw new Error(`Invalid port: ${port} (must be 0–65535)`)
+  }
+  if (!Number.isFinite(price) || price < 0) {
+    throw new Error(`Invalid price: ${price} (must be non-negative)`)
+  }
+  if (!Number.isFinite(pricingDefault) || pricingDefault < 0) {
+    throw new Error(`Invalid pricing default: ${pricingDefault} (must be non-negative)`)
+  }
+  if (!Number.isFinite(maxConcurrent) || maxConcurrent < 0) {
+    throw new Error(`Invalid max-concurrent: ${maxConcurrent} (must be non-negative)`)
+  }
+  if (!Number.isFinite(freeTierRequests) || freeTierRequests < 0) {
+    throw new Error(`Invalid free-tier: ${freeTierRequests} (must be non-negative)`)
+  }
+
   return {
     upstream: upstream.replace(/\/+$/, ''),
     port,

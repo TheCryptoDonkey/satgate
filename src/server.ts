@@ -91,7 +91,9 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
   // /v1/models passes through without auth
   app.get('/v1/models', async (c) => {
     try {
-      const res = await fetch(`${config.upstream}/v1/models`)
+      const res = await fetch(`${config.upstream}/v1/models`, {
+        signal: AbortSignal.timeout(10_000),
+      })
       const body = await res.json()
       return c.json(body as Record<string, unknown>)
     } catch {
