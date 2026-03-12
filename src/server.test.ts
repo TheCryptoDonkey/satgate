@@ -50,6 +50,11 @@ describe('createTokenTollServer', () => {
       trustProxy: false,
       estimatedCostSats: 10,
       maxBodySize: 10 * 1024 * 1024,
+      authMode: 'lightning' as const,
+      allowlist: [],
+      flatPricing: false,
+      price: 1,
+      tunnel: false,
     })
 
     // Health check
@@ -79,5 +84,41 @@ describe('createTokenTollServer', () => {
       body: JSON.stringify({ model: 'llama3', messages: [] }),
     })
     expect(chatRes.status).toBe(402)
+  })
+
+  it('passes lightning backend to toll-booth when configured', async () => {
+    const mockBackend = {
+      createInvoice: async () => ({ bolt11: 'lnbc...', paymentHash: 'a'.repeat(64) }),
+      checkInvoice: async () => ({ paid: false }),
+    }
+
+    const { app } = createTokenTollServer({
+      upstream: upstreamUrl,
+      port: 0,
+      rootKey: 'a'.repeat(64),
+      rootKeyGenerated: false,
+      storage: 'memory',
+      dbPath: '',
+      pricing: { default: 1, models: {} },
+      freeTier: { requestsPerDay: 0 },
+      capacity: { maxConcurrent: 0 },
+      tiers: [{ amountSats: 1000, creditSats: 1000, label: '1k sats' }],
+      trustProxy: false,
+      estimatedCostSats: 10,
+      maxBodySize: 10 * 1024 * 1024,
+      authMode: 'lightning',
+      allowlist: [],
+      flatPricing: true,
+      price: 1,
+      tunnel: false,
+      backend: mockBackend,
+    })
+
+    const res = await app.request('/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'llama3', messages: [] }),
+    })
+    expect(res.status).toBe(402)
   })
 })
