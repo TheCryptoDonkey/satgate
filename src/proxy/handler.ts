@@ -125,15 +125,21 @@ export function createProxyHandler(deps: ProxyDeps) {
         )
       }
 
-      // If upstream returned an error, refund and forward the error
+      // If upstream returned an error, refund and return a generic error
+      // (don't forward raw upstream body — may leak internal details)
       if (!upstreamRes.ok) {
         if (paymentHash) {
           deps.reconcile(paymentHash, 0)
         }
-        return new Response(upstreamRes.body, {
-          status: upstreamRes.status,
-          headers: { 'Content-Type': upstreamRes.headers.get('content-type') ?? 'application/json' },
-        })
+        // Consume and discard the upstream error body to prevent connection leaks
+        await upstreamRes.body?.cancel().catch(() => {})
+        const status = upstreamRes.status >= 400 && upstreamRes.status < 600
+          ? upstreamRes.status
+          : 502
+        return new Response(
+          JSON.stringify({ error: `Upstream returned ${upstreamRes.status}` }),
+          { status, headers: { 'Content-Type': 'application/json' } },
+        )
       }
 
       // Handle streaming response
@@ -160,10 +166,27 @@ export function createProxyHandler(deps: ProxyDeps) {
         })
       }
 
-      // Handle non-streaming response
-      const responseBody = await upstreamRes.json()
+      // Handle non-streaming response — enforce size limit before parsing
+      const responseText = await upstreamRes.text()
+      if (new TextEncoder().encode(responseText).byteLength > deps.maxBodySize) {
+        if (paymentHash) deps.reconcile(paymentHash, 0)
+        return new Response(
+          JSON.stringify({ error: 'Upstream response too large' }),
+          { status: 502, headers: { 'Content-Type': 'application/json' } },
+        )
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let responseBody: any
+      try {
+        responseBody = JSON.parse(responseText)
+      } catch {
+        return new Response(
+          JSON.stringify({ error: 'Upstream returned invalid JSON' }),
+          { status: 502, headers: { 'Content-Type': 'application/json' } },
+        )
+      }
       const counter = new TokenCounter()
-      if (responseBody.usage) {
+      if (responseBody && typeof responseBody === 'object' && responseBody.usage) {
         counter.setBufferedUsage(responseBody.usage)
       }
       const tokenCount = counter.finalCount()

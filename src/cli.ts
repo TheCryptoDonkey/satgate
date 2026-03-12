@@ -45,7 +45,7 @@ function loadFileConfig(path?: string): Record<string, unknown> {
   try {
     const content = readFileSync(configPath, 'utf-8')
     if (configPath.endsWith('.yaml') || configPath.endsWith('.yml')) {
-      return yaml.load(content) as Record<string, unknown>
+      return yaml.load(content, { schema: yaml.JSON_SCHEMA }) as Record<string, unknown>
     }
     return JSON.parse(content)
   } catch {

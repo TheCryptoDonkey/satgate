@@ -202,6 +202,17 @@ export function loadConfig(
   const lightning = lightningRaw as TokenTollConfig['lightning']
   const lightningUrl = args.lightningUrl ?? env.LIGHTNING_URL ?? file.lightningUrl
     ?? (lightning ? LIGHTNING_URL_DEFAULTS[lightning] : undefined)
+  if (lightningUrl) {
+    try {
+      const parsed = new URL(lightningUrl)
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        throw new Error('lightning URL must use http or https')
+      }
+    } catch (e) {
+      if (e instanceof Error && e.message.includes('http or https')) throw e
+      throw new Error(`lightning URL is not a valid URL: ${lightningUrl}`)
+    }
+  }
   const lightningKey = args.lightningKey ?? env.LIGHTNING_KEY ?? file.lightningKey
 
   // Auth mode inference

@@ -48,13 +48,17 @@ export function startTunnel(port: number): Promise<TunnelResult> {
     })
 
     let stderr = ''
+    const MAX_STDERR = 64 * 1024 // 64 KiB cap to prevent unbounded memory growth
     const timeout = setTimeout(() => {
       if (!child.killed) child.kill('SIGTERM')
       resolve({ error: 'Tunnel startup timed out (10s)' })
     }, 10_000)
 
     child.stderr?.on('data', (chunk: Buffer) => {
-      stderr += chunk.toString()
+      if (stderr.length < MAX_STDERR) {
+        stderr += chunk.toString()
+        if (stderr.length > MAX_STDERR) stderr = stderr.slice(0, MAX_STDERR)
+      }
       const url = parseTunnelUrl(stderr)
       if (url) {
         clearTimeout(timeout)
