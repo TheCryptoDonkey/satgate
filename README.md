@@ -2,6 +2,8 @@
 
 [![MIT licence](https://img.shields.io/badge/licence-MIT-blue.svg)](./LICENSE)
 [![Nostr](https://img.shields.io/badge/Nostr-Zap%20me-purple)](https://primal.net/p/npub1mgvlrnf5hm9yf0n5mf9nqmvarhvxkc6remu5ec3vf8r0txqkuk7su0e7q2)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue)](https://www.typescriptlang.org/)
+[![Node](https://img.shields.io/badge/Node-%3E%3D22-green)](https://nodejs.org/)
 
 **Monetise any OpenAI-compatible endpoint in 30 seconds.**
 
@@ -149,6 +151,16 @@ const config = loadConfig(
 )
 const { app } = createTokenTollServer(config)
 ```
+
+---
+
+## Ecosystem
+
+| Project | Role |
+|---------|------|
+| [toll-booth](https://github.com/TheCryptoDonkey/toll-booth) | Payment-rail agnostic HTTP 402 middleware |
+| **[token-toll](https://github.com/TheCryptoDonkey/token-toll)** | **Pay-per-token AI inference proxy (built on toll-booth)** |
+| [l402-mcp](https://github.com/TheCryptoDonkey/l402-mcp) | MCP client — AI agents discover, pay, and consume L402 APIs |
 
 ---
 
