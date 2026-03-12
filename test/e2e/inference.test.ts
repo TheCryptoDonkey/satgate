@@ -63,6 +63,11 @@ describe('E2E: token-toll inference', () => {
       trustProxy: false,
       estimatedCostSats: 10,
       maxBodySize: 10 * 1024 * 1024,
+      authMode: 'lightning',
+      allowlist: [],
+      flatPricing: false,
+      price: 0,
+      tunnel: false,
     })
 
     const res = await app.request('/v1/chat/completions', {
@@ -88,6 +93,11 @@ describe('E2E: token-toll inference', () => {
       trustProxy: false,
       estimatedCostSats: 10,
       maxBodySize: 10 * 1024 * 1024,
+      authMode: 'lightning',
+      allowlist: [],
+      flatPricing: false,
+      price: 0,
+      tunnel: false,
     })
 
     // First request - free tier
@@ -122,6 +132,11 @@ describe('E2E: token-toll inference', () => {
       trustProxy: false,
       estimatedCostSats: 10,
       maxBodySize: 10 * 1024 * 1024,
+      authMode: 'lightning',
+      allowlist: [],
+      flatPricing: false,
+      price: 0,
+      tunnel: false,
     })
 
     const endpoints = ['/.well-known/l402', '/llms.txt', '/openapi.json', '/health', '/v1/models']
@@ -146,6 +161,11 @@ describe('E2E: token-toll inference', () => {
       trustProxy: false,
       estimatedCostSats: 10,
       maxBodySize: 10 * 1024 * 1024,
+      authMode: 'lightning',
+      allowlist: [],
+      flatPricing: false,
+      price: 0,
+      tunnel: false,
     })
 
     const res = await app.request('/create-invoice', {
