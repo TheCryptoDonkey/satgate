@@ -117,6 +117,20 @@ describe('loadConfig', () => {
     expect(config.authMode).toBe('open')
   })
 
+  it('rejects invalid auth mode', () => {
+    expect(() => loadConfig({
+      upstream: 'http://localhost:11434',
+      authMode: 'foobar',
+    })).toThrow(/Invalid auth mode/)
+  })
+
+  it('rejects typo in auth mode', () => {
+    expect(() => loadConfig({
+      upstream: 'http://localhost:11434',
+      authMode: 'alowlist',
+    })).toThrow(/Invalid auth mode/)
+  })
+
   it('errors when auth is lightning but no lightning backend', () => {
     expect(() => loadConfig({
       upstream: 'http://localhost:11434',

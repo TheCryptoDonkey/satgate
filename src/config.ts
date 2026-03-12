@@ -167,8 +167,12 @@ export function loadConfig(
 
   // Auth mode inference
   const explicitAuth = args.authMode ?? env.AUTH_MODE ?? file.auth
+  const validAuthModes = ['open', 'lightning', 'allowlist'] as const
   let authMode: TokenTollConfig['authMode']
   if (explicitAuth) {
+    if (!validAuthModes.includes(explicitAuth as typeof validAuthModes[number])) {
+      throw new Error(`Invalid auth mode '${explicitAuth}' (must be one of: ${validAuthModes.join(', ')})`)
+    }
     authMode = explicitAuth as TokenTollConfig['authMode']
     if (authMode === 'lightning' && !lightning) {
       throw new Error("auth mode 'lightning' requires --lightning <backend>")

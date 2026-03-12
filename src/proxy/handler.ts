@@ -22,6 +22,34 @@ export interface ProxyDeps {
 }
 
 /**
+ * Reads a response body up to maxBytes, then stops. Prevents OOM from huge upstream responses.
+ */
+async function readLimited(res: Response, maxBytes: number): Promise<string> {
+  if (!res.body) return ''
+  const reader = res.body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      total += value.byteLength
+      if (total > maxBytes) {
+        chunks.push(value.subarray(0, value.byteLength - (total - maxBytes)))
+        break
+      }
+      chunks.push(value)
+    }
+  } finally {
+    reader.releaseLock()
+    // Cancel any remaining body to free resources
+    res.body.cancel().catch(() => {})
+  }
+  const decoder = new TextDecoder()
+  return chunks.map(c => decoder.decode(c, { stream: true })).join('') + decoder.decode()
+}
+
+/**
  * Extracts the model name from an OpenAI-compatible request body.
  */
 function extractModel(body: Record<string, unknown>): string {
@@ -119,11 +147,8 @@ export function createProxyHandler(deps: ProxyDeps) {
         if (paymentHash) {
           deps.reconcile(paymentHash, 0)
         }
-        const errorBody = await upstreamRes.text()
-        const truncated = errorBody.length > MAX_RESPONSE_SIZE
-          ? errorBody.slice(0, MAX_RESPONSE_SIZE)
-          : errorBody
-        return new Response(truncated, {
+        const errorBody = await readLimited(upstreamRes, MAX_RESPONSE_SIZE)
+        return new Response(errorBody, {
           status: upstreamRes.status,
           headers: { 'Content-Type': upstreamRes.headers.get('content-type') ?? 'application/json' },
         })
