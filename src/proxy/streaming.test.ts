@@ -105,4 +105,20 @@ describe('createStreamingProxy', () => {
     await new Promise((r) => setTimeout(r, 50))
     expect(onComplete).toHaveBeenCalledTimes(1)
   })
+
+  it('times out on inactive upstream stream', async () => {
+    const onComplete = vi.fn()
+    const upstream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const encoder = new TextEncoder()
+        controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":"a"}}]}\n\n'))
+        // Never sends more data or closes — simulates a stalled upstream
+      },
+    })
+
+    const { readable } = createStreamingProxy(upstream, onComplete, 100) // 100ms timeout
+    await collectStream(readable)
+    expect(onComplete).toHaveBeenCalledTimes(1)
+    expect(onComplete).toHaveBeenCalledWith(1)
+  })
 })

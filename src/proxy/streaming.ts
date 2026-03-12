@@ -1,41 +1,72 @@
 import { TokenCounter } from './token-counter.js'
 
+/** Default inactivity timeout for streaming responses (2 minutes). */
+const DEFAULT_INACTIVITY_TIMEOUT_MS = 120_000
+
 /**
- * Creates a TransformStream that pipes SSE chunks through while counting tokens.
+ * Creates a ReadableStream that pipes upstream SSE chunks through while counting tokens.
  *
  * @param upstream - The upstream SSE ReadableStream
- * @param onComplete - Called with the final token count after the stream ends
- * @returns An object with the readable side of the transform stream
+ * @param onComplete - Called with the final token count after the stream ends or errors
+ * @param inactivityTimeoutMs - Max time between chunks before aborting (default: 120s)
+ * @returns An object with the readable side
  */
 export function createStreamingProxy(
   upstream: ReadableStream<Uint8Array>,
   onComplete: (tokenCount: number) => void,
+  inactivityTimeoutMs: number = DEFAULT_INACTIVITY_TIMEOUT_MS,
 ): { readable: ReadableStream<Uint8Array> } {
   const counter = new TokenCounter()
   const decoder = new TextDecoder()
-  let completed = false
+  let completeCalled = false
+  let inactivityTimer: ReturnType<typeof setTimeout> | undefined
 
   function finish() {
-    if (completed) return
-    completed = true
+    if (completeCalled) return
+    completeCalled = true
+    clearTimeout(inactivityTimer)
     onComplete(counter.finalCount())
   }
 
-  const transform = new TransformStream<Uint8Array, Uint8Array>({
-    transform(chunk, controller) {
-      controller.enqueue(chunk)
-      const text = decoder.decode(chunk, { stream: true })
-      counter.ingestSSEChunk(text)
+  const readable = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const reader = upstream.getReader()
+
+      function resetTimer() {
+        clearTimeout(inactivityTimer)
+        inactivityTimer = setTimeout(() => {
+          reader.cancel('inactivity timeout').catch(() => {})
+          controller.close()
+          finish()
+        }, inactivityTimeoutMs)
+      }
+
+      resetTimer()
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          resetTimer()
+          controller.enqueue(value)
+          const text = decoder.decode(value, { stream: true })
+          counter.ingestSSEChunk(text)
+        }
+        controller.close()
+      } catch {
+        // Upstream errored — close gracefully
+        try { controller.close() } catch { /* already closed */ }
+      } finally {
+        clearTimeout(inactivityTimer)
+        finish()
+      }
     },
-    flush() {
+    cancel() {
+      // Client disconnected
+      clearTimeout(inactivityTimer)
       finish()
     },
   })
 
-  upstream.pipeTo(transform.writable).catch(() => {
-    // Upstream errored before flush — still release resources (capacity slots, reconciliation).
-    finish()
-  })
-
-  return { readable: transform.readable }
+  return { readable }
 }

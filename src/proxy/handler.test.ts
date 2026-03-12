@@ -160,6 +160,132 @@ describe('AI proxy handler', () => {
     expect(reconcile).toHaveBeenCalledWith('test-payment-hash', 0)
   })
 
+  it('rejects oversized request body', async () => {
+    const deps: ProxyDeps = {
+      upstream: upstreamUrl,
+      pricing,
+      capacity: new CapacityTracker(0),
+      reconcile: vi.fn(),
+      maxBodySize: 100, // 100 bytes
+    }
+
+    const handler = createProxyHandler(deps)
+    const largeBody = JSON.stringify({ model: 'llama3', messages: [{ role: 'user', content: 'x'.repeat(200) }] })
+    const req = new Request(`${upstreamUrl}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': String(largeBody.length) },
+      body: largeBody,
+    })
+
+    const res = await handler(req, undefined)
+    expect(res.status).toBe(413)
+  })
+
+  it('rejects invalid JSON body', async () => {
+    const deps: ProxyDeps = {
+      upstream: upstreamUrl,
+      pricing,
+      capacity: new CapacityTracker(0),
+      reconcile: vi.fn(),
+      maxBodySize: 10 * 1024 * 1024,
+    }
+
+    const handler = createProxyHandler(deps)
+    const req = new Request(`${upstreamUrl}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: 'not-json',
+    })
+
+    const res = await handler(req, undefined)
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toBe('Invalid JSON body')
+  })
+
+  it('times out on slow upstream', async () => {
+    // Create a slow upstream that never responds
+    const slowApp = new Hono()
+    slowApp.post('/v1/chat/completions', async () => {
+      await new Promise((r) => setTimeout(r, 10_000))
+      return new Response('too late')
+    })
+
+    let slowServer: ReturnType<typeof serve>
+    let slowUrl: string
+    await new Promise<void>((resolve) => {
+      slowServer = serve({ fetch: slowApp.fetch, port: 0 }, (info) => {
+        slowUrl = `http://localhost:${info.port}`
+        resolve()
+      })
+    })
+
+    try {
+      const reconcile = vi.fn().mockReturnValue({ adjusted: true, newBalance: 1000, delta: 10 })
+      const handler = createProxyHandler({
+        upstream: slowUrl!,
+        pricing,
+        capacity: new CapacityTracker(0),
+        reconcile,
+        maxBodySize: 10 * 1024 * 1024,
+        upstreamTimeout: 100, // 100ms timeout
+      })
+
+      const req = new Request(`http://test/v1/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'test', messages: [] }),
+      })
+
+      const res = await handler(req, 'test-hash')
+      expect(res.status).toBe(502)
+      expect(reconcile).toHaveBeenCalledWith('test-hash', 0)
+    } finally {
+      slowServer!.close()
+    }
+  })
+
+  it('returns generic error on upstream failure without leaking body', async () => {
+    const errorApp = new Hono()
+    errorApp.post('/v1/chat/completions', () => {
+      return new Response('internal secret details', { status: 500 })
+    })
+
+    let errorServer: ReturnType<typeof serve>
+    let errorUrl: string
+    await new Promise<void>((resolve) => {
+      errorServer = serve({ fetch: errorApp.fetch, port: 0 }, (info) => {
+        errorUrl = `http://localhost:${info.port}`
+        resolve()
+      })
+    })
+
+    try {
+      const handler = createProxyHandler({
+        upstream: errorUrl!,
+        pricing,
+        capacity: new CapacityTracker(0),
+        reconcile: vi.fn().mockReturnValue({ adjusted: false, newBalance: 0, delta: 0 }),
+        maxBodySize: 10 * 1024 * 1024,
+      })
+
+      const req = new Request(`http://test/v1/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'test', messages: [] }),
+      })
+
+      const res = await handler(req, undefined)
+      expect(res.status).toBe(500)
+      const body = await res.json()
+      // Should return generic error, not leak upstream body
+      expect(body.error).toBe('Upstream returned 500')
+      expect(JSON.stringify(body)).not.toContain('internal secret details')
+    } finally {
+      errorServer!.close()
+    }
+  })
+
   it('skips reconciliation when flatPricing is true (non-streaming)', async () => {
     let reconcileCalled = false
     const capacity = new CapacityTracker(0)
