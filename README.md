@@ -26,14 +26,10 @@ That's it. satgate auto-detects your models, starts accepting payments, and prox
 A public instance is running at [satgate.trotters.dev](https://satgate.trotters.dev). Open it in a browser for the chat playground, or use curl:
 
 ```bash
-# Free request (5 per day, per IP — no payment needed)
-curl -s https://satgate.trotters.dev/v1/chat/completions \
+# Free request (5 per day per IP — once exhausted you'll get a 402 + invoice)
+curl -s -w '\n%{http_code}\n' https://satgate.trotters.dev/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -d '{"model":"qwen3:0.6b","messages":[{"role":"user","content":"What is Bitcoin?"}]}' \
-  | jq '.choices[0].message.content'
-
-# Once the free tier is exhausted, you'll get a 402 with a Lightning invoice.
-# Pay it, then retry with the L402 credential — see "How it works" below.
+  -d '{"model":"qwen3:0.6b","messages":[{"role":"user","content":"What is Bitcoin?"}]}'
 
 # Check pricing
 curl -s https://satgate.trotters.dev/.well-known/l402 | jq .
