@@ -39,7 +39,7 @@ Enter
 Sleep 300ms
 Show
 
-Type `curl -s -H "Content-Type: application/json" localhost:3000/v1/chat/completions -d @demo/prompt.json | jq .choices[0].message.content`
+Type `curl -s -H "Content-Type: application/json" localhost:3000/v1/chat/completions -d @demo/prompt.json | jq '.choices[0].message.content'`
 Enter
 Sleep 4s
 
@@ -89,7 +89,7 @@ Enter
 Sleep 300ms
 Show
 
-Type `curl -s -H "Authorization: L402 $MAC:$PRE" -H "Content-Type: application/json" localhost:3000/v1/chat/completions -d @demo/prompt.json | jq .choices[0].message.content`
+Type `curl -s -H "Authorization: L402 $MAC:$PRE" -H "Content-Type: application/json" localhost:3000/v1/chat/completions -d @demo/prompt.json | jq '.choices[0].message.content'`
 Enter
 Sleep 4s
 

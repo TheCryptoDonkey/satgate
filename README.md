@@ -30,7 +30,7 @@ A public instance is running at [satgate.trotters.dev](https://satgate.trotters.
 curl -s https://satgate.trotters.dev/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{"model":"qwen3:0.6b","messages":[{"role":"user","content":"What is Bitcoin?"}]}' \
-  | jq .choices[0].message.content
+  | jq '.choices[0].message.content'
 
 # Check pricing
 curl -s https://satgate.trotters.dev/.well-known/l402 | jq .
