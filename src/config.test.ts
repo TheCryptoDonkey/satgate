@@ -312,3 +312,77 @@ describe('loadConfig', () => {
     expect(withCli.tunnel).toBe(false)
   })
 })
+
+describe('x402 config', () => {
+  it('parses x402 config from env vars', () => {
+    const config = loadConfig(
+      { upstream: 'http://localhost:11434' },
+      {
+        X402_RECEIVER: '0xabc123',
+        X402_NETWORK: 'base',
+        X402_FACILITATOR_URL: 'https://x402.org/facilitator',
+        X402_FACILITATOR_KEY: 'test-key',
+      },
+    )
+    expect(config.x402).toEqual({
+      receiverAddress: '0xabc123',
+      network: 'base',
+      facilitatorUrl: 'https://x402.org/facilitator',
+      facilitatorKey: 'test-key',
+      asset: undefined,
+      creditMode: undefined,
+    })
+  })
+
+  it('parses x402 config from file', () => {
+    const config = loadConfig(
+      { upstream: 'http://localhost:11434' },
+      {},
+      {
+        x402: {
+          receiverAddress: '0xdef456',
+          network: 'polygon',
+          creditMode: false,
+        },
+      },
+    )
+    expect(config.x402?.receiverAddress).toBe('0xdef456')
+    expect(config.x402?.network).toBe('polygon')
+    expect(config.x402?.creditMode).toBe(false)
+  })
+
+  it('x402 is undefined when receiver not set', () => {
+    const config = loadConfig({ upstream: 'http://localhost:11434' })
+    expect(config.x402).toBeUndefined()
+  })
+
+  it('x402 is undefined when only receiver but no network', () => {
+    const config = loadConfig(
+      { upstream: 'http://localhost:11434' },
+      { X402_RECEIVER: '0xabc' },
+    )
+    expect(config.x402).toBeUndefined()
+  })
+
+  it('parses DEFAULT_PRICE_USD from env', () => {
+    const config = loadConfig(
+      { upstream: 'http://localhost:11434' },
+      { DEFAULT_PRICE_USD: '5' },
+    )
+    expect(config.defaultPriceUsd).toBe(5)
+  })
+
+  it('parses defaultPriceUsd from file config', () => {
+    const config = loadConfig(
+      { upstream: 'http://localhost:11434' },
+      {},
+      { defaultPriceUsd: 10 },
+    )
+    expect(config.defaultPriceUsd).toBe(10)
+  })
+
+  it('defaultPriceUsd is undefined when not set', () => {
+    const config = loadConfig({ upstream: 'http://localhost:11434' })
+    expect(config.defaultPriceUsd).toBeUndefined()
+  })
+})

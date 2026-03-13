@@ -39,6 +39,15 @@ export interface TokenTollConfig {
   tunnel: boolean
   /** Lightning backend instance (created externally, threaded to server). */
   backend?: LightningBackend
+  x402?: {
+    receiverAddress: string
+    network: string
+    facilitatorUrl?: string
+    facilitatorKey?: string
+    asset?: string
+    creditMode?: boolean
+  }
+  defaultPriceUsd?: number
 }
 
 export interface CliArgs {
@@ -83,6 +92,15 @@ export interface FileConfig {
   allowlist?: string[]
   price?: number
   tunnel?: boolean
+  x402?: {
+    receiverAddress?: string
+    network?: string
+    facilitatorUrl?: string
+    facilitatorKey?: string
+    asset?: string
+    creditMode?: boolean
+  }
+  defaultPriceUsd?: number
 }
 
 const LIGHTNING_URL_DEFAULTS: Record<string, string> = {
@@ -241,6 +259,24 @@ export function loadConfig(
   const tunnelEnv = env.TUNNEL !== undefined ? env.TUNNEL !== 'false' : undefined
   const tunnel = args.noTunnel === true ? false : (tunnelEnv ?? file.tunnel ?? true)
 
+  // x402 stablecoin config
+  const x402Receiver = env.X402_RECEIVER ?? file.x402?.receiverAddress
+  const x402Network = env.X402_NETWORK ?? file.x402?.network
+  const x402 = x402Receiver && x402Network
+    ? {
+        receiverAddress: x402Receiver,
+        network: x402Network,
+        facilitatorUrl: env.X402_FACILITATOR_URL ?? file.x402?.facilitatorUrl,
+        facilitatorKey: env.X402_FACILITATOR_KEY ?? file.x402?.facilitatorKey,
+        asset: env.X402_ASSET ?? file.x402?.asset,
+        creditMode: file.x402?.creditMode,
+      }
+    : undefined
+
+  const defaultPriceUsd = env.DEFAULT_PRICE_USD
+    ? parseInt(env.DEFAULT_PRICE_USD, 10)
+    : file.defaultPriceUsd
+
   return {
     upstream: upstream.replace(/\/+$/, ''),
     port,
@@ -263,5 +299,7 @@ export function loadConfig(
     flatPricing,
     price,
     tunnel,
+    x402,
+    defaultPriceUsd,
   }
 }
