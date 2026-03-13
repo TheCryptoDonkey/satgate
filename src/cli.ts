@@ -30,6 +30,10 @@ function parseArgs(argv: string[]): CliArgs {
       case '--root-key': args.rootKey = argv[++i]; break
       case '--verbose': args.verbose = true; break
       case '--log-format': args.logFormat = argv[++i]; break
+      case '--token-price': args.tokenPrice = parseInt(argv[++i], 10); break
+      case '--model-price':
+        args.modelPrice = [...(args.modelPrice ?? []), argv[++i]]
+        break
       case '-h': case '--help': printHelp(); process.exit(0);
       case '-v': case '--version': printVersion(); process.exit(0);
       default:
@@ -77,7 +81,9 @@ function printHelp(): void {
     --allowlist-file <path>    File with one key per line
 
   Pricing:
-    --price <sats>             Sats per request (default: 1)
+    --price <sats>             Sats per request (flat pricing)
+    --token-price <sats>       Sats per 1k tokens (per-token pricing)
+    --model-price <model:sats> Per-model token price (repeatable)
 
   Server:
     --port <number>            Listen port (default: 3000)

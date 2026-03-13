@@ -75,6 +75,8 @@ export interface CliArgs {
   noTunnel?: boolean
   verbose?: boolean
   logFormat?: string
+  tokenPrice?: number
+  modelPrice?: string[]
 }
 
 export interface FileConfig {
