@@ -71,13 +71,15 @@ One-liner per event with emoji prefix and ANSI colours:
 
 Note: `PaymentEvent` does not carry `clientIp` or `remainingBalance` — those fields are only on `RequestEvent` and `ChallengeEvent`. Payment lines show amount, hash, and rail only.
 
+Note: `RequestEvent` and `ChallengeEvent` do not carry an HTTP method field, so `POST` is not shown. `RequestEvent` does not carry an HTTP status code, so colour is not status-dependent.
+
 Colours:
 - Payment: green
-- Request (2xx): dim/grey
-- Request (4xx/5xx): yellow
+- Request: dim/grey
 - Challenge: cyan
 - Error: red
-- Info/Warn: white/yellow
+- Info: white
+- Warn: yellow
 
 ### Verbose mode (`--verbose`)
 
