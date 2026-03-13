@@ -257,7 +257,7 @@ body {
   var pricePerThousand = null; // sats per 1k tokens for current model
 
   // Free token budget — tracked client-side, resets daily
-  var FREE_TOKEN_BUDGET = 1000;
+  var FREE_TOKEN_BUDGET = 250;
   var freeTokensKey = 'satgate_free_tokens';
   var freeTokensDayKey = 'satgate_free_day';
   function todayStr() { return new Date().toISOString().slice(0, 10); }
