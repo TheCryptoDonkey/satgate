@@ -5,6 +5,9 @@ import type { CapacityTracker } from './capacity.js'
 import type { ModelPricing } from '../config.js'
 import type { Logger } from '../logger.js'
 
+/** Allowed upstream path prefixes — anything else is rejected. */
+const ALLOWED_PATH_PREFIXES = ['/v1/chat/completions', '/v1/completions', '/v1/embeddings']
+
 export interface ProxyDeps {
   upstream: string
   pricing: ModelPricing
@@ -47,6 +50,15 @@ export function createProxyHandler(deps: ProxyDeps) {
     const start = Date.now()
     let streamingResponse = false
     try {
+      // Validate request path — only allow known OpenAI-compatible endpoints
+      const requestPath = new URL(req.url).pathname
+      if (!ALLOWED_PATH_PREFIXES.some(p => requestPath === p)) {
+        return new Response(
+          JSON.stringify({ error: 'Not found' }),
+          { status: 404, headers: { 'Content-Type': 'application/json' } },
+        )
+      }
+
       // Validate Content-Type
       const contentType = req.headers.get('content-type')
       if (!contentType || !contentType.includes('application/json')) {

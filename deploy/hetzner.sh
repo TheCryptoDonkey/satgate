@@ -79,6 +79,9 @@ echo "[6/6] Deploying satgate container..."
 $SSH_CMD "docker stop $CONTAINER_NAME 2>/dev/null && docker rm $CONTAINER_NAME 2>/dev/null || true"
 
 # Start new container
+# Ensure data dir is writable by non-root container user (uid from groupadd -r satgate)
+$SSH_CMD "mkdir -p $REMOTE_DIR/data && chown -R 999:999 $REMOTE_DIR/data 2>/dev/null || true"
+
 $SSH_CMD "docker run -d \
   --name $CONTAINER_NAME \
   --network host \

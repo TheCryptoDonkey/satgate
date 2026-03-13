@@ -27,10 +27,34 @@ export interface TokenTollServer {
   close: () => void
 }
 
+/**
+ * Sanitise upstream /v1/models response — only forward id + object fields.
+ * Prevents leaking internal upstream metadata (e.g. paths, owners, permissions).
+ */
+function sanitiseModelsResponse(body: Record<string, unknown>): Record<string, unknown> {
+  if (!body || typeof body !== 'object') return { data: [] }
+  const raw = body.data
+  if (!Array.isArray(raw)) return { data: [] }
+  const data = raw
+    .filter((m): m is Record<string, unknown> => typeof m === 'object' && m !== null && typeof m.id === 'string')
+    .map(m => ({ id: m.id, object: 'model' }))
+  return { object: 'list', data }
+}
+
 export function createTokenTollServer(config: TokenTollConfig): TokenTollServer {
   const logger = config.logger ?? createNoopLogger()
   const app = new Hono<TollBoothEnv>()
   const capacity = new CapacityTracker(config.capacity.maxConcurrent)
+
+  // Security headers on every response
+  app.use('*', async (c, next) => {
+    await next()
+    c.header('X-Content-Type-Options', 'nosniff')
+    c.header('X-Frame-Options', 'DENY')
+    c.header('Referrer-Policy', 'no-referrer')
+    c.header('X-Download-Options', 'noopen')
+    c.header('Strict-Transport-Security', 'max-age=63072000; includeSubDomains')
+  })
 
   // Create storage
   const storage = config.storage === 'sqlite'
@@ -177,8 +201,10 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
         signal: AbortSignal.timeout(10_000),
       })
       const body = await res.json() as Record<string, unknown>
-      modelsCache = { data: body, expires: Date.now() + 60_000 }
-      return c.json(body)
+      // Sanitise upstream response — only forward model IDs, not arbitrary fields
+      const sanitised = sanitiseModelsResponse(body)
+      modelsCache = { data: sanitised, expires: Date.now() + 60_000 }
+      return c.json(sanitised)
     } catch {
       return c.json({ data: [] })
     }

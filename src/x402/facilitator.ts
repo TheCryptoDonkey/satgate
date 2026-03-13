@@ -26,8 +26,17 @@ export function createHttpFacilitator(config: HttpFacilitatorConfig): X402Facili
         return { valid: false, txHash: '', amount: 0, sender: '' }
       }
 
-      const result = await res.json() as X402VerifyResult
-      return result
+      const result = await res.json() as Record<string, unknown>
+      // Validate response shape — don't trust arbitrary JSON from external facilitator
+      if (typeof result !== 'object' || result === null) {
+        return { valid: false, txHash: '', amount: 0, sender: '' }
+      }
+      return {
+        valid: result.valid === true,
+        txHash: typeof result.txHash === 'string' ? result.txHash : '',
+        amount: typeof result.amount === 'number' ? result.amount : 0,
+        sender: typeof result.sender === 'string' ? result.sender : '',
+      }
     },
   }
 }
