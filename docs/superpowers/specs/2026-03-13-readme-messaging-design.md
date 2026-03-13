@@ -147,7 +147,7 @@ Seven bullets covering only what token-toll itself provides. Everything toll-boo
 - **Streaming reconciliation** — estimated charge upfront, reconciled to actual usage after. Overpayments credited back.
 - **Capacity management** — limit concurrent inference requests to protect your GPU.
 - **Auto-detect models** — queries your upstream on startup. No manual model list.
-- **Four payment rails** — Lightning, Cashu ecash, NWC, and x402 stablecoins. Operator picks what to accept.
+- **Four payment rails** — Lightning, Cashu ecash, NWC, and x402 stablecoins. Operator picks what to accept. *(Note: confirm x402 is shipped in token-toll before publishing. If not, say "three today, x402 coming.")*
 - **Instant public URL** — auto-spawns a Cloudflare tunnel. Your GPU is reachable from the internet in seconds.
 
 ### Section 6: How it Works
@@ -193,7 +193,7 @@ Trimmed to just the YAML example. Full reference linked out.
 >   maxConcurrent: 4
 > ```
 >
-> CLI flags > environment variables > config file > defaults. See [full configuration reference](docs/configuration.md) for all options.
+> CLI flags > environment variables > config file > defaults. See [full configuration reference](docs/configuration.md) for all options. *(Note: confirm `docs/configuration.md` exists before publishing. If not, either create it or link to the config section of this README instead.)*
 
 ### Section 8: Get Started (action close)
 
@@ -214,6 +214,7 @@ Badges, support links (Lightning tips, Nostr), and licence at the bottom.
 
 ### Sections Removed
 
+- **"Features" (10 bullets)** — replaced by "What token-toll adds" (7 bullets, AI-specific only)
 - **"How it works" text-art diagram** — replaced by mermaid
 - **"AI agent compatibility"** — promoted and expanded into "Built for machines"
 - **"Programmatic usage"** — cut from README, can live in docs/ if needed
@@ -241,7 +242,7 @@ Update the token-toll entry to reflect its role:
 | Project | Role |
 |---------|------|
 | **[toll-booth](https://github.com/TheCryptoDonkey/toll-booth)** | **Payment-rail agnostic HTTP 402 middleware** |
-| [token-toll](https://github.com/TheCryptoDonkey/token-toll) | Flagship product — pay-per-token AI inference proxy (~400 lines on toll-booth) |
+| [token-toll](https://github.com/TheCryptoDonkey/token-toll) | Production showcase — pay-per-token AI inference proxy (~400 lines on toll-booth) |
 | [l402-mcp](https://github.com/TheCryptoDonkey/l402-mcp) | Client side — AI agents discover, pay, and consume L402 APIs |
 
 ### Change 3: No Other Changes
