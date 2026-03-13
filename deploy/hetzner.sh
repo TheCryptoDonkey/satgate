@@ -75,8 +75,9 @@ $SSH_CMD "docker exec $OLLAMA_CONTAINER ollama pull $OLLAMA_MODEL" || true
 # --- Step 6: Deploy satgate container ---
 echo "[6/6] Deploying satgate container..."
 
-# Stop and remove existing container
+# Stop and remove existing container (and legacy token-toll if present)
 $SSH_CMD "docker stop $CONTAINER_NAME 2>/dev/null && docker rm $CONTAINER_NAME 2>/dev/null || true"
+$SSH_CMD "docker stop token-toll 2>/dev/null && docker rm token-toll 2>/dev/null || true"
 
 # Start new container
 $SSH_CMD "docker run -d \
