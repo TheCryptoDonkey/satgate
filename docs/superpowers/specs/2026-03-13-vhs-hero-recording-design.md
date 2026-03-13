@@ -33,33 +33,53 @@ The token-toll README has a `<!-- TODO -->` placeholder for a hero GIF. This rec
 ```json
 {
   "model": "qwen3:0.6b",
-  "messages": [{ "role": "user", "content": "Say hello in 5 words" }]
+  "messages": [
+    { "role": "system", "content": "Respond concisely. No thinking tags." },
+    { "role": "user", "content": "Say hello in 5 words" }
+  ],
+  "stream": false,
+  "temperature": 0
 }
 ```
 
-Small model, short prompt, deterministic-ish response. Keeps inference fast (~1-2s).
+- `stream: false` ensures the response is a single JSON object (not SSE), so `jq` piping works cleanly.
+- `temperature: 0` for deterministic output.
+- System message suppresses qwen3's `<think>` tags which would look messy in the GIF.
 
 ### demo/demo.ts
 
-A standalone script that boots a real token-toll server with:
+**Architecture:** The demo script builds the server **manually** rather than using `createTokenTollServer`. This is necessary because the mock Lightning backend needs direct access to the toll-booth storage instance to call `settleWithCredit()` — and `createTokenTollServer` creates storage internally without exposing it.
+
+This mirrors exactly how toll-booth's own `demo/demo.ts` works: build the toll-booth engine manually, wire in a mock backend that has the storage reference, then compose the Hono app with token-toll's proxy handler on top.
+
+**The script should:**
+
+1. Create a `memoryStorage()` from toll-booth
+2. Create an inline mock Lightning backend (self-contained, like toll-booth's demo):
+   - `createInvoice`: generate preimage + paymentHash, create a fake bolt11 string, immediately call `storage.settleWithCredit(paymentHash, amount, preimage)`, return invoice
+   - `checkInvoice`: check `storage.isSettled(paymentHash)`, return paid status + preimage from `storage.getSettlementSecret(paymentHash)`
+3. Create a `createTollBooth` engine with the mock backend and storage, wired to token-toll's logger via `onPayment`, `onRequest`, `onChallenge` callbacks
+4. Create a `createHonoTollBooth` adapter and mount payment routes
+5. Mount token-toll's proxy handler for `/v1/chat/completions` (via `createProxyHandler`)
+6. Mount token-toll's discovery endpoints (`/.well-known/l402`, `/llms.txt`, `/openapi.json`)
+7. Auto-detect models from Ollama (`fetch http://localhost:11434/v1/models`)
+8. Print a startup banner via token-toll's `createLogger`
+
+**Configuration:**
 - **Upstream:** `http://localhost:11434` (real Ollama)
-- **Lightning:** Mock backend that auto-settles invoices immediately (no timeout delay — instant settle for demo speed)
-- **Storage:** In-memory
-- **Auth:** Lightning mode (pay-per-request via toll-booth)
-- **Free tier:** 1 request per day (so Scene 2 gets a free pass, Scene 3 hits the paywall)
+- **Lightning:** Inline mock that auto-settles immediately (no setTimeout)
+- **Storage:** In-memory (from toll-booth)
+- **Free tier:** 1 request per day
 - **Pricing:** 1 sat per 1k tokens (default)
 - **Port:** 3000
-- **Tunnel:** Disabled (local demo)
-- **Logger:** Pretty format with event callbacks wired
+- **Tunnel:** Disabled
 
-The script should:
-1. Import from token-toll's own modules (`createTokenTollServer`, `loadConfig`, `createLogger`)
-2. Create a mock Lightning backend similar to toll-booth's `demo/demo.ts` but using token-toll's types
-3. Auto-detect models from Ollama on startup
-4. Print the standard token-toll startup banner via the logger
-5. Wire toll-booth event callbacks (`onPayment`, `onRequest`, `onChallenge`) to the logger
+**Key imports:**
+- From toll-booth: `createTollBooth`, `memoryStorage`, `createHonoTollBooth` (+ Hono adapter)
+- From token-toll src: `createProxyHandler`, `createLogger`, `CapacityTracker`, discovery generators
+- From node:crypto: `randomBytes`, `createHash`
 
-The mock Lightning backend should auto-settle invoices **immediately** (not after 1s like toll-booth's demo) to keep the VHS recording snappy.
+**The mock Lightning backend does NOT need the `bolt11` library.** Unlike the e2e test mock which generates real BOLT11 invoices (for l402-mcp to decode), the demo just needs any string as the bolt11 field. The VHS tape never decodes the invoice — it only extracts the macaroon and preimage from the `/create-invoice` and `/invoice-status` responses. Use a fake bolt11 string like toll-booth's demo: `` `lnbc${amountSats}n1demo${randomBytes(20).toString('hex')}` ``.
 
 ### demo/demo.tape
 
@@ -85,26 +105,42 @@ Set PlaybackSpeed 1
 ```
 npx tsx demo/demo.ts &
 ```
-Server starts. Banner prints: version, upstream (Ollama auto-detected), models, Lightning (mock), pricing, storage, discovery endpoints. Hold 3s for viewer to absorb.
+Wait 4s (tsx cold start + Ollama model detection). Server banner prints: version, upstream (Ollama), models, Lightning (mock), pricing, storage, discovery endpoints. Hold 3s for viewer to absorb.
 
 **Scene 2: Free request (5s)**
 Clear screen. Type:
 ```
-curl -s localhost:3000/v1/chat/completions -d @demo/prompt.json | jq .choices[0].message.content
+curl -s -H "Content-Type: application/json" localhost:3000/v1/chat/completions -d @demo/prompt.json | jq .choices[0].message.content
 ```
 Real Ollama response appears. Then echo: `# Free tier — no payment needed`. Hold 3s.
+
+**Note:** `-H "Content-Type: application/json"` is required — token-toll's proxy handler validates Content-Type and returns 415 without it. `curl -d` defaults to `application/x-www-form-urlencoded`.
 
 **Scene 3: Paywall (4s)**
 Clear screen. Type:
 ```
-curl -s -w '\nHTTP %{http_code}\n' -o /dev/null localhost:3000/v1/chat/completions -d @demo/prompt.json
+curl -s -w '\nHTTP %{http_code}\n' -H "Content-Type: application/json" localhost:3000/v1/chat/completions -d @demo/prompt.json
 ```
-Shows `HTTP 402`. Then echo: `# Free tier exhausted — 402 Payment Required`. Hold 3s.
+Shows `HTTP 402` (without `-o /dev/null` so the 402 response body is visible — shows the L402 challenge context). Then echo: `# Free tier exhausted — 402 Payment Required`. Hold 3s.
 
 **Scene 4: Paid request (5s)**
-Hidden: create invoice via `curl -s -X POST localhost:3000/create-invoice`, wait for auto-settle, extract macaroon and preimage from invoice status endpoint. Then visible:
+Hidden: create invoice, extract credentials:
+```bash
+# Create invoice (auto-settles immediately via mock)
+curl -s -X POST localhost:3000/create-invoice > /tmp/inv.json
+sleep 1
+
+# Extract macaroon
+MAC=$(jq -r .macaroon /tmp/inv.json)
+
+# Get preimage from invoice status
+HASH=$(jq -r .paymentHash /tmp/inv.json)
+PRE=$(curl -s localhost:3000/invoice-status/$HASH | jq -r .preimage)
 ```
-curl -s -H "Authorization: L402 $MAC:$PRE" localhost:3000/v1/chat/completions -d @demo/prompt.json | jq .choices[0].message.content
+
+Then visible:
+```
+curl -s -H "Authorization: L402 $MAC:$PRE" -H "Content-Type: application/json" localhost:3000/v1/chat/completions -d @demo/prompt.json | jq .choices[0].message.content
 ```
 Real response. Then echo: `# Paid with Lightning — 1 sat per 1k tokens`. Hold 4s.
 
@@ -122,18 +158,18 @@ Replace the `<!-- TODO -->` comment in README.md with:
 
 | Scene | Typing | Execution | Hold | Total |
 |-------|--------|-----------|------|-------|
-| 1: Boot | 1s | 3s | 3s | ~4s |
+| 1: Boot | 1s | 4s | 3s | ~5s |
 | 2: Free request | 2s | 2s | 3s | ~5s |
 | 3: Paywall | 2s | 1s | 3s | ~4s |
 | 4: Paid request | 2s | 2s | 4s | ~5s |
-| **Total** | | | | **~18s** |
+| **Total** | | | | **~19s** |
 
 ## Dependencies
 
-- `demo/demo.ts` imports from token-toll's own source modules — no new npm dependencies needed
-- The mock Lightning backend is self-contained (uses `node:crypto` for preimage/hash generation)
-- `bolt11` is already a devDependency for generating valid BOLT11 invoices in the mock
+- `demo/demo.ts` imports from toll-booth and token-toll's own source modules — no new npm dependencies needed
+- The mock Lightning backend is self-contained (uses `node:crypto`, no bolt11 library needed)
 - VHS requires `bash`, `curl`, `jq` (all available)
+- Ollama must be running with `qwen3:0.6b` loaded
 
 ## Success Criteria
 
@@ -142,3 +178,4 @@ Replace the `<!-- TODO -->` comment in README.md with:
 3. The payment flow is visible: free → 402 → paid
 4. The startup banner shows real model names
 5. The GIF renders well at README width on GitHub (~800px displayed)
+6. No `<think>` tags or messy output in the inference response
