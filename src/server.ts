@@ -231,36 +231,39 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
     app.use('/v1/*', authMiddleware)
   }
 
-  // Forward toll-booth credit/free-tier context as response headers
-  function withTollHeaders(c: Context<TollBoothEnv>, res: Response): Response {
+  // Forward toll-booth credit/free-tier context as response headers.
+  // Uses c.header() (not res.headers.set()) so headers survive Hono's response pipeline.
+  function setTollHeaders(c: Context<TollBoothEnv>): void {
     const creditBalance = c.get('tollBoothCreditBalance')
     if (creditBalance !== undefined) {
-      res.headers.set('X-Credit-Balance', String(creditBalance))
+      c.header('X-Credit-Balance', String(creditBalance))
     }
     const estimatedCost = c.get('tollBoothEstimatedCost')
     if (estimatedCost !== undefined) {
-      res.headers.set('X-Estimated-Cost', String(estimatedCost))
+      c.header('X-Estimated-Cost', String(estimatedCost))
     }
     const freeRemaining = c.get('tollBoothFreeRemaining')
     if (freeRemaining !== undefined) {
-      res.headers.set('X-Free-Remaining', String(freeRemaining))
+      c.header('X-Free-Remaining', String(freeRemaining))
     }
-    return res
   }
 
   app.post('/v1/chat/completions', async (c: Context<TollBoothEnv>) => {
     const paymentHash = config.authMode === 'lightning' ? c.get('tollBoothPaymentHash') : undefined
-    return withTollHeaders(c, await proxyHandler(c.req.raw, paymentHash))
+    setTollHeaders(c)
+    return proxyHandler(c.req.raw, paymentHash)
   })
 
   app.post('/v1/completions', async (c: Context<TollBoothEnv>) => {
     const paymentHash = config.authMode === 'lightning' ? c.get('tollBoothPaymentHash') : undefined
-    return withTollHeaders(c, await proxyHandler(c.req.raw, paymentHash))
+    setTollHeaders(c)
+    return proxyHandler(c.req.raw, paymentHash)
   })
 
   app.post('/v1/embeddings', async (c: Context<TollBoothEnv>) => {
     const paymentHash = config.authMode === 'lightning' ? c.get('tollBoothPaymentHash') : undefined
-    return withTollHeaders(c, await proxyHandler(c.req.raw, paymentHash))
+    setTollHeaders(c)
+    return proxyHandler(c.req.raw, paymentHash)
   })
 
   return {
