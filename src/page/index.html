@@ -348,9 +348,6 @@ body {
       }
       if (freeTier.requests_per_day) {
         pricingChips.appendChild(makeChip(freeTier.requests_per_day + ' free requests/day'));
-        // Show initial balance in status bar
-        while (statusBar.firstChild) { statusBar.removeChild(statusBar.firstChild); }
-        statusBar.appendChild(makeStatusSpan('free', freeTier.requests_per_day + ' free requests remaining today'));
       }
     } catch (e) {
       while (pricingChips.firstChild) { pricingChips.removeChild(pricingChips.firstChild); }
@@ -694,14 +691,6 @@ body {
         } else {
           statusBar.appendChild(makeStatusSpan('credit', sats + ' sats credit remaining'));
         }
-        return;
-      }
-    }
-    if (freeRemaining !== null && freeRemaining !== undefined) {
-      var remaining = parseInt(freeRemaining, 10);
-      if (!isNaN(remaining)) {
-        statusBar.appendChild(makeStatusSpan('free', remaining + ' free request' + (remaining !== 1 ? 's' : '') + ' remaining today'));
-        return;
       }
     }
   }
