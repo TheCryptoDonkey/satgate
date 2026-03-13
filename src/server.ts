@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { dirname, join } from 'node:path'
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import {
@@ -136,6 +139,29 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
       maxConcurrent: capacity.maxConcurrent,
     })
   })
+
+  // Landing page — try two locations:
+  // 1. Dev (tsx): __dirname is src/, so ../src/page/index.html → src/page/index.html
+  // 2. Docker (compiled): __dirname is dist/src/, so ../page/index.html → dist/page/index.html
+  const __dirname = dirname(fileURLToPath(import.meta.url))
+  const landingPagePaths = [
+    join(__dirname, '..', 'src', 'page', 'index.html'),
+    join(__dirname, '..', 'page', 'index.html'),
+  ]
+  let landingPageHtml: string | undefined
+  for (const p of landingPagePaths) {
+    try {
+      landingPageHtml = readFileSync(p, 'utf-8')
+      break
+    } catch {
+      // Try next path
+    }
+  }
+
+  if (landingPageHtml) {
+    const html = landingPageHtml
+    app.get('/', (c) => c.html(html))
+  }
 
   // /v1/models passes through without auth — cached for 60s to prevent upstream amplification
   let modelsCache: { data: Record<string, unknown>; expires: number } | undefined

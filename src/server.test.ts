@@ -86,6 +86,35 @@ describe('createTokenTollServer', () => {
     expect(chatRes.status).toBe(402)
   })
 
+  it('serves landing page at GET /', async () => {
+    const { app } = createTokenTollServer({
+      upstream: upstreamUrl,
+      port: 0,
+      rootKey: 'a'.repeat(64),
+      rootKeyGenerated: false,
+      storage: 'memory',
+      dbPath: '',
+      pricing: { default: 1, models: {} },
+      freeTier: { requestsPerDay: 0 },
+      capacity: { maxConcurrent: 0 },
+      tiers: [],
+      trustProxy: false,
+      estimatedCostSats: 10,
+      maxBodySize: 10 * 1024 * 1024,
+      authMode: 'lightning' as const,
+      allowlist: [],
+      flatPricing: false,
+      price: 1,
+      tunnel: false,
+    })
+
+    const res = await app.request('/')
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toContain('text/html')
+    const html = await res.text()
+    expect(html).toContain('satgate')
+  })
+
   it('passes lightning backend to toll-booth when configured', async () => {
     const mockBackend = {
       createInvoice: async () => ({ bolt11: 'lnbc...', paymentHash: 'a'.repeat(64) }),
