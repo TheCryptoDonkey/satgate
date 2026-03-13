@@ -432,23 +432,24 @@ body {
       if (res.status === 200) {
         // Read balance headers immediately
         var creditBalance = res.headers.get('X-Credit-Balance');
+        var isPaid = creditBalance !== null && parseInt(creditBalance, 10) > 0;
 
-        await streamResponse(res, contentEl, modelTagEl);
-        // After streaming completes, push assistant content
-        var assistantContent = contentEl.textContent || '';
-        messages.push({ role: 'assistant', content: assistantContent });
-
-        // Track token usage
-        if (creditBalance !== null && parseInt(creditBalance, 10) > 0) {
-          // Paid credit — show server-reported balance in tokens
-          updateStatusBar(creditBalance);
-        } else {
-          // Free tier — estimate tokens from prompt + response text
-          var promptTokens = estimateTokens(text);
-          var responseTokens = estimateTokens(assistantContent);
-          var totalTokens = promptTokens + responseTokens;
-          var remaining = spendFreeTokens(totalTokens);
+        // For free tier, deduct prompt tokens upfront and tick down during streaming
+        if (!isPaid) {
+          spendFreeTokens(estimateTokens(text));
           updateFreeTokenStatus();
+        }
+
+        var onChunk = (!isPaid) ? function(chunkText) {
+          spendFreeTokens(estimateTokens(chunkText));
+          updateFreeTokenStatus();
+        } : null;
+
+        await streamResponse(res, contentEl, modelTagEl, onChunk);
+        messages.push({ role: 'assistant', content: contentEl.textContent || '' });
+
+        if (isPaid) {
+          updateStatusBar(creditBalance);
         }
       } else if (res.status === 402) {
         // Payment required
@@ -485,7 +486,7 @@ body {
   }
 
   // === STREAM RESPONSE ===
-  async function streamResponse(res, contentEl, modelTagEl) {
+  async function streamResponse(res, contentEl, modelTagEl, onChunk) {
     if (!res.body) return;
     var reader = res.body.getReader();
     var decoder = new TextDecoder();
@@ -520,6 +521,7 @@ body {
             fullContent += delta.content;
             contentEl.textContent = fullContent;
             scrollToBottom();
+            if (onChunk) onChunk(delta.content);
           }
         } catch (parseErr) {
           // skip malformed JSON
