@@ -75,9 +75,8 @@ $SSH_CMD "docker exec $OLLAMA_CONTAINER ollama pull $OLLAMA_MODEL" || true
 # --- Step 6: Deploy satgate container ---
 echo "[6/6] Deploying satgate container..."
 
-# Stop and remove existing container (and legacy token-toll if present)
+# Stop and remove existing container
 $SSH_CMD "docker stop $CONTAINER_NAME 2>/dev/null && docker rm $CONTAINER_NAME 2>/dev/null || true"
-$SSH_CMD "docker stop token-toll 2>/dev/null && docker rm token-toll 2>/dev/null || true"
 
 # Start new container
 $SSH_CMD "docker run -d \
@@ -91,9 +90,10 @@ $SSH_CMD "docker run -d \
   -e LIGHTNING_KEY=$PHOENIXD_PASSWORD \
   -e PORT=$PORT \
   -e ROOT_KEY=$ROOT_KEY \
-  -e SATGATE_TOKEN_PRICE=1 \
-  -e 'SATGATE_MODEL_PRICE=$OLLAMA_MODEL:2' \
-  -e FREE_TIER_REQUESTS=3 \
+  -e SATGATE_TOKEN_PRICE=5 \
+  -e 'SATGATE_MODEL_PRICE=$OLLAMA_MODEL:10' \
+  -e SATGATE_ESTIMATED_COST=2 \
+  -e FREE_TIER_REQUESTS=5 \
   -e STORAGE=sqlite \
   -e SATGATE_DB_PATH=./data/satgate.db \
   -e TUNNEL=false \
