@@ -413,3 +413,133 @@ describe('logging config', () => {
       .toThrow('Invalid log format')
   })
 })
+
+describe('per-token CLI pricing', () => {
+  it('--token-price sets flatPricing false and pricing.default', () => {
+    const config = loadConfig({ upstream: 'http://localhost:11434', tokenPrice: 3 })
+    expect(config.flatPricing).toBe(false)
+    expect(config.pricing.default).toBe(3)
+  })
+
+  it('--model-price populates pricing.models', () => {
+    const config = loadConfig({ upstream: 'http://localhost:11434', modelPrice: ['llama3:2', 'deepseek-r1:5'] })
+    expect(config.flatPricing).toBe(false)
+    expect(config.pricing.models.llama3).toBe(2)
+    expect(config.pricing.models['deepseek-r1']).toBe(5)
+  })
+
+  it('--model-price without --token-price uses default of 1', () => {
+    const config = loadConfig({ upstream: 'http://localhost:11434', modelPrice: ['deepseek-r1:5'] })
+    expect(config.flatPricing).toBe(false)
+    expect(config.pricing.default).toBe(1)
+  })
+
+  it('--price and --token-price together throws', () => {
+    expect(() => loadConfig({
+      upstream: 'http://localhost:11434',
+      price: 5,
+      tokenPrice: 3,
+    })).toThrow(/Cannot use --price .* and --token-price .* together/)
+  })
+
+  it('--price and --model-price together throws', () => {
+    expect(() => loadConfig({
+      upstream: 'http://localhost:11434',
+      price: 5,
+      modelPrice: ['llama3:2'],
+    })).toThrow(/Cannot use --price .* and --token-price .* together/)
+  })
+
+  it('env var TOKEN_TOLL_TOKEN_PRICE works', () => {
+    const config = loadConfig(
+      { upstream: 'http://localhost:11434' },
+      { TOKEN_TOLL_TOKEN_PRICE: '4' },
+    )
+    expect(config.flatPricing).toBe(false)
+    expect(config.pricing.default).toBe(4)
+  })
+
+  it('env var TOKEN_TOLL_MODEL_PRICE parses comma-separated entries', () => {
+    const config = loadConfig(
+      { upstream: 'http://localhost:11434' },
+      { TOKEN_TOLL_MODEL_PRICE: 'llama3:2,deepseek-r1:5' },
+    )
+    expect(config.pricing.models.llama3).toBe(2)
+    expect(config.pricing.models['deepseek-r1']).toBe(5)
+  })
+
+  it('CLI --model-price merges with config file pricing.models (CLI wins)', () => {
+    const config = loadConfig(
+      { upstream: 'http://localhost:11434', modelPrice: ['llama3:10'] },
+      {},
+      { pricing: { default: 2, models: { llama3: 3, mistral: 4 } } },
+    )
+    expect(config.pricing.models.llama3).toBe(10)
+    expect(config.pricing.models.mistral).toBe(4)
+  })
+
+  it('invalid --model-price format (missing colon) throws', () => {
+    expect(() => loadConfig({
+      upstream: 'http://localhost:11434',
+      modelPrice: ['llama3'],
+    })).toThrow(/Invalid --model-price value/)
+  })
+
+  it('invalid --model-price format (non-numeric rate) throws', () => {
+    expect(() => loadConfig({
+      upstream: 'http://localhost:11434',
+      modelPrice: ['llama3:abc'],
+    })).toThrow(/Invalid --model-price value/)
+  })
+
+  it('invalid --model-price format (zero rate) throws', () => {
+    expect(() => loadConfig({
+      upstream: 'http://localhost:11434',
+      modelPrice: ['llama3:0'],
+    })).toThrow(/Invalid --model-price value/)
+  })
+
+  it('invalid --model-price format (negative rate) throws', () => {
+    expect(() => loadConfig({
+      upstream: 'http://localhost:11434',
+      modelPrice: ['llama3:-1'],
+    })).toThrow(/Invalid --model-price value/)
+  })
+
+  it('negative --token-price throws', () => {
+    expect(() => loadConfig({
+      upstream: 'http://localhost:11434',
+      tokenPrice: -1,
+    })).toThrow(/Invalid --token-price/)
+  })
+
+  it('zero --token-price throws', () => {
+    expect(() => loadConfig({
+      upstream: 'http://localhost:11434',
+      tokenPrice: 0,
+    })).toThrow(/Invalid --token-price/)
+  })
+
+  it('estimatedCostSats reflects CLI tokenPrice when set', () => {
+    const config = loadConfig({ upstream: 'http://localhost:11434', tokenPrice: 5 })
+    expect(config.estimatedCostSats).toBe(50)
+  })
+
+  it('model ID with colon (e.g. qwen3:0.6b) parses correctly', () => {
+    const config = loadConfig({
+      upstream: 'http://localhost:11434',
+      modelPrice: ['qwen3:0.6b:8'],
+    })
+    expect(config.pricing.models['qwen3:0.6b']).toBe(8)
+  })
+
+  it('CLI --token-price overrides config file pricing.default', () => {
+    const config = loadConfig(
+      { upstream: 'http://localhost:11434', tokenPrice: 9 },
+      {},
+      { pricing: { default: 2, models: { llama3: 3 } } },
+    )
+    expect(config.pricing.default).toBe(9)
+    expect(config.pricing.models.llama3).toBe(3)
+  })
+})
