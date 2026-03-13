@@ -27,7 +27,7 @@ Two new standalone containers (not added to the routing docker-compose):
 
 | Container | Image | Port | Purpose |
 |-----------|-------|------|---------|
-| `ollama` | `ollama/ollama:latest` | 11434 (localhost only) | Runs qwen3:0.6b for inference |
+| `ollama` | `ollama/ollama:latest` | 11434 (localhost only, via `OLLAMA_HOST`) | Runs qwen3:0.6b for inference |
 | `token-toll` | Built from `Dockerfile` | 3002 (host network) | Lightning-paid inference proxy |
 
 Both use `--network host` to reach Phoenixd and each other on localhost.
@@ -36,14 +36,16 @@ Both use `--network host` to reach Phoenixd and each other on localhost.
 
 Multi-stage build following the sats-for-laughs pattern:
 
-1. **Build stage:** Node 22 slim base, copies `package.json` + `package-lock.json`, runs `npm ci`, copies source, runs `npm run build`.
-2. **Run stage:** Node 22 slim base, copies `package.json` + `package-lock.json`, runs `npm ci --omit=dev`, copies `build/` from build stage, sets entrypoint to `node build/cli.js`.
+1. **Build stage:** Node 22 slim base, copies `package.json` + `package-lock.json`, runs `npm ci`, copies source (`src/`, `bin/`, `tsconfig.json`), runs `npm run build`.
+2. **Run stage:** Node 22 slim base, copies `package.json` + `package-lock.json`, runs `npm ci --omit=dev`, copies `dist/` from build stage, `WORKDIR /app`, entrypoint `node dist/bin/token-toll.js`.
+
+Note: `l402-mcp` is a `file:` dev dependency that won't exist in the Docker context. Since `--omit=dev` skips it, this is fine — but if `npm ci` fails due to strict lockfile validation, the deploy script should use `npm install --omit=dev` instead.
 
 The image does not bundle Ollama — that runs as a separate container.
 
 ## .dockerignore
 
-Excludes: `node_modules`, `test/`, `*.test.ts`, `.git`, `docs/`, `deploy/`, `*.md` (except `LICENSE`).
+Excludes: `node_modules`, `test/`, `*.test.ts`, `.git`, `docs/`, `deploy/`, `*.md` (except `LICENSE`), `.env`, `.env.*`.
 
 ## Environment variables
 
@@ -61,13 +63,16 @@ All configuration via env vars (no config file):
 | `TOKEN_TOLL_MODEL_PRICE` | `qwen3:0.6b:2` | Model-specific rate to showcase feature |
 | `FREE_TIER_REQUESTS` | `10` | Let people try before paying |
 | `STORAGE` | `sqlite` | Persist credits across restarts |
-| `TOKEN_TOLL_DB_PATH` | `/data/token-toll.db` | Mounted volume |
+| `TOKEN_TOLL_DB_PATH` | `./data/token-toll.db` | Relative to WORKDIR `/app`, volume at `/app/data` |
+| `TUNNEL` | `false` | No tunnel on headless VPS |
+
+Auth mode is inferred as `lightning` from `LIGHTNING_BACKEND=phoenixd`. Combined with `FREE_TIER_REQUESTS=10`, the first 10 requests per IP per day are free, then Lightning payment is required.
 
 ## Ollama setup
 
 The Ollama container:
 - Uses `ollama/ollama:latest` image
-- Runs with `--network host` (exposes 11434 on localhost)
+- Runs with `--network host` and `OLLAMA_HOST=127.0.0.1:11434` (binds to localhost only, not publicly accessible)
 - Volume: `/opt/ollama/models:/root/.ollama` for model persistence
 - After first start, pull the model: `docker exec ollama ollama pull qwen3:0.6b`
 - Restart policy: `--restart always`
@@ -92,7 +97,11 @@ The deploy script generates a root key on first deploy and stores it in `/opt/to
 
 ### Data volume
 
-Token-toll's SQLite database is stored in a host-mounted volume at `/opt/token-toll/data/` mapped to `/data` in the container.
+Token-toll's SQLite database is stored in a host-mounted volume at `/opt/token-toll/data/` mapped to `/app/data` in the container (relative to `WORKDIR /app`).
+
+### Container restart policy
+
+Both `ollama` and `token-toll` containers use `--restart always`.
 
 ## File changes
 
