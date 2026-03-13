@@ -131,11 +131,14 @@ body {
 }
 .new-chat-btn:hover { border-color: rgba(6,182,212,0.4); color: #22d3ee; }
 
-/* Status bar */
+/* Status bar — inside chat-box, above input */
 .status-bar {
-  text-align: center; font-size: 0.95rem; color: #64748b;
-  margin-bottom: 1.75rem;
+  text-align: center; font-size: 0.85rem; color: #64748b;
+  padding: 0.4rem 1rem;
+  border-top: 1px solid rgba(255,255,255,0.04);
+  background: rgba(0,0,0,0.1);
 }
+.status-bar:empty { display: none; }
 .status-bar .free { color: #4ade80; }
 .status-bar .credit { color: #22d3ee; }
 
@@ -220,14 +223,12 @@ body {
   <div class="chat-box">
     <div id="messages" class="messages"></div>
     <div id="payment-overlay" class="payment-overlay"></div>
+    <div id="status-bar" class="status-bar"></div>
     <div class="input-bar">
       <input id="prompt-input" type="text" placeholder="Ask anything..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();handleSend()}">
       <button id="send-btn" onclick="handleSend()">Send</button>
     </div>
   </div>
-
-  <!-- STATUS -->
-  <div id="status-bar" class="status-bar"></div>
 
   <!-- FOOTER -->
   <div class="footer">
@@ -341,6 +342,9 @@ body {
       }
       if (freeTier.requests_per_day) {
         pricingChips.appendChild(makeChip(freeTier.requests_per_day + ' free requests/day'));
+        // Show initial balance in status bar
+        while (statusBar.firstChild) { statusBar.removeChild(statusBar.firstChild); }
+        statusBar.appendChild(makeStatusSpan('free', freeTier.requests_per_day + ' free requests remaining today'));
       }
     } catch (e) {
       while (pricingChips.firstChild) { pricingChips.removeChild(pricingChips.firstChild); }
