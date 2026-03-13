@@ -256,6 +256,19 @@ body {
   var scrollPending = false;  // rAF debounce for scrollToBottom
   var pricePerThousand = null; // sats per 1k tokens for current model
 
+  // Free token budget — tracked client-side in sessionStorage
+  var FREE_TOKEN_BUDGET = 1000;
+  var freeTokensKey = 'satgate_free_tokens';
+  function getFreeTokens() {
+    var v = sessionStorage.getItem(freeTokensKey);
+    return v === null ? FREE_TOKEN_BUDGET : parseInt(v, 10);
+  }
+  function spendFreeTokens(count) {
+    var remaining = Math.max(0, getFreeTokens() - count);
+    sessionStorage.setItem(freeTokensKey, String(remaining));
+    return remaining;
+  }
+
   // DOM refs
   var messagesEl = document.getElementById('messages');
   var inputEl = document.getElementById('prompt-input');
@@ -346,8 +359,11 @@ body {
         var label = currentModel ? currentModel : 'default';
         pricingChips.appendChild(makeChip(label + ' \u2014 ' + pricePerThousand + ' sats/1k tokens'));
       }
-      if (freeTier.requests_per_day) {
-        pricingChips.appendChild(makeChip(freeTier.requests_per_day + ' free requests/day'));
+      pricingChips.appendChild(makeChip(formatTokenCount(FREE_TOKEN_BUDGET) + ' free tokens to start'));
+
+      // Show initial token balance if no paid credential yet
+      if (!getToken()) {
+        updateFreeTokenStatus();
       }
     } catch (e) {
       while (pricingChips.firstChild) { pricingChips.removeChild(pricingChips.firstChild); }
@@ -375,6 +391,14 @@ body {
     inputEl.value = '';
     pendingPrompt = null;
 
+    // Check if free token budget is exhausted (and no paid credential)
+    var token = getToken();
+    if (!token && getFreeTokens() <= 0) {
+      pendingPrompt = text;
+      showPayment({});
+      return;
+    }
+
     // Append user message
     messages.push({ role: 'user', content: text });
     var userDiv = renderUserMessage(text);
@@ -391,7 +415,6 @@ body {
 
     abortController = new AbortController();
     var headers = { 'Content-Type': 'application/json' };
-    var token = getToken();
     if (token) headers['Authorization'] = token;
 
     try {
@@ -408,13 +431,25 @@ body {
 
       if (res.status === 200) {
         // Read balance headers immediately
-        var freeRemaining = res.headers.get('X-Free-Remaining');
         var creditBalance = res.headers.get('X-Credit-Balance');
-        updateStatusBar(freeRemaining, creditBalance);
 
         await streamResponse(res, contentEl, modelTagEl);
         // After streaming completes, push assistant content
-        messages.push({ role: 'assistant', content: contentEl.textContent });
+        var assistantContent = contentEl.textContent || '';
+        messages.push({ role: 'assistant', content: assistantContent });
+
+        // Track token usage
+        if (creditBalance !== null && parseInt(creditBalance, 10) > 0) {
+          // Paid credit — show server-reported balance in tokens
+          updateStatusBar(creditBalance);
+        } else {
+          // Free tier — estimate tokens from prompt + response text
+          var promptTokens = estimateTokens(text);
+          var responseTokens = estimateTokens(assistantContent);
+          var totalTokens = promptTokens + responseTokens;
+          var remaining = spendFreeTokens(totalTokens);
+          updateFreeTokenStatus();
+        }
       } else if (res.status === 402) {
         // Payment required
         if (token) clearToken(); // token expired/invalid
@@ -655,6 +690,8 @@ body {
     pendingPrompt = null;
     setIdle();
     inputEl.focus();
+    // Refresh status bar
+    if (!getToken()) updateFreeTokenStatus();
   };
 
   // === RENDER HELPERS ===
@@ -679,7 +716,23 @@ body {
     return String(n);
   }
 
-  function updateStatusBar(freeRemaining, creditBalance) {
+  // Rough token estimate: ~4 chars per token for English text
+  function estimateTokens(text) {
+    if (!text) return 0;
+    return Math.ceil(text.length / 4);
+  }
+
+  function updateFreeTokenStatus() {
+    while (statusBar.firstChild) { statusBar.removeChild(statusBar.firstChild); }
+    var remaining = getFreeTokens();
+    if (remaining > 0) {
+      statusBar.appendChild(makeStatusSpan('free', formatTokenCount(remaining) + ' tokens remaining'));
+    } else {
+      statusBar.appendChild(makeStatusSpan('credit', '0 tokens remaining'));
+    }
+  }
+
+  function updateStatusBar(creditBalance) {
     while (statusBar.firstChild) { statusBar.removeChild(statusBar.firstChild); }
     if (creditBalance !== null && creditBalance !== undefined) {
       var sats = parseInt(creditBalance, 10);
