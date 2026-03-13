@@ -29,7 +29,7 @@ rsync -az --delete \
 # --- Step 2: Read Phoenixd password ---
 echo "[2/6] Reading Phoenixd password..."
 PHOENIXD_PASSWORD=$($SSH_CMD "docker exec routing-phoenixd-1 cat /phoenix/.phoenix/phoenix.conf" \
-  | grep 'http-password' | cut -d'=' -f2 | tr -d '[:space:]')
+  | grep '^http-password=' | cut -d'=' -f2 | tr -d '[:space:]')
 if [ -z "$PHOENIXD_PASSWORD" ]; then
   echo "ERROR: Could not read Phoenixd password"
   exit 1
