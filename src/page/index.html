@@ -327,13 +327,17 @@ body {
       var hasModelChips = false;
       if (pricing.models) {
         Object.keys(pricing.models).forEach(function(model) {
-          pricingChips.appendChild(makeChip(model + ' \u2014 ' + pricing.models[model] + ' sats/1k tokens'));
+          var p = pricing.models[model];
+          var cost = (p && p.perThousandTokens !== undefined) ? p.perThousandTokens : p;
+          pricingChips.appendChild(makeChip(model + ' \u2014 ' + cost + ' sats/1k tokens'));
           hasModelChips = true;
         });
       }
       if (!hasModelChips && pricing.default !== undefined) {
         var label = currentModel ? currentModel : 'default';
-        pricingChips.appendChild(makeChip(label + ' \u2014 ' + pricing.default + ' sats/1k tokens'));
+        var dp = pricing.default;
+        var defaultCost = (dp && dp.perThousandTokens !== undefined) ? dp.perThousandTokens : dp;
+        pricingChips.appendChild(makeChip(label + ' \u2014 ' + defaultCost + ' sats/1k tokens'));
       }
       if (freeTier.requests_per_day) {
         pricingChips.appendChild(makeChip(freeTier.requests_per_day + ' free requests/day'));
