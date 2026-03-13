@@ -4,6 +4,14 @@
 
 One command turns a local inference server into a billable API endpoint. satgate auto-detects your models, issues L402 payment challenges, proxies requests once paid, counts actual tokens from the response, and reconciles any overpayment back to the client's credit balance.
 
+## Live Demo
+
+A public instance is running at https://satgate.trotters.dev — open it in a browser for the chat playground, or point any OpenAI-compatible client at it. Discovery endpoints:
+
+- https://satgate.trotters.dev/.well-known/l402
+- https://satgate.trotters.dev/llms.txt
+- https://satgate.trotters.dev/openapi.json
+
 ## Getting Started
 
 ```bash
