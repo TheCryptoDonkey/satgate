@@ -102,15 +102,24 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
       models,
       tiers: config.tiers,
       paymentMethods,
+      x402: config.x402,
     }))
   })
 
   app.get('/llms.txt', (c) => {
-    return c.text(generateLlmsTxt({ pricing: config.pricing, models }))
+    return c.text(generateLlmsTxt({
+      pricing: config.pricing,
+      models,
+      ...(config.x402 && { x402: { network: config.x402.network } }),
+    }))
   })
 
   app.get('/openapi.json', (c) => {
-    return c.json(generateOpenApiSpec({ models, pricing: config.pricing }))
+    return c.json(generateOpenApiSpec({
+      models,
+      pricing: config.pricing,
+      x402: !!config.x402,
+    }))
   })
 
   // Health check
