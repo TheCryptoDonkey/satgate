@@ -10,6 +10,7 @@ import type { PaymentRail } from '@thecryptodonkey/toll-booth'
 import { createHonoTollBooth } from '@thecryptodonkey/toll-booth/hono'
 import type { TollBoothEnv } from '@thecryptodonkey/toll-booth/hono'
 import type { TokenTollConfig } from './config.js'
+import { createNoopLogger, type Logger } from './logger.js'
 import { createAuthMiddleware } from './auth/middleware.js'
 import { createProxyHandler } from './proxy/handler.js'
 import { CapacityTracker } from './proxy/capacity.js'
@@ -24,6 +25,7 @@ export interface TokenTollServer {
 }
 
 export function createTokenTollServer(config: TokenTollConfig): TokenTollServer {
+  const logger = config.logger ?? createNoopLogger()
   const app = new Hono<TollBoothEnv>()
   const capacity = new CapacityTracker(config.capacity.maxConcurrent)
 
@@ -75,6 +77,9 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
     defaultInvoiceAmount: config.tiers[0]?.amountSats ?? 1000,
     freeTier: config.freeTier.requestsPerDay > 0 ? { requestsPerDay: config.freeTier.requestsPerDay } : undefined,
     ...(rails.length > 0 && { rails }),
+    onPayment: (e) => logger.payment(e),
+    onRequest: (e) => logger.request(e),
+    onChallenge: (e) => logger.challenge(e),
   })
 
   // Create Hono toll-booth adapter
@@ -158,6 +163,7 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
     reconcile: (paymentHash, actualCost) => engine.reconcile(paymentHash, actualCost),
     maxBodySize: config.maxBodySize,
     flatPricing: config.flatPricing,
+    logger,
   })
 
   if (config.authMode === 'lightning') {

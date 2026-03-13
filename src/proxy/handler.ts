@@ -3,6 +3,7 @@ import { createStreamingProxy } from './streaming.js'
 import { resolveModelPrice, tokenCostToSats } from './pricing.js'
 import type { CapacityTracker } from './capacity.js'
 import type { ModelPricing } from '../config.js'
+import type { Logger } from '../logger.js'
 
 export interface ProxyDeps {
   upstream: string
@@ -14,6 +15,8 @@ export interface ProxyDeps {
   flatPricing?: boolean
   /** Timeout in ms for upstream requests (default: 120_000). */
   upstreamTimeout?: number
+  /** Logger instance — if omitted, errors are silent. */
+  logger?: Logger
 }
 
 /**
@@ -41,6 +44,7 @@ export function createProxyHandler(deps: ProxyDeps) {
       )
     }
 
+    const start = Date.now()
     let streamingResponse = false
     try {
       // Validate Content-Type
@@ -118,7 +122,12 @@ export function createProxyHandler(deps: ProxyDeps) {
         if (paymentHash) {
           deps.reconcile(paymentHash, 0)
         }
-        console.error('[token-toll] upstream error:', err instanceof Error ? err.message : err)
+        deps.logger?.error('upstream error', {
+          endpoint: new URL(req.url).pathname,
+          method: req.method,
+          latencyMs: Date.now() - start,
+          reason: err instanceof Error ? err.message : String(err),
+        })
         return new Response(
           JSON.stringify({ error: 'Upstream inference API unreachable' }),
           { status: 502, headers: { 'Content-Type': 'application/json' } },

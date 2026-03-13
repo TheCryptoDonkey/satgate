@@ -432,6 +432,27 @@ describe('AI proxy handler', () => {
     expect(res.status).toBe(400)
   })
 
+  it('calls logger.error on upstream failure', async () => {
+    const errorSpy = vi.fn()
+    const handler = createProxyHandler({
+      upstream: 'http://localhost:1', // unreachable
+      pricing,
+      capacity: new CapacityTracker(0),
+      reconcile: vi.fn().mockReturnValue({ adjusted: true, newBalance: 1000, delta: 10 }),
+      maxBodySize: 10 * 1024 * 1024,
+      logger: { error: errorSpy, info: vi.fn(), warn: vi.fn(), payment: vi.fn(), request: vi.fn(), challenge: vi.fn() },
+    })
+    const req = new Request('http://localhost/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'test', messages: [] }),
+    })
+    const res = await handler(req, 'abc123')
+    expect(res.status).toBe(502)
+    expect(errorSpy).toHaveBeenCalledOnce()
+    expect(errorSpy.mock.calls[0][0]).toBe('upstream error')
+  })
+
   it('skips reconciliation when flatPricing is true (streaming)', async () => {
     let reconcileCalled = false
     const capacity = new CapacityTracker(0)
