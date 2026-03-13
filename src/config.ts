@@ -167,30 +167,69 @@ export function loadConfig(
   }
   const dbPath = dbPathRaw
 
-  // Pricing: two separate concerns
-  // 1. pricing.default / pricing.models — per-token pricing (config file users)
-  // 2. config.price / config.flatPricing — flat per-request pricing (CLI quick-start)
-  //
-  // args.price means flat per-request price, NOT pricing.default.
-  // pricing.default comes only from env.DEFAULT_PRICE or file pricing.default.
+  // Pricing: three sources
+  // 1. File: pricing.default / pricing.models (per-token via config file)
+  // 2. CLI flat: --price / file.price (flat per-request)
+  // 3. CLI per-token: --token-price / --model-price (per-token via CLI)
   const pricingDefault = (env.DEFAULT_PRICE ? parseInt(env.DEFAULT_PRICE, 10) : undefined)
     ?? file.pricing?.default
     ?? 1
 
   const pricing: ModelPricing = {
     default: pricingDefault,
-    models: file.pricing?.models ?? {},
+    models: { ...(file.pricing?.models ?? {}) },
   }
 
-  // Flat pricing determination
-  // Flat mode activates when: (a) explicit --price / file.price is set, OR
-  // (b) no pricing config exists at all (quick-start default).
-  // Any file `pricing` block (even just `pricing.default`) opts into per-token mode.
+  // Flat pricing
   const flatPrice = args.price ?? file.price
   if (flatPrice !== undefined && (!Number.isFinite(flatPrice) || flatPrice < 0)) {
     throw new Error(`Invalid price: ${flatPrice} (must be a non-negative number)`)
   }
-  const hasPricingConfig = file.pricing !== undefined
+
+  // Per-token CLI pricing
+  const tokenPrice = args.tokenPrice
+    ?? (env.TOKEN_TOLL_TOKEN_PRICE ? parseInt(env.TOKEN_TOLL_TOKEN_PRICE, 10) : undefined)
+  if (tokenPrice !== undefined && (!Number.isFinite(tokenPrice) || tokenPrice <= 0)) {
+    throw new Error(`Invalid --token-price: ${tokenPrice} (must be a positive integer)`)
+  }
+
+  // Model-price entries from CLI and env (CLI last = CLI wins on conflict)
+  const cliModelEntries = args.modelPrice ?? []
+  const envModelEntries = env.TOKEN_TOLL_MODEL_PRICE?.split(',').filter(Boolean) ?? []
+  const allModelEntries = [...envModelEntries, ...cliModelEntries]
+
+  // Parse model-price entries (split on last colon to allow model IDs with colons)
+  const parsedModelPrices: Record<string, number> = {}
+  for (const raw of allModelEntries) {
+    const lastColonIdx = raw.lastIndexOf(':')
+    if (lastColonIdx === -1) {
+      throw new Error(`Invalid --model-price value: "${raw}" (expected <model>:<sats>)`)
+    }
+    const modelPart = raw.slice(0, lastColonIdx)
+    const ratePart = raw.slice(lastColonIdx + 1)
+    const rate = parseInt(ratePart, 10)
+    if (!Number.isFinite(rate) || rate <= 0) {
+      throw new Error(`Invalid --model-price value: "${raw}" (expected <model>:<sats>)`)
+    }
+    parsedModelPrices[modelPart] = rate
+  }
+
+  const hasCliTokenPricing = tokenPrice !== undefined || allModelEntries.length > 0
+
+  // Mutual exclusion: flat pricing vs per-token pricing
+  if (flatPrice !== undefined && hasCliTokenPricing) {
+    throw new Error('Cannot use --price (flat) and --token-price (per-token) together')
+  }
+
+  // Apply CLI per-token pricing overrides
+  if (hasCliTokenPricing) {
+    if (tokenPrice !== undefined) {
+      pricing.default = tokenPrice
+    }
+    Object.assign(pricing.models, parsedModelPrices)
+  }
+
+  const hasPricingConfig = file.pricing !== undefined || hasCliTokenPricing
   const flatPricing = flatPrice !== undefined || !hasPricingConfig
   const price = flatPrice ?? 1
 
@@ -218,7 +257,7 @@ export function loadConfig(
 
   const tiers = file.tiers ?? []
 
-  const estimatedCostSats = file.estimatedCostSats ?? Math.max(pricingDefault * 10, 10)
+  const estimatedCostSats = file.estimatedCostSats ?? Math.max(pricing.default * 10, 10)
   const maxBodySize = file.maxBodySize ?? 10 * 1024 * 1024 // 10 MiB
 
   // Lightning backend config
