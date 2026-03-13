@@ -61,26 +61,15 @@ export class TokenCounter {
     }
   }
 
-  /** Returns the final token count using the best available source. */
+  /** Returns the final token count using the best available source.
+   *  Uses prompt_tokens from usage stats + content chunk count for completion.
+   *  This avoids billing for reasoning/thinking tokens that some models produce. */
   finalCount(): number {
-    // Priority 1: buffered usage
-    if (this.bufferedUsage) {
-      return this.extractTotal(this.bufferedUsage)
-    }
+    const usage = this.bufferedUsage ?? this.sseUsage
+    const promptTokens = usage?.prompt_tokens ?? 0
 
-    // Priority 2: SSE usage from final chunk
-    if (this.sseUsage) {
-      return this.extractTotal(this.sseUsage)
-    }
-
-    // Priority 3: chunk count fallback
-    return this.contentChunkCount
-  }
-
-  private extractTotal(usage: UsageData): number {
-    if (typeof usage.total_tokens === 'number') return usage.total_tokens
-    const prompt = usage.prompt_tokens ?? 0
-    const completion = usage.completion_tokens ?? 0
-    return prompt + completion
+    // Content chunk count is the most reliable measure of actual output
+    // since it excludes reasoning tokens that models like qwen3 produce
+    return promptTokens + this.contentChunkCount
   }
 }

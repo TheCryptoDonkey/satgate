@@ -3,23 +3,15 @@ import { TokenCounter } from './token-counter.js'
 
 describe('TokenCounter', () => {
   describe('buffered JSON response', () => {
-    it('extracts total_tokens from usage', () => {
+    it('uses prompt_tokens from usage (no content chunks for buffered)', () => {
       const counter = new TokenCounter()
       counter.setBufferedUsage({
         prompt_tokens: 100,
         completion_tokens: 50,
         total_tokens: 150,
       })
-      expect(counter.finalCount()).toBe(150)
-    })
-
-    it('sums prompt + completion if total_tokens missing', () => {
-      const counter = new TokenCounter()
-      counter.setBufferedUsage({
-        prompt_tokens: 100,
-        completion_tokens: 50,
-      })
-      expect(counter.finalCount()).toBe(150)
+      // No content chunks ingested, so finalCount = prompt_tokens + 0
+      expect(counter.finalCount()).toBe(100)
     })
 
     it('returns 0 for empty usage', () => {
@@ -30,7 +22,7 @@ describe('TokenCounter', () => {
   })
 
   describe('SSE chunk ingestion', () => {
-    it('counts content chunks as fallback', () => {
+    it('counts content chunks (no usage stats)', () => {
       const counter = new TokenCounter()
       counter.ingestSSEChunk('data: {"choices":[{"delta":{"content":"Hello"}}]}\n\n')
       counter.ingestSSEChunk('data: {"choices":[{"delta":{"content":" world"}}]}\n\n')
@@ -38,11 +30,26 @@ describe('TokenCounter', () => {
       expect(counter.finalCount()).toBe(2)
     })
 
-    it('extracts usage from final chunk (OpenAI format)', () => {
+    it('uses prompt_tokens from usage + content chunk count', () => {
       const counter = new TokenCounter()
       counter.ingestSSEChunk('data: {"choices":[{"delta":{"content":"Hi"}}]}\n\n')
       counter.ingestSSEChunk('data: {"choices":[],"usage":{"prompt_tokens":10,"completion_tokens":1,"total_tokens":11}}\n\n')
       counter.ingestSSEChunk('data: [DONE]\n\n')
+      // prompt_tokens(10) + content_chunks(1) = 11
+      expect(counter.finalCount()).toBe(11)
+    })
+
+    it('excludes reasoning tokens from billing', () => {
+      const counter = new TokenCounter()
+      // Reasoning chunks (not content)
+      counter.ingestSSEChunk('data: {"choices":[{"delta":{"reasoning":"thinking..."}}]}\n\n')
+      counter.ingestSSEChunk('data: {"choices":[{"delta":{"reasoning":"more thinking"}}]}\n\n')
+      // Actual content
+      counter.ingestSSEChunk('data: {"choices":[{"delta":{"content":"Hello!"}}]}\n\n')
+      // Usage includes all tokens (reasoning + content + prompt)
+      counter.ingestSSEChunk('data: {"choices":[],"usage":{"prompt_tokens":10,"completion_tokens":50,"total_tokens":60}}\n\n')
+      counter.ingestSSEChunk('data: [DONE]\n\n')
+      // Should bill: prompt(10) + content_chunks(1) = 11, NOT total_tokens(60)
       expect(counter.finalCount()).toBe(11)
     })
 
@@ -72,21 +79,15 @@ describe('TokenCounter', () => {
   })
 
   describe('priority', () => {
-    it('usage from final chunk beats chunk count', () => {
+    it('prompt_tokens from usage + content chunks', () => {
       const counter = new TokenCounter()
       counter.ingestSSEChunk('data: {"choices":[{"delta":{"content":"a"}}]}\n\n')
       counter.ingestSSEChunk('data: {"choices":[{"delta":{"content":"b"}}]}\n\n')
       counter.ingestSSEChunk('data: {"choices":[{"delta":{"content":"c"}}]}\n\n')
-      counter.ingestSSEChunk('data: {"choices":[],"usage":{"total_tokens":50}}\n\n')
+      counter.ingestSSEChunk('data: {"choices":[],"usage":{"prompt_tokens":20,"total_tokens":50}}\n\n')
       counter.ingestSSEChunk('data: [DONE]\n\n')
-      expect(counter.finalCount()).toBe(50)
-    })
-
-    it('buffered usage beats SSE data', () => {
-      const counter = new TokenCounter()
-      counter.ingestSSEChunk('data: {"choices":[{"delta":{"content":"a"}}]}\n\n')
-      counter.setBufferedUsage({ total_tokens: 100 })
-      expect(counter.finalCount()).toBe(100)
+      // prompt(20) + content_chunks(3) = 23
+      expect(counter.finalCount()).toBe(23)
     })
   })
 })

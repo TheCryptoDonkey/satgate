@@ -51,16 +51,17 @@ describe('createStreamingProxy', () => {
     expect(onComplete).toHaveBeenCalledWith(2)
   })
 
-  it('uses usage from final chunk when available', async () => {
+  it('uses prompt_tokens from usage + content chunk count', async () => {
     const events = [
       'data: {"choices":[{"delta":{"content":"hi"}}]}\n\n',
-      'data: {"choices":[],"usage":{"total_tokens":42}}\n\n',
+      'data: {"choices":[],"usage":{"prompt_tokens":20,"total_tokens":42}}\n\n',
       'data: [DONE]\n\n',
     ]
     const onComplete = vi.fn()
     const { readable } = createStreamingProxy(makeSSEStream(events), onComplete)
     await collectStream(readable)
-    expect(onComplete).toHaveBeenCalledWith(42)
+    // prompt_tokens(20) + content_chunks(1) = 21, not total_tokens(42)
+    expect(onComplete).toHaveBeenCalledWith(21)
   })
 
   it('handles empty stream', async () => {
