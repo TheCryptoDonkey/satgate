@@ -52,6 +52,8 @@ export interface TokenTollConfig {
   verbose: boolean
   logFormat: 'pretty' | 'json'
   logger?: Logger
+  /** Human-readable service name for Lightning invoice descriptions. Defaults to 'toll-booth'. */
+  serviceName?: string
 }
 
 export interface CliArgs {
@@ -257,7 +259,9 @@ export function loadConfig(
 
   const tiers = file.tiers ?? []
 
-  const estimatedCostSats = file.estimatedCostSats ?? Math.max(pricing.default * 10, 10)
+  const estimatedCostSats = env.SATGATE_ESTIMATED_COST
+    ? parseInt(env.SATGATE_ESTIMATED_COST, 10)
+    : file.estimatedCostSats ?? Math.max(pricing.default * 2, 5)
   const maxBodySize = file.maxBodySize ?? 10 * 1024 * 1024 // 10 MiB
 
   // Lightning backend config
@@ -337,6 +341,8 @@ export function loadConfig(
   }
   const logFormat = logFormatRaw as 'pretty' | 'json'
 
+  const serviceName = env.SATGATE_SERVICE_NAME ?? 'satgate'
+
   return {
     upstream: upstream.replace(/\/+$/, ''),
     port,
@@ -363,5 +369,6 @@ export function loadConfig(
     defaultPriceUsd,
     verbose,
     logFormat,
+    serviceName,
   }
 }

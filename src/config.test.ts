@@ -522,7 +522,7 @@ describe('per-token CLI pricing', () => {
 
   it('estimatedCostSats reflects CLI tokenPrice when set', () => {
     const config = loadConfig({ upstream: 'http://localhost:11434', tokenPrice: 5 })
-    expect(config.estimatedCostSats).toBe(50)
+    expect(config.estimatedCostSats).toBe(10)
   })
 
   it('model ID with colon (e.g. qwen3:0.6b) parses correctly', () => {
