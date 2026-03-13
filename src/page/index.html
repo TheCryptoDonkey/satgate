@@ -4,8 +4,720 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>satgate</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: linear-gradient(135deg, #0a0a1a, #0d1525);
+  color: #e2e8f0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2.5rem 1rem;
+  line-height: 1.6;
+}
+
+.container { max-width: 720px; width: 100%; }
+
+/* Hero */
+.hero { text-align: center; margin-bottom: 2rem; }
+.hero .icon { font-size: 5rem; display: block; margin-bottom: 0.5rem; }
+.hero h1 {
+  font-size: 3rem; font-weight: 800;
+  background: linear-gradient(135deg, #06b6d4, #22d3ee);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; margin-bottom: 0.5rem;
+}
+.hero .tagline { color: #94a3b8; font-size: 1.3rem; }
+
+/* Pricing chips */
+.pricing-chips {
+  display: flex; flex-wrap: wrap; gap: 0.6rem;
+  justify-content: center; margin-bottom: 2rem;
+}
+.chip {
+  background: rgba(6, 182, 212, 0.1);
+  border: 1px solid rgba(6, 182, 212, 0.3);
+  color: #22d3ee; padding: 0.4rem 0.9rem;
+  border-radius: 999px; font-size: 0.95rem;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+
+/* Chat area */
+.chat-box {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 1rem;
+  overflow: hidden;
+  margin-bottom: 1.25rem;
+}
+.messages {
+  padding: 1.5rem;
+  min-height: 320px;
+  max-height: 60vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.msg {
+  max-width: 85%;
+  padding: 0.75rem 1.1rem;
+  border-radius: 0.75rem;
+  font-size: 1.1rem;
+  line-height: 1.6;
+  word-wrap: break-word;
+}
+.msg.user {
+  align-self: flex-end;
+  background: rgba(6, 182, 212, 0.15);
+  border: 1px solid rgba(6, 182, 212, 0.25);
+  color: #e2e8f0;
+}
+.msg.assistant {
+  align-self: flex-start;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #cbd5e1;
+}
+.msg .model-tag {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-bottom: 0.3rem;
+  font-family: monospace;
+}
+
+/* Input bar */
+.input-bar {
+  display: flex; gap: 0.6rem;
+  padding: 0.85rem 1.1rem;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  background: rgba(0,0,0,0.15);
+}
+.input-bar input {
+  flex: 1; background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #e2e8f0; padding: 0.7rem 1rem;
+  border-radius: 0.5rem; font-size: 1.1rem;
+  font-family: inherit; outline: none;
+}
+.input-bar input::placeholder { color: #475569; }
+.input-bar input:focus { border-color: rgba(6,182,212,0.4); }
+.input-bar button {
+  background: linear-gradient(135deg, #06b6d4, #22d3ee);
+  border: none; color: #0a0a1a; font-weight: 700;
+  padding: 0.7rem 1.5rem; border-radius: 0.5rem;
+  font-size: 1.1rem; cursor: pointer; font-family: inherit;
+}
+.input-bar button:hover { filter: brightness(1.1); }
+.input-bar button:disabled {
+  opacity: 0.5; cursor: not-allowed; filter: none;
+}
+
+/* New chat button */
+.new-chat-btn {
+  display: none;
+  margin: 0 auto 1rem;
+  padding: 0.45rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.9rem;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.15);
+  color: #94a3b8;
+  cursor: pointer;
+  font-family: inherit;
+}
+.new-chat-btn:hover { border-color: rgba(6,182,212,0.4); color: #22d3ee; }
+
+/* Status bar */
+.status-bar {
+  text-align: center; font-size: 0.95rem; color: #64748b;
+  margin-bottom: 1.75rem;
+}
+.status-bar .free { color: #4ade80; }
+.status-bar .credit { color: #22d3ee; }
+
+/* Payment overlay — inside chat-box, hidden by default */
+.payment-overlay {
+  display: none;
+  background: rgba(0,0,0,0.85);
+  border-top: 1px solid rgba(6,182,212,0.2);
+  padding: 1.75rem;
+  text-align: center;
+}
+.payment-overlay h3 { color: #22d3ee; margin-bottom: 0.35rem; font-size: 1.3rem; }
+.payment-overlay .sub { color: #94a3b8; font-size: 1rem; margin-bottom: 1.25rem; }
+.qr-container {
+  width: 220px; margin: 0 auto 1.25rem;
+  background: #fff; border-radius: 0.5rem; padding: 0.75rem;
+}
+.qr-container svg { width: 100%; height: auto; display: block; }
+.payment-actions { display: flex; gap: 0.6rem; justify-content: center; flex-wrap: wrap; }
+.btn-outline {
+  padding: 0.55rem 1.15rem; border-radius: 0.5rem; font-size: 1rem;
+  background: transparent; border: 1px solid rgba(6,182,212,0.4);
+  color: #22d3ee; cursor: pointer; font-family: inherit;
+}
+.btn-outline:hover { background: rgba(6,182,212,0.1); }
+.btn-solid {
+  padding: 0.55rem 1.15rem; border-radius: 0.5rem; font-size: 1rem;
+  background: linear-gradient(135deg, #06b6d4, #22d3ee);
+  border: none; color: #0a0a1a; font-weight: 600;
+  cursor: pointer; font-family: inherit;
+}
+.btn-solid:hover { filter: brightness(1.1); }
+.poll-status { color: #64748b; font-size: 0.9rem; margin-top: 0.75rem; }
+
+/* Footer */
+.footer {
+  text-align: center; font-size: 0.9rem; color: #475569;
+  margin-top: 0.75rem;
+}
+.footer a { color: #64748b; text-decoration: none; }
+.footer a:hover { color: #22d3ee; }
+.footer .links {
+  display: flex; gap: 1.25rem; justify-content: center;
+  margin-top: 0.5rem; font-size: 0.85rem;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+
+/* Mobile */
+@media (max-width: 480px) {
+  body { padding: 1.5rem 0.75rem; }
+  .hero .icon { font-size: 3.5rem; }
+  .hero h1 { font-size: 2rem; }
+  .hero .tagline { font-size: 1.05rem; }
+  .chip { font-size: 0.8rem; }
+  .msg { font-size: 0.95rem; }
+  .input-bar input, .input-bar button { font-size: 0.95rem; }
+  .messages { min-height: 240px; padding: 1rem; }
+  .status-bar { font-size: 0.85rem; }
+  .payment-overlay h3 { font-size: 1.1rem; }
+  .qr-container { width: 180px; }
+  .footer .links { flex-wrap: wrap; gap: 0.75rem; }
+}
+</style>
 </head>
 <body>
-<h1>satgate</h1>
+<div class="container">
+
+  <!-- HERO -->
+  <div class="hero">
+    <span class="icon">&#x1F6F8;</span>
+    <h1>satgate</h1>
+    <p class="tagline">Pay-per-token AI inference. No accounts. Just sats.</p>
+  </div>
+
+  <!-- LIVE PRICING (populated by JS) -->
+  <div id="pricing-chips" class="pricing-chips"></div>
+
+  <!-- NEW CHAT -->
+  <button id="new-chat-btn" class="new-chat-btn" onclick="newChat()">New chat</button>
+
+  <!-- CHAT BOX -->
+  <div class="chat-box">
+    <div id="messages" class="messages"></div>
+    <div id="payment-overlay" class="payment-overlay"></div>
+    <div class="input-bar">
+      <input id="prompt-input" type="text" placeholder="Ask anything..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();handleSend()}">
+      <button id="send-btn" onclick="handleSend()">Send</button>
+    </div>
+  </div>
+
+  <!-- STATUS -->
+  <div id="status-bar" class="status-bar"></div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <p>Powered by <a href="https://github.com/TheCryptoDonkey/toll-booth" target="_blank">toll-booth</a> &#x2014; L402 Lightning middleware</p>
+    <div class="links">
+      <a href="https://github.com/TheCryptoDonkey/token-toll" target="_blank">GitHub</a>
+      <a href="/.well-known/l402">/.well-known/l402</a>
+      <a href="/llms.txt">/llms.txt</a>
+      <a href="/openapi.json">/openapi.json</a>
+    </div>
+  </div>
+
+</div>
+<script>
+(function() {
+  'use strict';
+
+  // State
+  var messages = [];          // { role, content } array
+  var currentModel = null;    // from /.well-known/l402
+  var abortController = null;
+  var pollTimer = null;
+  var pendingPrompt = null;   // saved when 402 interrupts
+  var invoiceData = null;     // current invoice (bolt11, macaroon, qr_svg)
+  var scrollPending = false;  // rAF debounce for scrollToBottom
+
+  // DOM refs
+  var messagesEl = document.getElementById('messages');
+  var inputEl = document.getElementById('prompt-input');
+  var sendBtn = document.getElementById('send-btn');
+  var statusBar = document.getElementById('status-bar');
+  var pricingChips = document.getElementById('pricing-chips');
+  var paymentOverlay = document.getElementById('payment-overlay');
+  var newChatBtn = document.getElementById('new-chat-btn');
+
+  // Get stored L402 token
+  function getToken() {
+    return sessionStorage.getItem('l402_token');
+  }
+  function setToken(token) {
+    sessionStorage.setItem('l402_token', token);
+  }
+  function clearToken() {
+    sessionStorage.removeItem('l402_token');
+  }
+
+  // === DOM HELPERS ===
+  function el(tag, attrs, children) {
+    var node = document.createElement(tag);
+    if (attrs) {
+      Object.keys(attrs).forEach(function(k) {
+        if (k === 'className') { node.className = attrs[k]; }
+        else if (k === 'textContent') { node.textContent = attrs[k]; }
+        else if (k === 'style') { node.style.cssText = attrs[k]; }
+        else if (k.startsWith('on')) { node[k] = attrs[k]; }
+        else { node.setAttribute(k, attrs[k]); }
+      });
+    }
+    if (children) {
+      children.forEach(function(c) {
+        if (typeof c === 'string') { node.appendChild(document.createTextNode(c)); }
+        else if (c) { node.appendChild(c); }
+      });
+    }
+    return node;
+  }
+
+  function makeChip(text) {
+    return el('span', { className: 'chip', textContent: text });
+  }
+
+  function makeErrorSpan(text) {
+    return el('span', { style: 'color:#f87171', textContent: text });
+  }
+
+  function makeStatusSpan(cls, text) {
+    return el('span', { className: cls, textContent: text });
+  }
+
+  // === INIT ===
+  async function init() {
+    try {
+      var res = await fetch('/.well-known/l402');
+      var data = await res.json();
+
+      // Extract models and pricing
+      var models = (data.capabilities && data.capabilities.models) || [];
+      var pricing = data.pricing || {};
+      var freeTier = data.free_tier || {};
+
+      // Set current model
+      currentModel = models[0] || null;
+
+      // Clear and populate pricing chips
+      while (pricingChips.firstChild) { pricingChips.removeChild(pricingChips.firstChild); }
+
+      var hasModelChips = false;
+      if (pricing.models) {
+        Object.keys(pricing.models).forEach(function(model) {
+          pricingChips.appendChild(makeChip(model + ' \u2014 ' + pricing.models[model] + ' sats/1k tokens'));
+          hasModelChips = true;
+        });
+      }
+      if (!hasModelChips && pricing.default !== undefined) {
+        var label = currentModel ? currentModel : 'default';
+        pricingChips.appendChild(makeChip(label + ' \u2014 ' + pricing.default + ' sats/1k tokens'));
+      }
+      if (freeTier.requests_per_day) {
+        pricingChips.appendChild(makeChip(freeTier.requests_per_day + ' free requests/day'));
+      }
+    } catch (e) {
+      while (pricingChips.firstChild) { pricingChips.removeChild(pricingChips.firstChild); }
+      pricingChips.appendChild(makeChip('Could not load pricing'));
+    }
+    inputEl.focus();
+  }
+
+  // === SEND MESSAGE ===
+  // Expose globally for onclick handlers
+  window.handleSend = function() {
+    var text = inputEl.value.trim();
+    if (!text) return;
+    if (abortController) {
+      // Currently streaming — abort
+      abortController.abort();
+      abortController = null;
+      setIdle();
+      return;
+    }
+    sendMessage(text);
+  };
+
+  async function sendMessage(text) {
+    inputEl.value = '';
+    pendingPrompt = null;
+
+    // Append user message
+    messages.push({ role: 'user', content: text });
+    var userDiv = renderUserMessage(text);
+
+    // Create empty assistant message
+    var assistantResult = renderAssistantMessage();
+    var contentEl = assistantResult.contentEl;
+    var modelTagEl = assistantResult.modelTagEl;
+    var assistantDiv = assistantResult.div;
+
+    newChatBtn.style.display = 'block';
+    setStreaming();
+    scrollToBottom();
+
+    abortController = new AbortController();
+    var headers = { 'Content-Type': 'application/json' };
+    var token = getToken();
+    if (token) headers['Authorization'] = token;
+
+    try {
+      var res = await fetch('/v1/chat/completions', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({
+          model: currentModel,
+          messages: messages,
+          stream: true,
+        }),
+        signal: abortController.signal,
+      });
+
+      if (res.status === 200) {
+        // Read balance headers immediately
+        var freeRemaining = res.headers.get('X-Free-Remaining');
+        var creditBalance = res.headers.get('X-Credit-Balance');
+        updateStatusBar(freeRemaining, creditBalance);
+
+        await streamResponse(res, contentEl, modelTagEl);
+        // After streaming completes, push assistant content
+        messages.push({ role: 'assistant', content: contentEl.textContent });
+      } else if (res.status === 402) {
+        // Payment required
+        if (token) clearToken(); // token expired/invalid
+        pendingPrompt = text;
+        // Remove the user message and empty assistant div
+        messages.pop(); // remove user message we just added
+        userDiv.remove();
+        assistantDiv.remove();
+        if (messages.length === 0) newChatBtn.style.display = 'none';
+        var body = await res.json();
+        showPayment(body);
+      } else if (res.status === 503) {
+        while (contentEl.firstChild) { contentEl.removeChild(contentEl.firstChild); }
+        contentEl.appendChild(makeErrorSpan('Server busy \u2014 try again in a moment.'));
+      } else {
+        while (contentEl.firstChild) { contentEl.removeChild(contentEl.firstChild); }
+        contentEl.appendChild(makeErrorSpan('Error: ' + res.status));
+      }
+    } catch (e) {
+      if (e.name === 'AbortError') {
+        // User cancelled — keep partial content
+        if (!contentEl.textContent) {
+          assistantDiv.remove();
+        }
+      } else {
+        while (contentEl.firstChild) { contentEl.removeChild(contentEl.firstChild); }
+        contentEl.appendChild(makeErrorSpan('Network error \u2014 check your connection.'));
+      }
+    }
+
+    abortController = null;
+    setIdle();
+  }
+
+  // === STREAM RESPONSE ===
+  async function streamResponse(res, contentEl, modelTagEl) {
+    if (!res.body) return;
+    var reader = res.body.getReader();
+    var decoder = new TextDecoder();
+    var buffer = '';
+    var fullContent = '';
+    var gotModel = false;
+
+    while (true) {
+      var result = await reader.read();
+      if (result.done) break;
+      buffer += decoder.decode(result.value, { stream: true });
+
+      var lines = buffer.split('\n');
+      buffer = lines.pop(); // keep incomplete line
+
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i].trim();
+        if (!line.startsWith('data: ')) continue;
+        var payload = line.slice(6);
+        if (payload === '[DONE]') {
+          reader.cancel();
+          return;
+        }
+        try {
+          var json = JSON.parse(payload);
+          if (!gotModel && json.model) {
+            modelTagEl.textContent = json.model;
+            gotModel = true;
+          }
+          var delta = json.choices && json.choices[0] && json.choices[0].delta;
+          if (delta && delta.content) {
+            fullContent += delta.content;
+            contentEl.textContent = fullContent;
+            scrollToBottom();
+          }
+        } catch (parseErr) {
+          // skip malformed JSON
+        }
+      }
+    }
+
+    // Flush any remaining data in the buffer after stream ends
+    if (buffer.trim().startsWith('data: ')) {
+      var remaining = buffer.trim().slice(6);
+      if (remaining !== '[DONE]') {
+        try {
+          var lastJson = JSON.parse(remaining);
+          if (!gotModel && lastJson.model) modelTagEl.textContent = lastJson.model;
+          var lastDelta = lastJson.choices && lastJson.choices[0] && lastJson.choices[0].delta;
+          if (lastDelta && lastDelta.content) {
+            fullContent += lastDelta.content;
+            contentEl.textContent = fullContent;
+          }
+        } catch (e) { /* skip */ }
+      }
+    }
+  }
+
+  // === PAYMENT ===
+  // Build the payment overlay DOM using DOM methods. QR SVG from the server is
+  // parsed via DOMParser and sanitised (scripts/event handlers stripped) before import.
+  function buildPaymentOverlay(data) {
+    while (paymentOverlay.firstChild) { paymentOverlay.removeChild(paymentOverlay.firstChild); }
+
+    var h3 = el('h3', { textContent: '\u26A1 Top up to keep chatting' });
+    var sub = el('p', { className: 'sub', textContent: 'Scan with any Lightning wallet' });
+    paymentOverlay.appendChild(h3);
+    paymentOverlay.appendChild(sub);
+
+    if (data && data.qr_svg) {
+      var qrContainer = el('div', { className: 'qr-container' });
+      // Parse server-supplied SVG via DOMParser then sanitise before import
+      var parser = new DOMParser();
+      var svgDoc = parser.parseFromString(data.qr_svg, 'image/svg+xml');
+      var svgEl = svgDoc.documentElement;
+      if (svgEl && svgEl.tagName && svgEl.tagName.toLowerCase() === 'svg') {
+        sanitiseSvg(svgEl);
+        qrContainer.appendChild(document.importNode(svgEl, true));
+      }
+      paymentOverlay.appendChild(qrContainer);
+    }
+
+    var actions = el('div', { className: 'payment-actions' });
+
+    if (data && data.bolt11) {
+      var copyBtn = el('button', { className: 'btn-outline', textContent: 'Copy invoice' });
+      copyBtn.onclick = window.copyInvoice;
+      actions.appendChild(copyBtn);
+    }
+
+    if (window.webln) {
+      var weblnBtn = el('button', { className: 'btn-solid', textContent: 'Pay with WebLN' });
+      weblnBtn.onclick = window.payWithWebLN;
+      actions.appendChild(weblnBtn);
+    }
+
+    paymentOverlay.appendChild(actions);
+
+    var pollStatusEl = el('p', { className: 'poll-status', id: 'poll-status', textContent: 'Waiting for payment...' });
+    paymentOverlay.appendChild(pollStatusEl);
+  }
+
+  function buildPaymentLoading() {
+    while (paymentOverlay.firstChild) { paymentOverlay.removeChild(paymentOverlay.firstChild); }
+    paymentOverlay.appendChild(el('h3', { textContent: '\u26A1 Top up to keep chatting' }));
+    paymentOverlay.appendChild(el('p', { className: 'sub', textContent: 'Scan with any Lightning wallet' }));
+    paymentOverlay.appendChild(el('div', { className: 'poll-status', textContent: 'Loading invoice...' }));
+  }
+
+  function buildPaymentError() {
+    while (paymentOverlay.firstChild) { paymentOverlay.removeChild(paymentOverlay.firstChild); }
+    paymentOverlay.appendChild(el('h3', { textContent: '\u26A1 Payment Error' }));
+    paymentOverlay.appendChild(el('p', { className: 'sub', textContent: 'Could not create invoice. Try refreshing.' }));
+  }
+
+  async function showPayment(challengeBody) {
+    paymentOverlay.style.display = 'block';
+    buildPaymentLoading();
+    setIdle(); // re-enable input area but payment is shown
+
+    try {
+      var res = await fetch('/create-invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      var data = await res.json();
+
+      buildPaymentOverlay(data);
+
+      // Store invoice data for copy/webln
+      invoiceData = data;
+
+      // Start polling
+      if (data.payment_url) {
+        pollTimer = setInterval(function() {
+          checkPayment(data.payment_url, data.macaroon);
+        }, 3000);
+      }
+    } catch (e) {
+      buildPaymentError();
+    }
+  }
+
+  async function checkPayment(paymentUrl, macaroon) {
+    try {
+      var res = await fetch(paymentUrl);
+      var data = await res.json();
+      if (data.paid) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+        // Store L402 credential
+        setToken('L402 ' + macaroon + ':' + data.preimage);
+        // Dismiss overlay
+        paymentOverlay.style.display = 'none';
+        while (paymentOverlay.firstChild) { paymentOverlay.removeChild(paymentOverlay.firstChild); }
+        // Retry pending prompt
+        if (pendingPrompt) {
+          sendMessage(pendingPrompt);
+        }
+      }
+    } catch (e) {
+      // Polling error — keep trying
+    }
+  }
+
+  // Copy invoice to clipboard
+  window.copyInvoice = function() {
+    if (invoiceData && invoiceData.bolt11) {
+      navigator.clipboard.writeText(invoiceData.bolt11).then(function() {
+        var btn = paymentOverlay.querySelector('.btn-outline');
+        if (btn) {
+          btn.textContent = 'Copied!';
+          setTimeout(function() { btn.textContent = 'Copy invoice'; }, 2000);
+        }
+      });
+    }
+  };
+
+  // Pay with WebLN
+  window.payWithWebLN = async function() {
+    if (window.webln && invoiceData && invoiceData.bolt11) {
+      try {
+        await window.webln.enable();
+        await window.webln.sendPayment(window._invoiceData.bolt11);
+        // WebLN payment sent — polling will pick up the settlement
+      } catch (e) {
+        // WebLN failed — user can still scan QR
+      }
+    }
+  };
+
+  // === NEW CHAT ===
+  window.newChat = function() {
+    messages = [];
+    while (messagesEl.firstChild) { messagesEl.removeChild(messagesEl.firstChild); }
+    newChatBtn.style.display = 'none';
+    paymentOverlay.style.display = 'none';
+    while (paymentOverlay.firstChild) { paymentOverlay.removeChild(paymentOverlay.firstChild); }
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    if (abortController) { abortController.abort(); abortController = null; }
+    pendingPrompt = null;
+    setIdle();
+    inputEl.focus();
+  };
+
+  // === RENDER HELPERS ===
+  function renderUserMessage(text) {
+    var div = el('div', { className: 'msg user', textContent: text });
+    messagesEl.appendChild(div);
+    return div;
+  }
+
+  function renderAssistantMessage() {
+    var div = el('div', { className: 'msg assistant' });
+    var modelTag = el('div', { className: 'model-tag', textContent: currentModel || '' });
+    var content = el('div', {});
+    div.appendChild(modelTag);
+    div.appendChild(content);
+    messagesEl.appendChild(div);
+    return { div: div, contentEl: content, modelTagEl: modelTag };
+  }
+
+  function updateStatusBar(freeRemaining, creditBalance) {
+    while (statusBar.firstChild) { statusBar.removeChild(statusBar.firstChild); }
+    if (creditBalance !== null && creditBalance !== undefined) {
+      var sats = parseInt(creditBalance, 10);
+      if (!isNaN(sats) && sats > 0) {
+        statusBar.appendChild(makeStatusSpan('credit', sats + ' sats credit remaining'));
+        return;
+      }
+    }
+    if (freeRemaining !== null && freeRemaining !== undefined) {
+      var remaining = parseInt(freeRemaining, 10);
+      if (!isNaN(remaining)) {
+        statusBar.appendChild(makeStatusSpan('free', remaining + ' free request' + (remaining !== 1 ? 's' : '') + ' remaining today'));
+        return;
+      }
+    }
+  }
+
+  function setStreaming() {
+    sendBtn.textContent = 'Stop';
+    inputEl.disabled = true;
+  }
+
+  function setIdle() {
+    sendBtn.textContent = 'Send';
+    inputEl.disabled = false;
+    if (paymentOverlay.style.display !== 'block') inputEl.focus();
+  }
+
+  function scrollToBottom() {
+    if (!scrollPending) {
+      scrollPending = true;
+      requestAnimationFrame(function() {
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+        scrollPending = false;
+      });
+    }
+  }
+
+  function sanitiseSvg(svgEl) {
+    // Remove <script> elements and event-handler attributes
+    var scripts = svgEl.querySelectorAll('script');
+    for (var i = 0; i < scripts.length; i++) scripts[i].remove();
+    var all = svgEl.querySelectorAll('*');
+    for (var j = 0; j < all.length; j++) {
+      var attrs = all[j].attributes;
+      for (var k = attrs.length - 1; k >= 0; k--) {
+        if (attrs[k].name.startsWith('on')) all[j].removeAttribute(attrs[k].name);
+      }
+    }
+  }
+
+  // === START ===
+  init();
+})();
+</script>
 </body>
 </html>
