@@ -200,6 +200,95 @@ describe('E2E: token-toll', () => {
     })
   })
 
+  describe('E2E: x402 payments', () => {
+    let facilitatorServer: ReturnType<typeof serve>
+    let facilitatorUrl: string
+
+    function mockFacilitatorServer() {
+      const app = new Hono()
+      app.post('/', async (c) => {
+        const body = await c.req.json()
+        return c.json({
+          valid: true,
+          txHash: '0x' + 'b'.repeat(62),
+          amount: body.amount ?? 500,
+          sender: body.sender ?? '0xsender',
+        })
+      })
+      return app
+    }
+
+    beforeEach(async () => {
+      const facilitator = mockFacilitatorServer()
+      await new Promise<void>((resolve) => {
+        facilitatorServer = serve({ fetch: facilitator.fetch, port: 0 }, (info) => {
+          facilitatorUrl = `http://localhost:${info.port}`
+          resolve()
+        })
+      })
+    })
+
+    afterEach(() => {
+      facilitatorServer?.close()
+    })
+
+    it('returns 402 with x402 info when configured', async () => {
+      const { app } = createTokenTollServer({
+        ...baseConfig,
+        upstream: upstreamUrl,
+        defaultPriceUsd: 5,
+        x402: {
+          receiverAddress: '0xreceiver',
+          network: 'base',
+          facilitatorUrl,
+        },
+      })
+
+      const res = await app.request('/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'llama3', messages: [{ role: 'user', content: 'hi' }] }),
+      })
+
+      expect(res.status).toBe(402)
+      const body = await res.json()
+      expect(body.x402).toBeDefined()
+      expect(body.x402.receiver).toBe('0xreceiver')
+      expect(body.x402.network).toBe('base')
+      expect(body.x402.amount_usd).toBe(5)
+    })
+
+    it('discovery endpoints include x402 when configured', async () => {
+      const { app } = createTokenTollServer({
+        ...baseConfig,
+        upstream: upstreamUrl,
+        defaultPriceUsd: 5,
+        x402: {
+          receiverAddress: '0xreceiver',
+          network: 'base',
+          facilitatorUrl,
+        },
+      })
+
+      // well-known
+      const wk = await app.request('/.well-known/l402')
+      const wkBody = await wk.json()
+      expect(wkBody.payment.methods).toContain('x402')
+      expect(wkBody.payment.x402).toBeDefined()
+      expect(wkBody.payment.x402.receiver).toBe('0xreceiver')
+
+      // llms.txt
+      const llms = await app.request('/llms.txt')
+      const llmsText = await llms.text()
+      expect(llmsText).toContain('x402')
+
+      // openapi
+      const oa = await app.request('/openapi.json')
+      const oaBody = await oa.json()
+      expect(oaBody.components.securitySchemes).toHaveProperty('x402')
+    })
+  })
+
   describe('E2E: flat pricing mode', () => {
     it('completes request without reconciliation errors in flat pricing mode', async () => {
       const { app } = createTokenTollServer({
