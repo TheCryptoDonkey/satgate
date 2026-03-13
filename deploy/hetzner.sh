@@ -2,9 +2,9 @@
 set -euo pipefail
 
 # --- Configuration ---
-VPS_HOST="REDACTED_IP"
-VPS_USER="deploy"
-SSH_KEY="$HOME/.ssh/id_ed25519"
+VPS_HOST="${VPS_HOST:?Set VPS_HOST environment variable}"
+VPS_USER="${VPS_USER:-deploy}"
+SSH_KEY="${SSH_KEY:-$HOME/.ssh/id_ed25519}"
 SSH_CMD="ssh -o IdentityFile=$SSH_KEY -o IdentitiesOnly=yes $VPS_USER@$VPS_HOST"
 REMOTE_DIR="/opt/token-toll"
 CONTAINER_NAME="token-toll"
@@ -16,6 +16,7 @@ echo "=== token-toll deploy ==="
 
 # --- Step 1: Rsync repo to VPS ---
 echo "[1/6] Syncing repo to VPS..."
+$SSH_CMD "mkdir -p $REMOTE_DIR/src"
 rsync -az --delete \
   --exclude=node_modules \
   --exclude=dist \
