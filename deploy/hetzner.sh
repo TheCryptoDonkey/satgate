@@ -93,7 +93,7 @@ $SSH_CMD "docker run -d \
   -e ROOT_KEY=$ROOT_KEY \
   -e SATGATE_TOKEN_PRICE=1 \
   -e 'SATGATE_MODEL_PRICE=$OLLAMA_MODEL:2' \
-  -e FREE_TIER_REQUESTS=10 \
+  -e FREE_TIER_REQUESTS=3 \
   -e STORAGE=sqlite \
   -e SATGATE_DB_PATH=./data/satgate.db \
   -e TUNNEL=false \
