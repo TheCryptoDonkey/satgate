@@ -31,7 +31,7 @@ logger.ts
 stdout
 ```
 
-The logger is created once in `cli.ts` and threaded through config. No global state, no singletons. When no logger is provided (programmatic use, tests), a silent no-op logger is used.
+The logger is created once in `cli.ts` and passed to `createTokenTollServer()` via a `logger?: Logger` field on `TokenTollConfig`. No global state, no singletons. When `logger` is omitted (programmatic use, tests), `createTokenTollServer` creates a no-op logger internally.
 
 ## Logger module (`src/logger.ts`)
 
@@ -62,12 +62,14 @@ function createNoopLogger(): Logger
 One-liner per event with emoji prefix and ANSI colours:
 
 ```
-⚡ PAID      21 sats from 192.168.1.1 → credit 79 sats remaining
-→ REQUEST   POST /v1/chat/completions 200 347ms 156 tokens (1 sat deducted)
+⚡ PAID      21 sats (hash=ab12…cd34)
+→ REQUEST   POST /v1/chat/completions 347ms 1 sat deducted (79 remaining) from 192.168.1.1
 🔒 CHALLENGE POST /v1/chat/completions → 402 sent to 192.168.1.1 (100 sats)
 ⚠ ERROR     upstream timeout POST /v1/chat/completions (5003ms)
 ℹ INFO      token-toll v0.1.0 listening on http://localhost:3456
 ```
+
+Note: `PaymentEvent` does not carry `clientIp` or `remainingBalance` — those fields are only on `RequestEvent` and `ChallengeEvent`. Payment lines show amount, hash, and rail only.
 
 Colours:
 - Payment: green
@@ -82,8 +84,8 @@ Colours:
 Appends extra fields to each line:
 
 ```
-→ REQUEST   POST /v1/chat/completions 200 347ms 156 tokens (1 sat deducted) model=llama3 hash=ab12…cd34
-⚡ PAID      21 sats from 192.168.1.1 → credit 79 sats remaining hash=ab12…cd34 rail=l402
+→ REQUEST   POST /v1/chat/completions 347ms 1 sat deducted (79 remaining) from 192.168.1.1 authenticated=true
+⚡ PAID      21 sats hash=ab12…cd34 rail=l402
 ```
 
 ### JSON format (`--log-format json`)
@@ -91,7 +93,8 @@ Appends extra fields to each line:
 One JSON object per line, all fields included regardless of verbose flag:
 
 ```json
-{"ts":"2026-03-13T12:00:00.000Z","level":"info","event":"payment","amount":21,"ip":"192.168.1.1","remaining":79,"paymentHash":"ab12...","rail":"l402"}
+{"ts":"2026-03-13T12:00:00.000Z","level":"info","event":"payment","amountSats":21,"paymentHash":"ab12...","rail":"l402"}
+{"ts":"2026-03-13T12:00:00.000Z","level":"info","event":"request","endpoint":"/v1/chat/completions","satsDeducted":1,"remainingBalance":79,"latencyMs":347,"clientIp":"192.168.1.1"}
 ```
 
 ### No-op logger
@@ -113,9 +116,9 @@ const engine = createTollBooth({
 
 These callbacks already exist in toll-booth's API and carry:
 
-- **ChallengeEvent**: endpoint, amount, clientIp
-- **PaymentEvent**: amount, paymentHash, currency, rail
-- **RequestEvent**: endpoint, costDeducted, remainingBalance, latencyMs, clientIp
+- **ChallengeEvent**: `timestamp`, `endpoint`, `amountSats`, `clientIp`
+- **PaymentEvent**: `timestamp`, `paymentHash`, `amountSats`, `currency?`, `rail?`
+- **RequestEvent**: `timestamp`, `endpoint`, `satsDeducted`, `remainingBalance`, `latencyMs`, `authenticated`, `clientIp`, `currency?`
 
 No new data collection is needed — we're just consuming what toll-booth already provides.
 
@@ -132,20 +135,27 @@ logger.error('upstream error', {
 })
 ```
 
-This requires adding a `start = Date.now()` timestamp at the beginning of the proxy handler. The logger reference is passed into `createProxyHandler()` via its options.
+This requires adding a `start = Date.now()` timestamp at the beginning of the proxy handler. The logger reference is passed into `createProxyHandler()` by adding `logger?: Logger` to the `ProxyDeps` interface and passing it from `server.ts`.
 
 ## Startup logging (`src/cli.ts`)
 
 Replace the current `console.log` startup banner with `logger.info()` calls. The banner content stays the same — just routed through the logger so it respects format mode and can be suppressed in tests.
 
+**Pre-logger errors:** A few `console.error`/`console.warn` calls in `cli.ts` fire before the logger is created (unknown CLI flags, missing config file, upstream not found). These remain as bare `console.error`/`console.warn` — they're fatal or near-fatal startup errors where the logger doesn't exist yet.
+
+**Output destination:** All logger output goes to `process.stderr` so that `stdout` remains clean for potential structured output or piping. The startup banner also goes to stderr.
+
 ## Configuration (`src/config.ts`)
 
-Two new fields on `TokenTollConfig`:
+Three new fields on `TokenTollConfig`:
 
 ```typescript
-verbose: boolean     // default: false
-logFormat: 'pretty' | 'json'  // default: 'pretty'
+verbose: boolean                // default: false
+logFormat: 'pretty' | 'json'   // default: 'pretty'
+logger?: Logger                 // optional — if omitted, createTokenTollServer uses createNoopLogger()
 ```
+
+`cli.ts` creates the logger from `verbose` + `logFormat` and sets it on config before calling `createTokenTollServer()`. Programmatic callers can either pass their own logger or omit it for silence.
 
 ### CLI flags
 
