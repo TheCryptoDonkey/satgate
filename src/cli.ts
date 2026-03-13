@@ -5,6 +5,7 @@ import { loadConfig, type CliArgs } from './config.js'
 import { createTokenTollServer } from './server.js'
 import { createLightningBackend } from './lightning.js'
 import { startTunnel, stopTunnel, type TunnelResult } from './tunnel.js'
+import { createLogger } from './logger.js'
 
 function parseArgs(argv: string[]): CliArgs {
   const args: CliArgs = {}
@@ -27,6 +28,8 @@ function parseArgs(argv: string[]): CliArgs {
       case '--allowlist-file': args.allowlistFile = argv[++i]; break
       case '--no-tunnel': args.noTunnel = true; break
       case '--root-key': args.rootKey = argv[++i]; break
+      case '--verbose': args.verbose = true; break
+      case '--log-format': args.logFormat = argv[++i]; break
       case '-h': case '--help': printHelp(); process.exit(0);
       case '-v': case '--version': printVersion(); process.exit(0);
       default:
@@ -90,6 +93,8 @@ function printHelp(): void {
     --free-tier <n>            Free requests per IP per day (default: 0)
     --trust-proxy              Trust X-Forwarded-For headers
     --root-key <key>           Root key for macaroon minting
+    --verbose                  Show extra fields in log output
+    --log-format <format>      pretty | json (default: pretty)
     -h, --help                 Show help
     -v, --version              Show version
 `)
@@ -139,6 +144,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
   }
 
   const config = loadConfig(args, process.env as Record<string, string>, fileConfig)
+  const logger = createLogger({ format: config.logFormat, verbose: config.verbose })
 
   // Auto-detect models from upstream
   let models: string[] = []
@@ -151,7 +157,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
   }
 
   const backend = createLightningBackend(config)
-  const { app } = createTokenTollServer({ ...config, models, backend })
+  const { app } = createTokenTollServer({ ...config, models, backend, logger })
 
   let version = '0.1.0'
   try {
@@ -174,33 +180,30 @@ export async function main(argv: string[] = process.argv): Promise<void> {
       ? `${config.price} sat/request`
       : `${config.pricing.default} sat/1k tokens`
 
-    console.log(`
-  token-toll v${version}
-
-  Upstream:   ${config.upstream}${ollamaAutoDetected ? ' (auto-detected)' : ''}
-  Models:     ${models.length > 0 ? models.join(', ') : '(none detected)'}
-  Lightning:  ${lightningLabel}
-  Auth:       ${authLabel}
-  Price:      ${priceLabel}
-  Storage:    ${config.storage}${config.storage === 'memory' ? ' (ephemeral)' : ''}
-  Local:      http://localhost:${config.port}
-${config.rootKeyGenerated ? `
-  ! Using auto-generated root key (not persisted across restarts)
-  ! Set ROOT_KEY env var for production use` : ''}
-
-  /.well-known/l402  |  /llms.txt  |  /health
-`)
+    logger.info(`token-toll v${version}`)
+    logger.info(`Upstream:   ${config.upstream}${ollamaAutoDetected ? ' (auto-detected)' : ''}`)
+    logger.info(`Models:     ${models.length > 0 ? models.join(', ') : '(none detected)'}`)
+    logger.info(`Lightning:  ${lightningLabel}`)
+    logger.info(`Auth:       ${authLabel}`)
+    logger.info(`Price:      ${priceLabel}`)
+    logger.info(`Storage:    ${config.storage}${config.storage === 'memory' ? ' (ephemeral)' : ''}`)
+    logger.info(`Local:      http://localhost:${config.port}`)
+    if (config.rootKeyGenerated) {
+      logger.warn('Using auto-generated root key (not persisted across restarts)')
+      logger.warn('Set ROOT_KEY env var for production use')
+    }
+    logger.info('/.well-known/l402  |  /llms.txt  |  /health')
 
     // Start tunnel if enabled
     if (config.tunnel) {
       tunnelResult = await startTunnel(config.port)
       if (tunnelResult.url) {
-        console.log(`  Public:     ${tunnelResult.url}`)
+        logger.info(`Public:     ${tunnelResult.url}`)
       } else if (tunnelResult.error) {
-        console.log(`  Tunnel:     ${tunnelResult.error}`)
+        logger.warn(`Tunnel:     ${tunnelResult.error}`)
       }
     } else {
-      console.log('  Tunnel:     disabled')
+      logger.info('Tunnel:     disabled')
     }
   })
 
