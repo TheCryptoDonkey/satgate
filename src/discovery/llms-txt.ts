@@ -3,6 +3,7 @@ import type { ModelPricing } from '../config.js'
 export interface LlmsTxtInput {
   pricing: ModelPricing
   models: string[]
+  x402?: { network: string }
 }
 
 export function generateLlmsTxt(input: LlmsTxtInput): string {
@@ -28,5 +29,5 @@ Pay the invoice, then retry with the L402 credential.
 ## Payment
 POST /create-invoice to get a Lightning invoice.
 Supports Lightning, NWC, and Cashu.
-`
+${input.x402 ? `Also accepts x402 stablecoin payments (${input.x402.network} network).\n` : ''}`
 }

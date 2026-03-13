@@ -3,10 +3,11 @@ import type { ModelPricing } from '../config.js'
 export interface OpenApiInput {
   models: string[]
   pricing: ModelPricing
+  x402?: boolean
 }
 
 export function generateOpenApiSpec(input: OpenApiInput): Record<string, any> {
-  return {
+  const spec: Record<string, any> = {
     openapi: '3.1.0',
     info: {
       title: 'Token Toll',
@@ -111,4 +112,14 @@ export function generateOpenApiSpec(input: OpenApiInput): Record<string, any> {
       },
     },
   }
+
+  if (input.x402) {
+    spec.components.securitySchemes.x402 = {
+      type: 'http',
+      scheme: 'x-payment',
+      description: 'x402 stablecoin payment via x-payment header',
+    }
+  }
+
+  return spec
 }

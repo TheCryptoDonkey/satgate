@@ -22,4 +22,14 @@ describe('generateLlmsTxt', () => {
     expect(text).toContain('402')
     expect(text).toContain('L402')
   })
+
+  it('mentions x402 when configured', () => {
+    const text = generateLlmsTxt({
+      pricing: { default: 1, models: {} },
+      models: ['llama3'],
+      x402: { network: 'base' },
+    })
+    expect(text).toContain('x402')
+    expect(text).toContain('base')
+  })
 })

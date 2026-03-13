@@ -5,6 +5,12 @@ export interface WellKnownInput {
   models: string[]
   tiers: Array<{ amountSats: number; creditSats: number; label: string }>
   paymentMethods: string[]
+  x402?: {
+    receiverAddress: string
+    network: string
+    asset?: string
+    facilitatorUrl?: string
+  }
 }
 
 export function generateWellKnown(input: WellKnownInput): Record<string, any> {
@@ -13,7 +19,7 @@ export function generateWellKnown(input: WellKnownInput): Record<string, any> {
     modelPricing[model] = { perThousandTokens: price }
   }
 
-  return {
+  const result: Record<string, any> = {
     version: 1,
     name: 'Token Toll',
     description: 'Lightning-paid AI inference',
@@ -38,4 +44,15 @@ export function generateWellKnown(input: WellKnownInput): Record<string, any> {
       models: input.models,
     },
   }
+
+  if (input.x402) {
+    result.payment.x402 = {
+      receiver: input.x402.receiverAddress,
+      network: input.x402.network,
+      ...(input.x402.asset && { asset: input.x402.asset }),
+      ...(input.x402.facilitatorUrl && { facilitator: input.x402.facilitatorUrl }),
+    }
+  }
+
+  return result
 }

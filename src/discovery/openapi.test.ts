@@ -20,4 +20,21 @@ describe('generateOpenApiSpec', () => {
     })
     expect(spec.components.securitySchemes).toHaveProperty('l402')
   })
+
+  it('includes x402 security scheme when configured', () => {
+    const spec = generateOpenApiSpec({
+      models: ['llama3'],
+      pricing: { default: 1, models: {} },
+      x402: true,
+    })
+    expect(spec.components.securitySchemes).toHaveProperty('x402')
+  })
+
+  it('omits x402 security scheme when not configured', () => {
+    const spec = generateOpenApiSpec({
+      models: ['llama3'],
+      pricing: { default: 1, models: {} },
+    })
+    expect(spec.components.securitySchemes).not.toHaveProperty('x402')
+  })
 })

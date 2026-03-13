@@ -34,4 +34,25 @@ describe('generateWellKnown', () => {
     const result = generateWellKnown(input)
     expect(result.capabilities.models).toEqual(['llama3', 'deepseek-r1'])
   })
+
+  it('includes x402 info when configured', () => {
+    const result = generateWellKnown({
+      ...input,
+      paymentMethods: ['lightning', 'cashu', 'x402'],
+      x402: {
+        receiverAddress: '0xreceiver',
+        network: 'base',
+        facilitatorUrl: 'https://x402.org/facilitator',
+      },
+    })
+    expect(result.payment.methods).toContain('x402')
+    expect(result.payment.x402).toBeDefined()
+    expect(result.payment.x402.receiver).toBe('0xreceiver')
+    expect(result.payment.x402.network).toBe('base')
+  })
+
+  it('omits x402 info when not configured', () => {
+    const result = generateWellKnown(input)
+    expect(result.payment.x402).toBeUndefined()
+  })
 })
