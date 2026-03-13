@@ -232,8 +232,9 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
   }
 
   // Forward toll-booth credit/free-tier context as response headers.
-  // Uses c.header() (not res.headers.set()) so headers survive Hono's response pipeline.
-  function setTollHeaders(c: Context<TollBoothEnv>): void {
+  // Must run AFTER next() so c.header() applies to the actual response.
+  app.use('/v1/*', async (c: Context<TollBoothEnv>, next) => {
+    await next()
     const creditBalance = c.get('tollBoothCreditBalance')
     if (creditBalance !== undefined) {
       c.header('X-Credit-Balance', String(creditBalance))
@@ -246,23 +247,20 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
     if (freeRemaining !== undefined) {
       c.header('X-Free-Remaining', String(freeRemaining))
     }
-  }
+  })
 
   app.post('/v1/chat/completions', async (c: Context<TollBoothEnv>) => {
     const paymentHash = config.authMode === 'lightning' ? c.get('tollBoothPaymentHash') : undefined
-    setTollHeaders(c)
     return proxyHandler(c.req.raw, paymentHash)
   })
 
   app.post('/v1/completions', async (c: Context<TollBoothEnv>) => {
     const paymentHash = config.authMode === 'lightning' ? c.get('tollBoothPaymentHash') : undefined
-    setTollHeaders(c)
     return proxyHandler(c.req.raw, paymentHash)
   })
 
   app.post('/v1/embeddings', async (c: Context<TollBoothEnv>) => {
     const paymentHash = config.authMode === 'lightning' ? c.get('tollBoothPaymentHash') : undefined
-    setTollHeaders(c)
     return proxyHandler(c.req.raw, paymentHash)
   })
 
