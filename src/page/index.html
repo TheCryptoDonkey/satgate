@@ -460,6 +460,9 @@ body {
 
         if (isPaid) {
           updateStatusBar(creditBalance);
+        } else if (getFreeTokens() <= 0) {
+          // Free budget exhausted — trigger payment immediately
+          showPayment({});
         }
       } else if (res.status === 402) {
         // Payment required
