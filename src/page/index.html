@@ -254,6 +254,7 @@ body {
   var pendingPrompt = null;   // saved when 402 interrupts
   var invoiceData = null;     // current invoice (bolt11, macaroon, qr_svg)
   var scrollPending = false;  // rAF debounce for scrollToBottom
+  var pricePerThousand = null; // sats per 1k tokens for current model
 
   // DOM refs
   var messagesEl = document.getElementById('messages');
@@ -319,8 +320,15 @@ body {
       var pricing = data.pricing || {};
       var freeTier = data.free_tier || {};
 
-      // Set current model
+      // Set current model and resolve price per 1k tokens
       currentModel = models[0] || null;
+      if (currentModel && pricing.models && pricing.models[currentModel]) {
+        var mp = pricing.models[currentModel];
+        pricePerThousand = (mp && mp.perThousandTokens !== undefined) ? mp.perThousandTokens : mp;
+      } else if (pricing.default) {
+        var defp = pricing.default;
+        pricePerThousand = (defp && defp.perThousandTokens !== undefined) ? defp.perThousandTokens : defp;
+      }
 
       // Clear and populate pricing chips
       while (pricingChips.firstChild) { pricingChips.removeChild(pricingChips.firstChild); }
@@ -336,9 +344,7 @@ body {
       }
       if (!hasModelChips && pricing.default !== undefined) {
         var label = currentModel ? currentModel : 'default';
-        var dp = pricing.default;
-        var defaultCost = (dp && dp.perThousandTokens !== undefined) ? dp.perThousandTokens : dp;
-        pricingChips.appendChild(makeChip(label + ' \u2014 ' + defaultCost + ' sats/1k tokens'));
+        pricingChips.appendChild(makeChip(label + ' \u2014 ' + pricePerThousand + ' sats/1k tokens'));
       }
       if (freeTier.requests_per_day) {
         pricingChips.appendChild(makeChip(freeTier.requests_per_day + ' free requests/day'));
@@ -671,12 +677,23 @@ body {
     return { div: div, contentEl: content, modelTagEl: modelTag };
   }
 
+  function formatTokenCount(n) {
+    if (n >= 1000) return Math.floor(n / 1000) + 'k';
+    return String(n);
+  }
+
   function updateStatusBar(freeRemaining, creditBalance) {
     while (statusBar.firstChild) { statusBar.removeChild(statusBar.firstChild); }
     if (creditBalance !== null && creditBalance !== undefined) {
       var sats = parseInt(creditBalance, 10);
       if (!isNaN(sats) && sats > 0) {
-        statusBar.appendChild(makeStatusSpan('credit', sats + ' sats credit remaining'));
+        // Convert sats to approximate tokens using pricing
+        if (pricePerThousand && pricePerThousand > 0) {
+          var approxTokens = Math.floor((sats / pricePerThousand) * 1000);
+          statusBar.appendChild(makeStatusSpan('credit', '~' + formatTokenCount(approxTokens) + ' tokens remaining (' + sats + ' sats)'));
+        } else {
+          statusBar.appendChild(makeStatusSpan('credit', sats + ' sats credit remaining'));
+        }
         return;
       }
     }
