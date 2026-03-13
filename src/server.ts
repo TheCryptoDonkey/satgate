@@ -110,6 +110,7 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
       models,
       tiers: config.tiers,
       paymentMethods,
+      freeTier: config.freeTier,
       x402: config.x402,
     }))
   })

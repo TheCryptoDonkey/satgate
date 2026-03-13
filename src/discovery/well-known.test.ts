@@ -55,4 +55,17 @@ describe('generateWellKnown', () => {
     const result = generateWellKnown(input)
     expect(result.payment.x402).toBeUndefined()
   })
+
+  it('includes free tier when configured', () => {
+    const result = generateWellKnown({
+      ...input,
+      freeTier: { requestsPerDay: 10 },
+    })
+    expect(result.free_tier).toEqual({ requests_per_day: 10 })
+  })
+
+  it('omits free tier when not configured', () => {
+    const result = generateWellKnown(input)
+    expect(result.free_tier).toBeUndefined()
+  })
 })
