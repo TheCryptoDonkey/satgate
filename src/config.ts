@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import { resolve, relative } from 'node:path'
 import type { LightningBackend } from '@thecryptodonkey/toll-booth'
+import type { Logger } from './logger.js'
 
 export interface ModelPricing {
   /** Sats per 1k tokens for each model. */
@@ -48,6 +49,9 @@ export interface TokenTollConfig {
     creditMode?: boolean
   }
   defaultPriceUsd?: number
+  verbose: boolean
+  logFormat: 'pretty' | 'json'
+  logger?: Logger
 }
 
 export interface CliArgs {
@@ -69,6 +73,8 @@ export interface CliArgs {
   allowlist?: string[]
   allowlistFile?: string
   noTunnel?: boolean
+  verbose?: boolean
+  logFormat?: string
 }
 
 export interface FileConfig {
@@ -101,6 +107,8 @@ export interface FileConfig {
     creditMode?: boolean
   }
   defaultPriceUsd?: number
+  verbose?: boolean
+  logFormat?: string
 }
 
 const LIGHTNING_URL_DEFAULTS: Record<string, string> = {
@@ -277,6 +285,17 @@ export function loadConfig(
     ? parseInt(env.DEFAULT_PRICE_USD, 10)
     : file.defaultPriceUsd
 
+  // Logging
+  const verbose = args.verbose
+    ?? (env.TOKEN_TOLL_VERBOSE !== undefined ? env.TOKEN_TOLL_VERBOSE === 'true' : undefined)
+    ?? file.verbose
+    ?? false
+  const logFormatRaw = args.logFormat ?? env.TOKEN_TOLL_LOG_FORMAT ?? file.logFormat ?? 'pretty'
+  if (logFormatRaw !== 'pretty' && logFormatRaw !== 'json') {
+    throw new Error(`Invalid log format: ${logFormatRaw} (must be 'pretty' or 'json')`)
+  }
+  const logFormat = logFormatRaw as 'pretty' | 'json'
+
   return {
     upstream: upstream.replace(/\/+$/, ''),
     port,
@@ -301,5 +320,7 @@ export function loadConfig(
     tunnel,
     x402,
     defaultPriceUsd,
+    verbose,
+    logFormat,
   }
 }

@@ -386,3 +386,30 @@ describe('x402 config', () => {
     expect(config.defaultPriceUsd).toBeUndefined()
   })
 })
+
+describe('logging config', () => {
+  it('defaults verbose to false', () => {
+    const config = loadConfig({ upstream: 'http://localhost:1234' })
+    expect(config.verbose).toBe(false)
+  })
+
+  it('defaults logFormat to pretty', () => {
+    const config = loadConfig({ upstream: 'http://localhost:1234' })
+    expect(config.logFormat).toBe('pretty')
+  })
+
+  it('accepts verbose from CLI args', () => {
+    const config = loadConfig({ upstream: 'http://localhost:1234', verbose: true })
+    expect(config.verbose).toBe(true)
+  })
+
+  it('accepts logFormat from env', () => {
+    const config = loadConfig({ upstream: 'http://localhost:1234' }, { TOKEN_TOLL_LOG_FORMAT: 'json' })
+    expect(config.logFormat).toBe('json')
+  })
+
+  it('rejects invalid logFormat', () => {
+    expect(() => loadConfig({ upstream: 'http://localhost:1234' }, { TOKEN_TOLL_LOG_FORMAT: 'xml' }))
+      .toThrow('Invalid log format')
+  })
+})
