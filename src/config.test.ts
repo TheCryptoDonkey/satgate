@@ -217,23 +217,23 @@ describe('loadConfig', () => {
   it('rejects dbPath outside working directory', () => {
     expect(() => loadConfig({
       upstream: 'http://localhost:11434',
-      dbPath: '/etc/token-toll.db',
+      dbPath: '/etc/satgate.db',
     })).toThrow(/dbPath must be within the working directory/)
   })
 
   it('rejects dbPath with traversal', () => {
     expect(() => loadConfig({
       upstream: 'http://localhost:11434',
-      dbPath: '../../etc/token-toll.db',
+      dbPath: '../../etc/satgate.db',
     })).toThrow(/dbPath must be within the working directory/)
   })
 
   it('accepts dbPath within cwd', () => {
     const config = loadConfig({
       upstream: 'http://localhost:11434',
-      dbPath: './data/token-toll.db',
+      dbPath: './data/satgate.db',
     })
-    expect(config.dbPath).toBe('./data/token-toll.db')
+    expect(config.dbPath).toBe('./data/satgate.db')
   })
 
   it('rejects invalid lightning backend', () => {
@@ -404,12 +404,12 @@ describe('logging config', () => {
   })
 
   it('accepts logFormat from env', () => {
-    const config = loadConfig({ upstream: 'http://localhost:1234' }, { TOKEN_TOLL_LOG_FORMAT: 'json' })
+    const config = loadConfig({ upstream: 'http://localhost:1234' }, { SATGATE_LOG_FORMAT: 'json' })
     expect(config.logFormat).toBe('json')
   })
 
   it('rejects invalid logFormat', () => {
-    expect(() => loadConfig({ upstream: 'http://localhost:1234' }, { TOKEN_TOLL_LOG_FORMAT: 'xml' }))
+    expect(() => loadConfig({ upstream: 'http://localhost:1234' }, { SATGATE_LOG_FORMAT: 'xml' }))
       .toThrow('Invalid log format')
   })
 })
@@ -450,19 +450,19 @@ describe('per-token CLI pricing', () => {
     })).toThrow(/Cannot use --price .* and --token-price .* together/)
   })
 
-  it('env var TOKEN_TOLL_TOKEN_PRICE works', () => {
+  it('env var SATGATE_TOKEN_PRICE works', () => {
     const config = loadConfig(
       { upstream: 'http://localhost:11434' },
-      { TOKEN_TOLL_TOKEN_PRICE: '4' },
+      { SATGATE_TOKEN_PRICE: '4' },
     )
     expect(config.flatPricing).toBe(false)
     expect(config.pricing.default).toBe(4)
   })
 
-  it('env var TOKEN_TOLL_MODEL_PRICE parses comma-separated entries', () => {
+  it('env var SATGATE_MODEL_PRICE parses comma-separated entries', () => {
     const config = loadConfig(
       { upstream: 'http://localhost:11434' },
-      { TOKEN_TOLL_MODEL_PRICE: 'llama3:2,deepseek-r1:5' },
+      { SATGATE_MODEL_PRICE: 'llama3:2,deepseek-r1:5' },
     )
     expect(config.pricing.models.llama3).toBe(2)
     expect(config.pricing.models['deepseek-r1']).toBe(5)

@@ -1,12 +1,12 @@
 {
-  "name": "token-toll",
+  "name": "satgate",
   "version": "0.1.0",
   "description": "Lightning-paid AI inference - monetise any OpenAI-compatible endpoint in 30 seconds",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "token-toll": "./dist/bin/token-toll.js"
+    "satgate": "./dist/bin/satgate.js"
   },
   "exports": {
     ".": {
@@ -56,11 +56,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/TheCryptoDonkey/token-toll"
+    "url": "https://github.com/TheCryptoDonkey/satgate"
   },
-  "homepage": "https://github.com/TheCryptoDonkey/token-toll",
+  "homepage": "https://github.com/TheCryptoDonkey/satgate",
   "author": "TheCryptoDonkey",
   "bugs": {
-    "url": "https://github.com/TheCryptoDonkey/token-toll/issues"
+    "url": "https://github.com/TheCryptoDonkey/satgate/issues"
   }
 }

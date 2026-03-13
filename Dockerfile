@@ -18,4 +18,4 @@ RUN node -e "const p=JSON.parse(require('fs').readFileSync('package.json','utf8'
 RUN npm install --omit=dev
 COPY --from=build /build/dist/ ./dist/
 EXPOSE 3002
-CMD ["node", "dist/bin/token-toll.js"]
+CMD ["node", "dist/bin/satgate.js"]

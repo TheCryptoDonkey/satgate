@@ -1,7 +1,7 @@
 /**
  * Demo server for VHS terminal recording.
  *
- * Boots a token-toll server with a mock Lightning backend pointed at
+ * Boots a satgate server with a mock Lightning backend pointed at
  * real Ollama on localhost:11434. No real Lightning infrastructure required.
  *
  * The app is built manually (not via createTokenTollServer) so the mock
@@ -33,7 +33,7 @@ const PORT = 3000
 
 const rootKey = randomBytes(32).toString('hex')
 
-/** Model-based pricing for token-toll proxy and discovery endpoints. */
+/** Model-based pricing for satgate proxy and discovery endpoints. */
 const tokenTollPricing = { default: 1, models: {} }
 
 /** Route-based pricing for toll-booth engine. */
@@ -220,7 +220,7 @@ async function main() {
       : 'none detected'
 
     process.stderr.write('\n')
-    process.stderr.write(`${BOLD}  token-toll demo${RESET}\n`)
+    process.stderr.write(`${BOLD}  satgate demo${RESET}\n`)
     process.stderr.write(`  ${'─'.repeat(44)}\n`)
     process.stderr.write(`  ${DIM}Upstream${RESET}    ${UPSTREAM}\n`)
     process.stderr.write(`  ${DIM}Gateway${RESET}     http://localhost:${PORT}\n`)

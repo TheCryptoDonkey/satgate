@@ -1,4 +1,4 @@
-# token-toll
+# satgate
 
 [![MIT licence](https://img.shields.io/badge/licence-MIT-blue.svg)](./LICENSE)
 [![Nostr](https://img.shields.io/badge/Nostr-Zap%20me-purple)](https://primal.net/p/npub1mgvlrnf5hm9yf0n5mf9nqmvarhvxkc6remu5ec3vf8r0txqkuk7su0e7q2)
@@ -7,25 +7,25 @@
 
 **Your GPU is burning money. Make it earn money.**
 
-token-toll sits in front of Ollama, vLLM, llama.cpp — any OpenAI-compatible backend — and turns it into a pay-per-token API. No accounts. No API keys. No Stripe. Clients pay per token, you earn sats before the response finishes streaming.
+satgate sits in front of Ollama, vLLM, llama.cpp — any OpenAI-compatible backend — and turns it into a pay-per-token API. No accounts. No API keys. No Stripe. Clients pay per token, you earn sats before the response finishes streaming.
 
-![token-toll demo](demo/token-toll-demo.gif)
+![satgate demo](demo/satgate-demo.gif)
 
 ## Quick start
 
 ```bash
-npx token-toll --upstream http://localhost:11434
+npx satgate --upstream http://localhost:11434
 ```
 
-That's it. token-toll auto-detects your models, starts accepting payments, and proxies inference requests. Clients pay per token, you earn sats.
+That's it. satgate auto-detects your models, starts accepting payments, and proxies inference requests. Clients pay per token, you earn sats.
 
 ---
 
-## The old way vs token-toll
+## The old way vs satgate
 
-| | The old way | With token-toll |
+| | The old way | With satgate |
 |---|---|---|
-| **Sell GPU time** | Sign up for a marketplace (OpenRouter, Together). They set the price, take a cut, own the customer. | `npx token-toll --upstream http://localhost:11434`. You set the price. You keep 100%. |
+| **Sell GPU time** | Sign up for a marketplace (OpenRouter, Together). They set the price, take a cut, own the customer. | `npx satgate --upstream http://localhost:11434`. You set the price. You keep 100%. |
 | **Handle billing** | Stripe account, KYC, usage tracking, invoices, chargebacks | Payments settle before the response finishes streaming. No accounts, no disputes. |
 | **Serve AI agents** | OAuth flows, API key management, billing portals — none of which machines can use | Agents discover your endpoint, pay per token from their own wallet, no human in the loop. |
 | **Price fairly** | Flat rate per request, regardless of whether it's 10 tokens or 10,000 | Actual tokens counted from the response. Overpayments credited back. |
@@ -34,9 +34,9 @@ That's it. token-toll auto-detects your models, starts accepting payments, and p
 
 ## Built for machines
 
-token-toll doesn't just serve humans with `curl`. It's designed for AI agents that pay for their own resources.
+satgate doesn't just serve humans with `curl`. It's designed for AI agents that pay for their own resources.
 
-Every token-toll instance exposes three discovery endpoints — no auth required:
+Every satgate instance exposes three discovery endpoints — no auth required:
 
 | Endpoint | Who reads it |
 |---|---|
@@ -50,7 +50,7 @@ Pair with [l402-mcp](https://github.com/TheCryptoDonkey/l402-mcp) and an AI agen
 sequenceDiagram
     participant A as AI Agent
     participant M as l402-mcp
-    participant T as token-toll
+    participant T as satgate
     participant G as Your GPU
 
     A->>M: "Use this inference endpoint"
@@ -70,11 +70,11 @@ sequenceDiagram
 
 ## The secret
 
-Everything you just saw — the payment gating, the multi-rail support, the credit system, the free tier, the macaroon credentials — that's not token-toll. That's [toll-booth](https://github.com/TheCryptoDonkey/toll-booth).
+Everything you just saw — the payment gating, the multi-rail support, the credit system, the free tier, the macaroon credentials — that's not satgate. That's [toll-booth](https://github.com/TheCryptoDonkey/toll-booth).
 
-token-toll is ~400 lines of glue on top of toll-booth. It adds the AI-specific bits: token counting, model pricing, streaming reconciliation, capacity management. Everything else comes from the middleware.
+satgate is ~400 lines of glue on top of toll-booth. It adds the AI-specific bits: token counting, model pricing, streaming reconciliation, capacity management. Everything else comes from the middleware.
 
-**You could build your own token-toll for your domain in an afternoon.**
+**You could build your own satgate for your domain in an afternoon.**
 
 Monetise a routing API. Gate a translation service. Sell weather data per request. toll-booth handles the payments — you just write the product logic.
 
@@ -82,7 +82,7 @@ Monetise a routing API. Gate a translation service. Sell weather data per reques
 
 ```mermaid
 graph TB
-    subgraph "token-toll (~400 lines)"
+    subgraph "satgate (~400 lines)"
         TC[Token counting]
         MP[Model pricing]
         SR[Streaming reconciliation]
@@ -105,7 +105,7 @@ graph TB
 
 ---
 
-## What token-toll adds
+## What satgate adds
 
 - **Pay-per-token** — actual token count from the response, not estimated. Streaming and buffered.
 - **Model-specific pricing** — 1 sat/1k for Llama, 5 sats/1k for DeepSeek. You set the rates.
@@ -122,7 +122,7 @@ graph TB
 ```mermaid
 sequenceDiagram
     participant C as Client
-    participant T as token-toll
+    participant T as satgate
     participant G as Your GPU
 
     C->>T: POST /v1/chat/completions
@@ -142,7 +142,7 @@ Charges are estimated upfront based on model pricing, then reconciled to actual 
 
 ## Configuration
 
-Zero config works (just `--upstream`). For production, create `token-toll.yaml`:
+Zero config works (just `--upstream`). For production, create `satgate.yaml`:
 
 ```yaml
 upstream: http://localhost:11434
@@ -166,10 +166,10 @@ CLI flags > environment variables > config file > defaults.
 
 ```bash
 # Monetise your local Ollama
-npx token-toll --upstream http://localhost:11434
+npx satgate --upstream http://localhost:11434
 
 # Or point at any OpenAI-compatible backend
-npx token-toll --upstream http://your-vllm-server:8000
+npx satgate --upstream http://your-vllm-server:8000
 ```
 
 → [**toll-booth**](https://github.com/TheCryptoDonkey/toll-booth) — the middleware that powers all of this. Build your own.

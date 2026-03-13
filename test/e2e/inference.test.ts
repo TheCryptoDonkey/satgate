@@ -51,7 +51,7 @@ const baseConfig = {
   tunnel: false,
 }
 
-describe('E2E: token-toll', () => {
+describe('E2E: satgate', () => {
   let upstreamServer: ReturnType<typeof serve>
   let upstreamUrl: string
 
@@ -69,7 +69,7 @@ describe('E2E: token-toll', () => {
     upstreamServer?.close()
   })
 
-  describe('E2E: token-toll inference', () => {
+  describe('E2E: satgate inference', () => {
     it('returns 402 for unauthenticated inference request', async () => {
       const { app } = createTokenTollServer({
         ...baseConfig,

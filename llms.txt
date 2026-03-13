@@ -1,22 +1,22 @@
-# token-toll
+# satgate
 
-> token-toll is a pay-per-token inference proxy for any OpenAI-compatible endpoint — Ollama, vLLM, llama.cpp, or any API that speaks the OpenAI format. Clients pay per token using Lightning, Cashu, or NWC (Nostr Wallet Connect); no accounts, no API keys, instant settlement. Stablecoin payments via x402 are coming. Powered by toll-booth under the hood.
+> satgate is a pay-per-token inference proxy for any OpenAI-compatible endpoint — Ollama, vLLM, llama.cpp, or any API that speaks the OpenAI format. Clients pay per token using Lightning, Cashu, or NWC (Nostr Wallet Connect); no accounts, no API keys, instant settlement. Stablecoin payments via x402 are coming. Powered by toll-booth under the hood.
 
-One command turns a local inference server into a billable API endpoint. token-toll auto-detects your models, issues L402 payment challenges, proxies requests once paid, counts actual tokens from the response, and reconciles any overpayment back to the client's credit balance.
+One command turns a local inference server into a billable API endpoint. satgate auto-detects your models, issues L402 payment challenges, proxies requests once paid, counts actual tokens from the response, and reconciles any overpayment back to the client's credit balance.
 
 ## Getting Started
 
 ```bash
-npx token-toll --upstream http://localhost:11434
+npx satgate --upstream http://localhost:11434
 ```
 
-That's all that's needed. token-toll queries `/v1/models` on startup, begins accepting payments, and proxies inference traffic to your backend. For production, create `token-toll.yaml`:
+That's all that's needed. satgate queries `/v1/models` on startup, begins accepting payments, and proxies inference traffic to your backend. For production, create `satgate.yaml`:
 
 ```yaml
 upstream: http://localhost:11434
 port: 3000
 storage: sqlite
-dbPath: ./token-toll.db
+dbPath: ./satgate.db
 
 pricing:
   default: 1          # sats per 1k tokens for unlisted models
@@ -100,7 +100,7 @@ Configuration precedence: **CLI flags > environment variables > config file > de
 
 ### YAML config file
 
-The config file (default: `token-toll.yaml` in the working directory) accepts all of the above plus:
+The config file (default: `satgate.yaml` in the working directory) accepts all of the above plus:
 
 - `dbPath` — path to the SQLite database file
 - `tiers` — array of `{ amountSats, creditSats, label }` objects for volume discount tiers
@@ -110,12 +110,12 @@ The config file (default: `token-toll.yaml` in the working directory) accepts al
 
 ## Ecosystem
 
-token-toll is built on top of **toll-booth** — L402 payment middleware that handles the full invoice → credential → credit flow. toll-booth is payment-rail agnostic and supports Lightning (Phoenixd, LND, Core Lightning, LNbits, Alby), Cashu ecash, and NWC. token-toll adds the inference-specific layer: model detection, token counting, cost reconciliation, and capacity management.
+satgate is built on top of **toll-booth** — L402 payment middleware that handles the full invoice → credential → credit flow. toll-booth is payment-rail agnostic and supports Lightning (Phoenixd, LND, Core Lightning, LNbits, Alby), Cashu ecash, and NWC. satgate adds the inference-specific layer: model detection, token counting, cost reconciliation, and capacity management.
 
 The natural client counterpart is **l402-mcp** — an MCP server that lets AI agents discover L402 APIs (via `/.well-known/l402`), pay invoices from a connected wallet, and consume the API — all autonomously, with no human in the loop.
 
 ```
-AI Agent -> l402-mcp -> token-toll -> Your inference backend
+AI Agent -> l402-mcp -> satgate -> Your inference backend
 ```
 
 - toll-booth: https://github.com/TheCryptoDonkey/toll-booth

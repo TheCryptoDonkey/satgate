@@ -46,8 +46,8 @@ function parseArgs(argv: string[]): CliArgs {
 
 function loadFileConfig(path?: string): Record<string, unknown> {
   const configPath = path
-    ?? (existsSync('token-toll.json') ? 'token-toll.json' : undefined)
-    ?? (existsSync('token-toll.yaml') ? 'token-toll.yaml' : undefined)
+    ?? (existsSync('satgate.json') ? 'satgate.json' : undefined)
+    ?? (existsSync('satgate.yaml') ? 'satgate.yaml' : undefined)
   if (!configPath) return {}
   try {
     const content = readFileSync(configPath, 'utf-8')
@@ -56,16 +56,16 @@ function loadFileConfig(path?: string): Record<string, unknown> {
     }
     return JSON.parse(content)
   } catch {
-    console.warn(`[token-toll] Could not read config file: ${configPath}`)
+    console.warn(`[satgate] Could not read config file: ${configPath}`)
     return {}
   }
 }
 
 function printHelp(): void {
   console.log(`
-  token-toll - Lightning-paid AI inference
+  satgate - Lightning-paid AI inference
 
-  Usage: token-toll [options]
+  Usage: satgate [options]
 
   Upstream:
     --upstream <url>           Upstream API URL (default: auto-detect Ollama on :11434)
@@ -91,7 +91,7 @@ function printHelp(): void {
 
   Storage:
     --storage <type>           memory | sqlite (default: memory)
-    --db-path <path>           SQLite path (default: ./token-toll.db)
+    --db-path <path>           SQLite path (default: ./satgate.db)
 
   Other:
     --config <path>            Config file (JSON or YAML)
@@ -109,9 +109,9 @@ function printHelp(): void {
 function printVersion(): void {
   try {
     const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf-8'))
-    console.log(`token-toll v${pkg.version}`)
+    console.log(`satgate v${pkg.version}`)
   } catch {
-    console.log('token-toll (unknown version)')
+    console.log('satgate (unknown version)')
   }
 }
 
@@ -129,15 +129,15 @@ export async function main(argv: string[] = process.argv): Promise<void> {
       if (res.ok) {
         args.upstream = 'http://localhost:11434'
         ollamaAutoDetected = true
-        console.log('[token-toll] Ollama detected on :11434')
+        console.log('[satgate] Ollama detected on :11434')
       }
     } catch {
       // Ollama not found
     }
 
     if (!args.upstream && !process.env.UPSTREAM_URL && !fileConfig?.upstream) {
-      console.error('[token-toll] No upstream detected. Ollama not found on :11434.')
-      console.error('[token-toll] Either start Ollama or pass --upstream <url>')
+      console.error('[satgate] No upstream detected. Ollama not found on :11434.')
+      console.error('[satgate] Either start Ollama or pass --upstream <url>')
       process.exit(1)
     }
   }
@@ -159,7 +159,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     const body = await res.json() as { data?: Array<{ id: string }> }
     models = body.data?.map(m => m.id) ?? []
   } catch {
-    console.warn('[token-toll] Could not auto-detect models from upstream')
+    console.warn('[satgate] Could not auto-detect models from upstream')
   }
 
   const backend = createLightningBackend(config)
@@ -186,7 +186,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
       ? `${config.price} sat/request`
       : `${config.pricing.default} sat/1k tokens`
 
-    logger.info(`token-toll v${version}`)
+    logger.info(`satgate v${version}`)
     logger.info(`Upstream:   ${config.upstream}${ollamaAutoDetected ? ' (auto-detected)' : ''}`)
     logger.info(`Models:     ${models.length > 0 ? models.join(', ') : '(none detected)'}`)
     logger.info(`Lightning:  ${lightningLabel}`)

@@ -20,7 +20,7 @@ function encodeBolt11(opts: {
     timestamp: Math.floor(Date.now() / 1000),
     tags: [
       { tagName: 'payment_hash', data: opts.paymentHash },
-      { tagName: 'description', data: opts.description ?? 'token-toll test invoice' },
+      { tagName: 'description', data: opts.description ?? 'satgate test invoice' },
       { tagName: 'expire_time', data: opts.expiry },
     ],
   })

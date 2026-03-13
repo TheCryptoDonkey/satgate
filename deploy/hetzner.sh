@@ -6,13 +6,13 @@ VPS_HOST="${VPS_HOST:?Set VPS_HOST environment variable}"
 VPS_USER="${VPS_USER:-deploy}"
 SSH_KEY="${SSH_KEY:-$HOME/.ssh/id_ed25519}"
 SSH_CMD="ssh -o IdentityFile=$SSH_KEY -o IdentitiesOnly=yes $VPS_USER@$VPS_HOST"
-REMOTE_DIR="/opt/token-toll"
-CONTAINER_NAME="token-toll"
+REMOTE_DIR="/opt/satgate"
+CONTAINER_NAME="satgate"
 OLLAMA_CONTAINER="ollama"
 OLLAMA_MODEL="qwen3:0.6b"
 PORT=3002
 
-echo "=== token-toll deploy ==="
+echo "=== satgate deploy ==="
 
 # --- Step 1: Rsync repo to VPS ---
 echo "[1/6] Syncing repo to VPS..."
@@ -49,7 +49,7 @@ fi
 
 # --- Step 4: Build Docker image ---
 echo "[4/6] Building Docker image on VPS..."
-$SSH_CMD "cd $REMOTE_DIR/src && docker build -t token-toll:latest ."
+$SSH_CMD "cd $REMOTE_DIR/src && docker build -t satgate:latest ."
 
 # --- Step 5: Ensure Ollama is running ---
 echo "[5/6] Ensuring Ollama is running..."
@@ -72,8 +72,8 @@ fi
 echo "  Ensuring model $OLLAMA_MODEL is available..."
 $SSH_CMD "docker exec $OLLAMA_CONTAINER ollama pull $OLLAMA_MODEL" || true
 
-# --- Step 6: Deploy token-toll container ---
-echo "[6/6] Deploying token-toll container..."
+# --- Step 6: Deploy satgate container ---
+echo "[6/6] Deploying satgate container..."
 
 # Stop and remove existing container
 $SSH_CMD "docker stop $CONTAINER_NAME 2>/dev/null && docker rm $CONTAINER_NAME 2>/dev/null || true"
@@ -90,13 +90,13 @@ $SSH_CMD "docker run -d \
   -e LIGHTNING_KEY=$PHOENIXD_PASSWORD \
   -e PORT=$PORT \
   -e ROOT_KEY=$ROOT_KEY \
-  -e TOKEN_TOLL_TOKEN_PRICE=1 \
-  -e 'TOKEN_TOLL_MODEL_PRICE=$OLLAMA_MODEL:2' \
+  -e SATGATE_TOKEN_PRICE=1 \
+  -e 'SATGATE_MODEL_PRICE=$OLLAMA_MODEL:2' \
   -e FREE_TIER_REQUESTS=10 \
   -e STORAGE=sqlite \
-  -e TOKEN_TOLL_DB_PATH=./data/token-toll.db \
+  -e SATGATE_DB_PATH=./data/satgate.db \
   -e TUNNEL=false \
-  token-toll:latest"
+  satgate:latest"
 
 # Wait for health check
 echo "Waiting for health check..."

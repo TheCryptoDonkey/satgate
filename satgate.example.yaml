@@ -1,11 +1,11 @@
-# token-toll configuration
-# See: https://github.com/TheCryptoDonkey/token-toll
+# satgate configuration
+# See: https://github.com/TheCryptoDonkey/satgate
 
 upstream: http://localhost:11434
 port: 3000
 # rootKey: ${ROOT_KEY}  # Set via env var for production
 storage: sqlite
-dbPath: ./token-toll.db
+dbPath: ./satgate.db
 
 pricing:
   default: 1          # 1 sat per 1k tokens

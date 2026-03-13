@@ -1,9 +1,9 @@
-# token-toll VHS demo
+# satgate VHS demo
 # Each scene clears the screen for maximum legibility at small sizes.
 #
-# Run:  cd token-toll && vhs demo/demo.tape
+# Run:  cd satgate && vhs demo/demo.tape
 
-Output "demo/token-toll-demo.gif"
+Output "demo/satgate-demo.gif"
 
 Require bash
 Require curl
@@ -22,7 +22,7 @@ Set PlaybackSpeed 1
 Hide
 Type `export PATH="/Users/darren/.nvm/versions/node/v22.17.0/bin:$PATH"`
 Enter
-Type "cd /Users/darren/WebstormProjects/token-toll && clear"
+Type "cd /Users/darren/WebstormProjects/satgate && clear"
 Enter
 Sleep 1s
 Show

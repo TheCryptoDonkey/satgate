@@ -35,7 +35,7 @@ function mockUpstream() {
       return new Response(stream, { headers: { 'Content-Type': 'text/event-stream' } })
     }
     return c.json({
-      choices: [{ message: { role: 'assistant', content: 'Hello from token-toll!' } }],
+      choices: [{ message: { role: 'assistant', content: 'Hello from satgate!' } }],
       usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
     })
   })
@@ -45,7 +45,7 @@ function mockUpstream() {
 
 const rootKey = 'a'.repeat(64)
 
-describe('E2E: l402-mcp → token-toll', () => {
+describe('E2E: l402-mcp → satgate', () => {
   let upstreamServer: ReturnType<typeof serve>
   let tokenTollServer: ReturnType<typeof serve>
   let baseUrl: string
@@ -60,7 +60,7 @@ describe('E2E: l402-mcp → token-toll', () => {
       })
     })
 
-    // 2. Create token-toll with mock Lightning
+    // 2. Create satgate with mock Lightning
     const storage = memoryStorage()
     const mockLn = createMockLightning(storage)
     preimageMap = mockLn.preimageMap
@@ -90,7 +90,7 @@ describe('E2E: l402-mcp → token-toll', () => {
       backend: mockLn.backend,
     })
 
-    // 3. Start token-toll HTTP server
+    // 3. Start satgate HTTP server
     baseUrl = await new Promise<string>((resolve) => {
       tokenTollServer = serve({ fetch: app.fetch, port: 0 }, (info) => {
         resolve(`http://localhost:${info.port}`)
@@ -169,7 +169,7 @@ describe('E2E: l402-mcp → token-toll', () => {
 
     // Got a real completion
     const body = JSON.parse(data.body)
-    expect(body.choices[0].message.content).toBe('Hello from token-toll!')
+    expect(body.choices[0].message.content).toBe('Hello from satgate!')
     expect(body.usage.total_tokens).toBe(15)
 
     // Credential stored (server is null because detectServer sees 'generic' —

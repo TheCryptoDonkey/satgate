@@ -159,7 +159,7 @@ export function loadConfig(
   }
   const storage = storageRaw as 'memory' | 'sqlite'
 
-  const dbPathRaw = args.dbPath ?? env.TOKEN_TOLL_DB_PATH ?? file.dbPath ?? './token-toll.db'
+  const dbPathRaw = args.dbPath ?? env.SATGATE_DB_PATH ?? file.dbPath ?? './satgate.db'
   const resolvedDbPath = resolve(dbPathRaw)
   const relFromCwd = relative(process.cwd(), resolvedDbPath)
   if (relFromCwd.startsWith('..')) {
@@ -188,14 +188,14 @@ export function loadConfig(
 
   // Per-token CLI pricing
   const tokenPrice = args.tokenPrice
-    ?? (env.TOKEN_TOLL_TOKEN_PRICE ? parseInt(env.TOKEN_TOLL_TOKEN_PRICE, 10) : undefined)
+    ?? (env.SATGATE_TOKEN_PRICE ? parseInt(env.SATGATE_TOKEN_PRICE, 10) : undefined)
   if (tokenPrice !== undefined && (!Number.isFinite(tokenPrice) || tokenPrice <= 0)) {
     throw new Error(`Invalid --token-price: ${tokenPrice} (must be a positive integer)`)
   }
 
   // Model-price entries from CLI and env (CLI last = CLI wins on conflict)
   const cliModelEntries = args.modelPrice ?? []
-  const envModelEntries = env.TOKEN_TOLL_MODEL_PRICE?.split(',').filter(Boolean) ?? []
+  const envModelEntries = env.SATGATE_MODEL_PRICE?.split(',').filter(Boolean) ?? []
   const allModelEntries = [...envModelEntries, ...cliModelEntries]
 
   // Parse model-price entries (split on last colon to allow model IDs with colons)
@@ -328,10 +328,10 @@ export function loadConfig(
 
   // Logging
   const verbose = args.verbose
-    ?? (env.TOKEN_TOLL_VERBOSE !== undefined ? env.TOKEN_TOLL_VERBOSE === 'true' : undefined)
+    ?? (env.SATGATE_VERBOSE !== undefined ? env.SATGATE_VERBOSE === 'true' : undefined)
     ?? file.verbose
     ?? false
-  const logFormatRaw = args.logFormat ?? env.TOKEN_TOLL_LOG_FORMAT ?? file.logFormat ?? 'pretty'
+  const logFormatRaw = args.logFormat ?? env.SATGATE_LOG_FORMAT ?? file.logFormat ?? 'pretty'
   if (logFormatRaw !== 'pretty' && logFormatRaw !== 'json') {
     throw new Error(`Invalid log format: ${logFormatRaw} (must be 'pretty' or 'json')`)
   }
