@@ -8,7 +8,7 @@ describe('generateOpenApiSpec', () => {
       pricing: { default: 1, models: { llama3: 2 } },
     })
     expect(spec.openapi).toBe('3.1.0')
-    expect(spec.info.title).toBe('Token Toll')
+    expect(spec.info.title).toBe('satgate')
     expect(spec.paths).toHaveProperty('/v1/chat/completions')
     expect(spec.paths).toHaveProperty('/v1/models')
   })

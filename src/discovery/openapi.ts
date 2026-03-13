@@ -10,7 +10,7 @@ export function generateOpenApiSpec(input: OpenApiInput): Record<string, any> {
   const spec: Record<string, any> = {
     openapi: '3.1.0',
     info: {
-      title: 'Token Toll',
+      title: 'satgate',
       description: 'Lightning-paid AI inference (OpenAI-compatible)',
       version: '1.0.0',
     },

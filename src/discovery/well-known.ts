@@ -21,7 +21,7 @@ export function generateWellKnown(input: WellKnownInput): Record<string, any> {
 
   const result: Record<string, any> = {
     version: 1,
-    name: 'Token Toll',
+    name: 'satgate',
     description: 'Lightning-paid AI inference',
     pricing: {
       unit: 'tokens',

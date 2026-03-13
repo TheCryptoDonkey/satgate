@@ -13,7 +13,7 @@ export function generateLlmsTxt(input: LlmsTxtInput): string {
     return `- ${model} (${price} ${unit} / 1k tokens)`
   })
 
-  return `# Token Toll - Lightning-paid AI inference
+  return `# satgate - Lightning-paid AI inference
 
 > This endpoint provides OpenAI-compatible inference behind L402 payments.
 > Pay with Lightning or Cashu. No account required.
