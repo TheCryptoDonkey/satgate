@@ -9,7 +9,7 @@
 
 token-toll sits in front of Ollama, vLLM, llama.cpp — any OpenAI-compatible backend — and turns it into a pay-per-token API. No accounts. No API keys. No Stripe. Clients pay per token, you earn sats before the response finishes streaming.
 
-<!-- TODO: VHS terminal recording goes here — startup, request, payment, inference, sats earned -->
+![token-toll demo](demo/token-toll-demo.gif)
 
 ## Quick start
 
