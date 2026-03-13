@@ -256,16 +256,26 @@ body {
   var scrollPending = false;  // rAF debounce for scrollToBottom
   var pricePerThousand = null; // sats per 1k tokens for current model
 
-  // Free token budget — tracked client-side in sessionStorage
+  // Free token budget — tracked client-side, resets daily
   var FREE_TOKEN_BUDGET = 1000;
   var freeTokensKey = 'satgate_free_tokens';
+  var freeTokensDayKey = 'satgate_free_day';
+  function todayStr() { return new Date().toISOString().slice(0, 10); }
   function getFreeTokens() {
+    // Reset budget if it's a new day
+    var day = sessionStorage.getItem(freeTokensDayKey);
+    if (day !== todayStr()) {
+      sessionStorage.setItem(freeTokensKey, String(FREE_TOKEN_BUDGET));
+      sessionStorage.setItem(freeTokensDayKey, todayStr());
+      return FREE_TOKEN_BUDGET;
+    }
     var v = sessionStorage.getItem(freeTokensKey);
     return v === null ? FREE_TOKEN_BUDGET : parseInt(v, 10);
   }
   function spendFreeTokens(count) {
     var remaining = Math.max(0, getFreeTokens() - count);
     sessionStorage.setItem(freeTokensKey, String(remaining));
+    sessionStorage.setItem(freeTokensDayKey, todayStr());
     return remaining;
   }
 
