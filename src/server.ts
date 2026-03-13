@@ -2,9 +2,11 @@ import { Hono } from 'hono'
 import type { Context } from 'hono'
 import {
   createTollBooth,
+  createX402Rail,
   memoryStorage,
   sqliteStorage,
 } from '@thecryptodonkey/toll-booth'
+import type { PaymentRail } from '@thecryptodonkey/toll-booth'
 import { createHonoTollBooth } from '@thecryptodonkey/toll-booth/hono'
 import type { TollBoothEnv } from '@thecryptodonkey/toll-booth/hono'
 import type { TokenTollConfig } from './config.js'
@@ -14,6 +16,7 @@ import { CapacityTracker } from './proxy/capacity.js'
 import { generateWellKnown } from './discovery/well-known.js'
 import { generateLlmsTxt } from './discovery/llms-txt.js'
 import { generateOpenApiSpec } from './discovery/openapi.js'
+import { createHttpFacilitator } from './x402/facilitator.js'
 
 export interface TokenTollServer {
   app: Hono<TollBoothEnv>
@@ -29,6 +32,35 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
     ? sqliteStorage({ path: config.dbPath })
     : memoryStorage()
 
+  // Build payment rails
+  const rails: PaymentRail[] = []
+
+  if (config.x402) {
+    const facilitator = config.x402.facilitatorUrl
+      ? createHttpFacilitator({
+          facilitatorUrl: config.x402.facilitatorUrl,
+          facilitatorKey: config.x402.facilitatorKey,
+        })
+      : undefined
+
+    if (facilitator) {
+      rails.push(createX402Rail({
+        receiverAddress: config.x402.receiverAddress,
+        network: config.x402.network,
+        asset: config.x402.asset,
+        facilitator,
+        creditMode: config.x402.creditMode ?? true,
+        facilitatorUrl: config.x402.facilitatorUrl,
+        storage,
+      }))
+    }
+  }
+
+  // Dual-currency pricing entry
+  const pricingEntry = config.defaultPriceUsd !== undefined
+    ? { sats: config.estimatedCostSats, usd: config.defaultPriceUsd }
+    : config.estimatedCostSats
+
   // Create toll-booth engine
   const engine = createTollBooth({
     rootKey: config.rootKey,
@@ -36,12 +68,13 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
     upstream: config.upstream,
     backend: config.backend,
     pricing: {
-      '/v1/chat/completions': config.estimatedCostSats,
-      '/v1/completions': config.estimatedCostSats,
-      '/v1/embeddings': config.estimatedCostSats,
+      '/v1/chat/completions': pricingEntry,
+      '/v1/completions': pricingEntry,
+      '/v1/embeddings': pricingEntry,
     },
     defaultInvoiceAmount: config.tiers[0]?.amountSats ?? 1000,
     freeTier: config.freeTier.requestsPerDay > 0 ? { requestsPerDay: config.freeTier.requestsPerDay } : undefined,
+    ...(rails.length > 0 && { rails }),
   })
 
   // Create Hono toll-booth adapter
@@ -60,12 +93,15 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
   // Discoverability endpoints (no auth required)
   const models: string[] = config.models ?? []
 
+  const paymentMethods = ['lightning', 'cashu']
+  if (config.x402) paymentMethods.push('x402')
+
   app.get('/.well-known/l402', (c) => {
     return c.json(generateWellKnown({
       pricing: config.pricing,
       models,
       tiers: config.tiers,
-      paymentMethods: ['lightning', 'cashu'],
+      paymentMethods,
     }))
   })
 
