@@ -1,3 +1,16 @@
+## [1.7.1](https://github.com/TheCryptoDonkey/satgate/compare/v1.7.0...v1.7.1) (2026-03-14)
+
+
+### Bug Fixes
+
+* add Content-Security-Policy and Permissions-Policy headers ([887b45a](https://github.com/TheCryptoDonkey/satgate/commit/887b45ac652e9a5992c105ba7dbfc9630b70b2e5))
+* add streaming size limit, pre-check upstream Content-Length, remove hop-by-hop header ([ad750af](https://github.com/TheCryptoDonkey/satgate/commit/ad750afe56434154a36905718e23d91de955538d))
+* address re-review findings — cap seen-ID cache, add stream error event ([45074be](https://github.com/TheCryptoDonkey/satgate/commit/45074bef7040f1522ae5ef43e1c433dfd17358de))
+* enforce rootKey minimum entropy, restrict announceKey directory permissions ([ffc8b05](https://github.com/TheCryptoDonkey/satgate/commit/ffc8b057467d7eeff45214361c3a89372b9fea0f))
+* harden auth — HMAC-based timing-safe comparison, NIP-98 replay prevention, case-insensitive hex pubkeys ([c8bc50c](https://github.com/TheCryptoDonkey/satgate/commit/c8bc50cfae77e7f4545543b775a9327d858f7952))
+* pass maxBodySize to streaming proxy instead of using hardcoded 100 MiB ([18ae958](https://github.com/TheCryptoDonkey/satgate/commit/18ae95827341c71f4864c4577678f9e9a7e0c03d))
+* require rootKey to be exactly 64 hex chars, matching toll-booth ([79ceb2a](https://github.com/TheCryptoDonkey/satgate/commit/79ceb2a7974bcc2970f57de566b9219d98581802))
+
 # [1.7.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.6.0...v1.7.0) (2026-03-14)
 
 
