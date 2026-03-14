@@ -273,7 +273,6 @@ export async function main(argv: string[] = process.argv): Promise<void> {
               currency: 'sats',
             })),
             paymentMethods,
-            status: 'UP',
             topics: ['ai', 'inference', 'llm', 'openai-compatible'],
             capabilities: models.map(m => ({
               name: m,
