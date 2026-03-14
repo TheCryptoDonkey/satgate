@@ -216,7 +216,8 @@ body {
   color: #94a3b8; cursor: pointer;
   transition: all 0.15s;
 }
-.model-pill:hover { border-color: rgba(6,182,212,0.4); color: #e2e8f0; }
+.model-pill:hover:not(:disabled) { border-color: rgba(6,182,212,0.4); color: #e2e8f0; }
+.model-pill:disabled { opacity: 0.4; cursor: not-allowed; }
 .model-pill.active {
   background: rgba(6, 182, 212, 0.15);
   border-color: rgba(6, 182, 212, 0.5);
@@ -448,13 +449,21 @@ body {
       }
       pricingChips.appendChild(makeChip(formatTokenCount(FREE_TOKEN_BUDGET) + ' free tokens to start'));
 
-      // Build model selector pills
+      // Build model selector pills with tooltips
+      var modelDescriptions = {
+        'qwen3:0.6b': 'Fast & cheap \u2014 simple queries, quick answers',
+        'gemma3:4b': 'Capable \u2014 better reasoning, longer answers',
+      };
       while (modelSelectorEl.firstChild) { modelSelectorEl.removeChild(modelSelectorEl.firstChild); }
       if (models.length > 1) {
         models.forEach(function(model) {
+          var price = modelPricing[model] || defaultPricePerThousand;
+          var desc = modelDescriptions[model] || '';
+          var tooltip = desc ? desc + ' (' + price + ' sats/1k tokens)' : price + ' sats/1k tokens';
           var pill = el('button', {
             className: 'model-pill' + (model === currentModel ? ' active' : ''),
             textContent: model,
+            title: tooltip,
           });
           pill.onclick = function() { switchModel(model); };
           modelSelectorEl.appendChild(pill);
@@ -498,6 +507,11 @@ body {
       if (savedSats !== null) updateStatusBar(String(savedSats));
     } else {
       updateFreeTokenStatus();
+    }
+
+    // Re-render tier selection if payment overlay is visible
+    if (paymentOverlay.style.display === 'block' && !invoiceData) {
+      buildTierSelection();
     }
   }
 
@@ -959,11 +973,15 @@ body {
   function setStreaming() {
     sendBtn.textContent = 'Stop';
     inputEl.disabled = true;
+    var pills = modelSelectorEl.querySelectorAll('.model-pill');
+    for (var i = 0; i < pills.length; i++) pills[i].disabled = true;
   }
 
   function setIdle() {
     sendBtn.textContent = 'Send';
     inputEl.disabled = false;
+    var pills = modelSelectorEl.querySelectorAll('.model-pill');
+    for (var i = 0; i < pills.length; i++) pills[i].disabled = false;
     if (paymentOverlay.style.display !== 'block') inputEl.focus();
   }
 
