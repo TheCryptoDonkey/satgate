@@ -162,8 +162,9 @@ body {
 .payment-overlay h3 { color: #22d3ee; margin-bottom: 0.35rem; font-size: 1.3rem; }
 .payment-overlay .sub { color: #94a3b8; font-size: 1rem; margin-bottom: 1.25rem; }
 .qr-container {
-  width: 220px; margin: 0 auto 1.25rem;
-  background: #fff; border-radius: 0.5rem; padding: 0.75rem;
+  width: 260px; margin: 0 auto 1.25rem;
+  background: #fff; border-radius: 0.75rem; padding: 1rem;
+  min-height: 80px;
 }
 .qr-container svg { width: 100%; height: auto; display: block; }
 .payment-actions { display: flex; gap: 0.6rem; justify-content: center; flex-wrap: wrap; }
@@ -184,8 +185,8 @@ body {
 
 /* Tier selection */
 .tier-grid {
-  display: flex; flex-direction: column; gap: 0.5rem;
-  margin-bottom: 1.25rem; max-width: 320px; margin-left: auto; margin-right: auto;
+  display: flex; flex-wrap: wrap; gap: 0.5rem;
+  margin-bottom: 1.25rem; justify-content: center;
 }
 .tier-btn {
   display: flex; justify-content: space-between; align-items: center;
@@ -198,10 +199,10 @@ body {
 .tier-btn:hover { background: rgba(6, 182, 212, 0.15); border-color: rgba(6, 182, 212, 0.5); }
 .tier-btn .amount { font-weight: 700; color: #22d3ee; }
 .tier-btn .tokens { font-size: 0.85rem; color: #94a3b8; }
-.tier-btn.recommended { border-color: rgba(6, 182, 212, 0.5); }
-.tier-btn.recommended::after {
-  content: 'best value'; font-size: 0.7rem; color: #0a0a1a;
-  background: #22d3ee; padding: 0.15rem 0.5rem; border-radius: 999px; font-weight: 600;
+.tier-btn.selected {
+  background: rgba(6, 182, 212, 0.2);
+  border-color: rgba(6, 182, 212, 0.6);
+  color: #22d3ee;
 }
 
 /* Model selector cards */
@@ -521,9 +522,9 @@ body {
       updateFreeTokenStatus();
     }
 
-    // Re-render tier selection if payment overlay is visible
-    if (paymentOverlay.style.display === 'block' && !invoiceData) {
-      buildTierSelection();
+    // Re-render payment UI if overlay is visible (updates tier token estimates)
+    if (paymentOverlay.style.display === 'block') {
+      showPayment();
     }
   }
 
@@ -567,7 +568,7 @@ body {
     var token = getToken();
     if (!token && getFreeTokens() <= 0) {
       pendingPrompt = text;
-      showPayment({});
+      showPayment();
       return;
     }
 
@@ -636,9 +637,9 @@ body {
         // Sync client budget with server's free-tier state
         if (!isPaid && freeRemaining !== null && parseInt(freeRemaining, 10) === 0) {
           sessionStorage.setItem(freeTokensKey, '0');
-          showPayment({});
+          showPayment();
         } else if (!isPaid && getFreeTokens() <= 0) {
-          showPayment({});
+          showPayment();
         }
       } else if (res.status === 402) {
         // Payment required — server says free tier exhausted
@@ -652,7 +653,7 @@ body {
         assistantDiv.remove();
         if (messages.length === 0) newChatBtn.style.display = 'none';
         var body = await res.json();
-        showPayment(body);
+        showPayment();
       } else if (res.status === 503) {
         while (contentEl.firstChild) { contentEl.removeChild(contentEl.firstChild); }
         contentEl.appendChild(makeErrorSpan('Server busy \u2014 try again in a moment.'));
@@ -750,99 +751,71 @@ body {
   // === PAYMENT ===
   // Build the payment overlay DOM using DOM methods. QR SVG from the server is
   // parsed via DOMParser and sanitised (scripts/event handlers stripped) before import.
-  function buildPaymentOverlay(data) {
+  // Refs for payment UI elements that persist across invoice reloads
+  var paymentQrContainer = null;
+  var paymentHeading = null;
+  var paymentActions = null;
+  var paymentPollStatus = null;
+  var selectedTierIdx = 0;
+
+  function buildPaymentUI() {
     while (paymentOverlay.firstChild) { paymentOverlay.removeChild(paymentOverlay.firstChild); }
 
-    var h3 = el('h3', { textContent: '\u26A1 Top up to keep chatting' });
+    paymentHeading = el('h3', { textContent: '\u26A1 Top up to keep chatting' });
     var sub = el('p', { className: 'sub', textContent: 'Scan with any Lightning wallet' });
-    paymentOverlay.appendChild(h3);
+    paymentOverlay.appendChild(paymentHeading);
     paymentOverlay.appendChild(sub);
 
-    if (data && data.qr_svg) {
-      var qrContainer = el('div', { className: 'qr-container' });
-      // Parse server-supplied SVG via DOMParser then sanitise before import
-      var parser = new DOMParser();
-      var svgDoc = parser.parseFromString(data.qr_svg, 'image/svg+xml');
-      var svgEl = svgDoc.documentElement;
-      if (svgEl && svgEl.tagName && svgEl.tagName.toLowerCase() === 'svg') {
-        sanitiseSvg(svgEl);
-        qrContainer.appendChild(document.importNode(svgEl, true));
-      }
-      paymentOverlay.appendChild(qrContainer);
-    }
+    // QR container — starts with spinner, replaced when invoice loads
+    paymentQrContainer = el('div', { className: 'qr-container' });
+    paymentQrContainer.appendChild(el('div', { className: 'poll-status', textContent: 'Loading...' }));
+    paymentOverlay.appendChild(paymentQrContainer);
 
-    var actions = el('div', { className: 'payment-actions' });
-
-    if (data && data.bolt11) {
-      var copyBtn = el('button', { className: 'btn-outline', textContent: 'Copy invoice' });
-      copyBtn.onclick = window.copyInvoice;
-      actions.appendChild(copyBtn);
-    }
-
+    // Action buttons
+    paymentActions = el('div', { className: 'payment-actions' });
+    var copyBtn = el('button', { className: 'btn-outline', textContent: 'Copy invoice' });
+    copyBtn.onclick = window.copyInvoice;
+    paymentActions.appendChild(copyBtn);
     if (window.webln) {
       var weblnBtn = el('button', { className: 'btn-solid', textContent: 'Pay with WebLN' });
       weblnBtn.onclick = window.payWithWebLN;
-      actions.appendChild(weblnBtn);
+      paymentActions.appendChild(weblnBtn);
     }
+    paymentOverlay.appendChild(paymentActions);
 
-    var backBtn = el('button', { className: 'btn-outline', textContent: '\u2190 Different amount' });
-    backBtn.onclick = function() {
-      if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
-      buildTierSelection();
-    };
-    actions.appendChild(backBtn);
-
-    paymentOverlay.appendChild(actions);
-
-    var pollStatusEl = el('p', { className: 'poll-status', id: 'poll-status', textContent: 'Waiting for payment...' });
-    paymentOverlay.appendChild(pollStatusEl);
-  }
-
-  function buildPaymentLoading() {
-    while (paymentOverlay.firstChild) { paymentOverlay.removeChild(paymentOverlay.firstChild); }
-    paymentOverlay.appendChild(el('h3', { textContent: '\u26A1 Top up to keep chatting' }));
-    paymentOverlay.appendChild(el('p', { className: 'sub', textContent: 'Scan with any Lightning wallet' }));
-    paymentOverlay.appendChild(el('div', { className: 'poll-status', textContent: 'Loading invoice...' }));
-  }
-
-  function buildPaymentError() {
-    while (paymentOverlay.firstChild) { paymentOverlay.removeChild(paymentOverlay.firstChild); }
-    paymentOverlay.appendChild(el('h3', { textContent: '\u26A1 Payment Error' }));
-    paymentOverlay.appendChild(el('p', { className: 'sub', textContent: 'Could not create invoice. Try refreshing.' }));
-  }
-
-  function buildTierSelection() {
-    while (paymentOverlay.firstChild) { paymentOverlay.removeChild(paymentOverlay.firstChild); }
-
-    paymentOverlay.appendChild(el('h3', { textContent: '\u26A1 Top up to keep chatting' }));
-    paymentOverlay.appendChild(el('p', { className: 'sub', textContent: 'Choose an amount' }));
-
-    var grid = el('div', { className: 'tier-grid' });
-
+    // Tier buttons — inline row to switch amounts
     var tiers = topupTiers.length > 0 ? topupTiers : [{ amountSats: 1000, approxTokens: 0 }];
-
+    var grid = el('div', { className: 'tier-grid' });
     tiers.forEach(function(tier, idx) {
-      var btn = el('div', { className: 'tier-btn' + (idx === tiers.length - 1 ? ' recommended' : '') });
+      var btn = el('div', { className: 'tier-btn' + (idx === selectedTierIdx ? ' selected' : '') });
       btn.appendChild(el('span', { className: 'amount', textContent: tier.amountSats.toLocaleString() + ' sats' }));
       if (tier.approxTokens > 0) {
         btn.appendChild(el('span', { className: 'tokens', textContent: '~' + formatTokenCount(tier.approxTokens) + ' tokens' }));
       }
-      btn.onclick = function() { requestInvoice(tier.amountSats); };
+      btn.onclick = function() {
+        selectedTierIdx = idx;
+        loadInvoice(tier.amountSats);
+        // Update selected state
+        var btns = grid.querySelectorAll('.tier-btn');
+        for (var i = 0; i < btns.length; i++) {
+          btns[i].className = 'tier-btn' + (i === idx ? ' selected' : '');
+        }
+      };
       grid.appendChild(btn);
     });
-
     paymentOverlay.appendChild(grid);
+
+    // Poll status
+    paymentPollStatus = el('p', { className: 'poll-status', textContent: 'Waiting for payment...' });
+    paymentOverlay.appendChild(paymentPollStatus);
   }
 
-  async function showPayment(challengeBody) {
-    paymentOverlay.style.display = 'block';
-    while (statusBar.firstChild) { statusBar.removeChild(statusBar.firstChild); }
-    buildTierSelection();
-    setIdle(); // re-enable input area but payment is shown
-  }
-
-  async function requestInvoice(amountSats) {
-    buildPaymentLoading();
+  async function loadInvoice(amountSats) {
+    // Show spinner in QR area
+    while (paymentQrContainer.firstChild) { paymentQrContainer.removeChild(paymentQrContainer.firstChild); }
+    paymentQrContainer.appendChild(el('div', { className: 'poll-status', textContent: 'Loading...' }));
+    if (paymentHeading) paymentHeading.textContent = '\u26A1 Scan to pay ' + amountSats + ' sats';
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
 
     try {
       var res = await fetch('/create-invoice', {
@@ -851,11 +824,19 @@ body {
         body: JSON.stringify({ amountSats: amountSats }),
       });
       var data = await res.json();
-
-      buildPaymentOverlay(data);
-
-      // Store invoice data for copy/webln
       invoiceData = data;
+
+      // Render QR
+      while (paymentQrContainer.firstChild) { paymentQrContainer.removeChild(paymentQrContainer.firstChild); }
+      if (data.qr_svg) {
+        var parser = new DOMParser();
+        var svgDoc = parser.parseFromString(data.qr_svg, 'image/svg+xml');
+        var svgEl = svgDoc.documentElement;
+        if (svgEl && svgEl.tagName && svgEl.tagName.toLowerCase() === 'svg') {
+          sanitiseSvg(svgEl);
+          paymentQrContainer.appendChild(document.importNode(svgEl, true));
+        }
+      }
 
       // Start polling
       if (data.payment_url) {
@@ -864,8 +845,20 @@ body {
         }, 3000);
       }
     } catch (e) {
-      buildPaymentError();
+      while (paymentQrContainer.firstChild) { paymentQrContainer.removeChild(paymentQrContainer.firstChild); }
+      paymentQrContainer.appendChild(el('div', { className: 'poll-status', textContent: 'Could not create invoice. Try again.' }));
     }
+  }
+
+  async function showPayment() {
+    paymentOverlay.style.display = 'block';
+    while (statusBar.firstChild) { statusBar.removeChild(statusBar.firstChild); }
+    selectedTierIdx = 0;
+    buildPaymentUI();
+    // Auto-load the first tier's invoice — zero extra clicks
+    var tiers = topupTiers.length > 0 ? topupTiers : [{ amountSats: 1000 }];
+    loadInvoice(tiers[0].amountSats);
+    setIdle();
   }
 
   async function checkPayment(paymentUrl, macaroon) {
