@@ -491,9 +491,9 @@ body {
       pills[i].className = 'model-pill' + (pills[i].textContent === model ? ' active' : '');
     }
 
-    // Recalculate status bar token estimate
-    var token = getToken();
-    if (token) {
+    // Refresh status bar — paid balance is in sats (model-independent),
+    // free tier is in tokens (model-independent budget)
+    if (getToken()) {
       var savedSats = getCreditSats();
       if (savedSats !== null) updateStatusBar(String(savedSats));
     } else {
@@ -582,27 +582,15 @@ body {
       if (res.status === 200) {
         // Read balance headers immediately
         var creditBalance = res.headers.get('X-Credit-Balance');
-        var estimatedCostHeader = res.headers.get('X-Estimated-Cost');
         var freeRemaining = res.headers.get('X-Free-Remaining');
         var creditSats = creditBalance !== null ? parseInt(creditBalance, 10) : NaN;
-        var holdSats = estimatedCostHeader !== null ? parseInt(estimatedCostHeader, 10) : 0;
         var isPaid = !isNaN(creditSats) && creditSats >= 0;
-        // Pre-hold balance = what the server had before this request's hold
-        var preHoldBalance = isPaid ? creditSats + holdSats : 0;
 
         var onChunk = null;
         if (isPaid) {
-          // Live countdown from pre-hold balance using estimated token costs
-          var runningCostSats = 0;
-          updateStatusBar(String(preHoldBalance));
-          var promptCost = pricePerThousand ? (estimateTokens(text) / 1000) * pricePerThousand : 0;
-          runningCostSats += promptCost;
-          updateStatusBar(String(Math.max(0, Math.round(preHoldBalance - runningCostSats))));
-          onChunk = function(chunkText) {
-            var cost = pricePerThousand ? (estimateTokens(chunkText) / 1000) * pricePerThousand : 0;
-            runningCostSats += cost;
-            updateStatusBar(String(Math.max(0, Math.round(preHoldBalance - runningCostSats))));
-          };
+          // Show server-reported balance (after hold deduction) — no client-side guessing
+          updateStatusBar(String(creditSats));
+          onChunk = null; // balance updates on next request via X-Credit-Balance header
         } else {
           // Free tier countdown
           spendFreeTokens(estimateTokens(text));
@@ -963,12 +951,7 @@ body {
       var sats = parseInt(creditBalance, 10);
       if (!isNaN(sats) && sats >= 0) {
         setCreditSats(sats);
-        if (pricePerThousand && pricePerThousand > 0) {
-          var approxTokens = Math.floor((sats / pricePerThousand) * 1000);
-          statusBar.appendChild(makeStatusSpan('free', formatTokenCount(approxTokens) + ' tokens remaining'));
-        } else {
-          statusBar.appendChild(makeStatusSpan('free', sats + ' sats remaining'));
-        }
+        statusBar.appendChild(makeStatusSpan('credit', sats.toLocaleString() + ' sats remaining'));
       }
     }
   }
