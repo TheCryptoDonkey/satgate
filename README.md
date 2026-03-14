@@ -132,6 +132,7 @@ graph TB
 - **Capacity management** — limit concurrent inference requests to protect your GPU.
 - **Auto-detect models** — queries your upstream on startup. No manual model list.
 - **Four payment rails** — Lightning, Cashu ecash, NWC, and x402 stablecoins. Operator picks what to accept.
+- **Privacy by design** — no personal data collected or stored. No accounts, no cookies, no IP logging. GDPR-safe out of the box.
 - **Instant public URL** — auto-spawns a Cloudflare tunnel. Your GPU is reachable from the internet in seconds.
 
 ---
