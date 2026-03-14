@@ -252,7 +252,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
 
           const keyDir = join(homedir(), '.satgate')
           const keyPath = join(keyDir, 'announce.key')
-          mkdirSync(keyDir, { recursive: true })
+          mkdirSync(keyDir, { recursive: true, mode: 0o700 })
           writeFileSync(keyPath, announceKey, { mode: 0o600 })
           logger.info(`Announce key saved to ${keyPath} (chmod 600)`)
         }

@@ -68,6 +68,17 @@ describe('loadConfig', () => {
     expect(config.rootKeyGenerated).toBe(false)
   })
 
+  it('rejects rootKey shorter than 32 characters', () => {
+    expect(() => loadConfig({ upstream: 'http://localhost:11434', rootKey: 'short' }))
+      .toThrow(/rootKey must be at least 32 characters/)
+  })
+
+  it('accepts rootKey of exactly 32 characters', () => {
+    const key = 'a'.repeat(32)
+    const config = loadConfig({ upstream: 'http://localhost:11434', rootKey: key })
+    expect(config.rootKey).toBe(key)
+  })
+
   it('accepts lightning config from CLI args', () => {
     const config = loadConfig({
       upstream: 'http://localhost:11434',
