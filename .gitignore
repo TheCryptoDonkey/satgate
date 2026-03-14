@@ -7,3 +7,5 @@ dist/
 .env
 .env.*
 docs/superpowers/
+.superpowers/
+.playwright-mcp/
