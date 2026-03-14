@@ -164,7 +164,11 @@ function verifyNip98(
 
     // Reject replayed event IDs
     if (seenEventIds.has(event.id)) return { allowed: false }
-    if (seenEventIds.size >= SEEN_ID_MAX_SIZE) pruneSeenIds()
+    if (seenEventIds.size >= SEEN_ID_MAX_SIZE) {
+      pruneSeenIds()
+      // If still at capacity after pruning, reject to prevent unbounded growth
+      if (seenEventIds.size >= SEEN_ID_MAX_SIZE) return { allowed: false }
+    }
 
     // Validate URL and method tags match the actual request
     const urlTag = event.tags.find(t => t[0] === 'u')?.[1]
