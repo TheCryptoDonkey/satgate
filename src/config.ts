@@ -54,6 +54,12 @@ export interface TokenTollConfig {
   logger?: Logger
   /** Human-readable service name for Lightning invoice descriptions. Defaults to 'toll-booth'. */
   serviceName?: string
+  /** Announce service on Nostr relays for discovery. */
+  announce: boolean
+  /** Nostr relay URLs for service announcement. */
+  announceRelays: string[]
+  /** Hex Nostr secret key for signing announcements. */
+  announceKey: string
 }
 
 export interface CliArgs {
@@ -79,6 +85,9 @@ export interface CliArgs {
   logFormat?: string
   tokenPrice?: number
   modelPrice?: string[]
+  announce?: boolean
+  announceRelays?: string
+  announceKey?: string
 }
 
 export interface FileConfig {
@@ -348,6 +357,11 @@ export function loadConfig(
 
   const serviceName = env.SATGATE_SERVICE_NAME ?? 'satgate'
 
+  // Announce
+  const announce = args.announce ?? (env.ANNOUNCE === 'true' || false)
+  const announceRelays = (args.announceRelays ?? env.ANNOUNCE_RELAYS ?? '').split(',').filter(Boolean)
+  const announceKey = args.announceKey ?? env.ANNOUNCE_KEY ?? ''
+
   return {
     upstream: upstream.replace(/\/+$/, ''),
     port,
@@ -375,5 +389,8 @@ export function loadConfig(
     verbose,
     logFormat,
     serviceName,
+    announce,
+    announceRelays,
+    announceKey,
   }
 }

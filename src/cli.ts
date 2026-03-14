@@ -34,6 +34,9 @@ function parseArgs(argv: string[]): CliArgs {
       case '--model-price':
         args.modelPrice = [...(args.modelPrice ?? []), argv[++i]]
         break
+      case '--announce': args.announce = true; break
+      case '--announce-relays': args.announceRelays = argv[++i]; break
+      case '--announce-key': args.announceKey = argv[++i]; break
       case '-h': case '--help': printHelp(); process.exit(0);
       case '-v': case '--version': printVersion(); process.exit(0);
       default:
@@ -88,6 +91,11 @@ function printHelp(): void {
   Server:
     --port <number>            Listen port (default: 3000)
     --no-tunnel                Skip Cloudflare Tunnel
+
+  Announce:
+    --announce                 Publish service on Nostr relays for discovery
+    --announce-relays <urls>   Comma-separated relay URLs (wss://...)
+    --announce-key <hex>       Nostr secret key for signing (auto-generated if omitted)
 
   Storage:
     --storage <type>           memory | sqlite (default: memory)
