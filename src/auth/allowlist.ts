@@ -1,7 +1,7 @@
 import { schnorr } from '@noble/curves/secp256k1.js'
 import { hexToBytes } from '@noble/curves/utils.js'
 import { bech32 } from '@scure/base'
-import { createHash, timingSafeEqual } from 'node:crypto'
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
 
 export interface AllowlistResult {
   allowed: boolean
@@ -13,7 +13,7 @@ export interface RequestContext {
   method: string
 }
 
-const HEX_PUBKEY_RE = /^[0-9a-f]{64}$/
+const HEX_PUBKEY_RE = /^[0-9a-fA-F]{64}$/
 
 interface NostrEvent {
   id: string
@@ -50,24 +50,23 @@ function extractPubkeys(allowlist: string[]): string[] {
       const hex = npubToHex(entry)
       if (hex) pubkeys.push(hex)
     } else if (HEX_PUBKEY_RE.test(entry)) {
-      pubkeys.push(entry)
+      pubkeys.push(entry.toLowerCase())
     }
   }
   return pubkeys
 }
 
+/** HMAC key used to normalise inputs to a fixed length before comparison. */
+const HMAC_KEY = createHash('sha256').update('satgate-bearer-compare').digest()
+
 /**
- * Constant-time string comparison to prevent timing attacks on Bearer tokens.
+ * Constant-time string comparison using HMAC to normalise to fixed length.
+ * This prevents leaking input length via timing side-channels.
  */
 function constantTimeEqual(a: string, b: string): boolean {
-  const bufA = Buffer.from(a)
-  const bufB = Buffer.from(b)
-  if (bufA.length !== bufB.length) {
-    // Compare against self to keep constant time even on length mismatch
-    timingSafeEqual(bufA, bufA)
-    return false
-  }
-  return timingSafeEqual(bufA, bufB)
+  const hmacA = createHmac('sha256', HMAC_KEY).update(a).digest()
+  const hmacB = createHmac('sha256', HMAC_KEY).update(b).digest()
+  return timingSafeEqual(hmacA, hmacB)
 }
 
 /**
@@ -105,8 +104,12 @@ export function checkAllowlist(
     const secrets = allowlist.filter(
       entry => !entry.startsWith('npub1') && !HEX_PUBKEY_RE.test(entry),
     )
-    const match = secrets.find(s => constantTimeEqual(s, credential))
-    if (match) {
+    // Check all entries to avoid leaking which position matched via timing
+    let matched = false
+    for (const s of secrets) {
+      if (constantTimeEqual(s, credential)) matched = true
+    }
+    if (matched) {
       return { allowed: true, identity: credential.slice(0, 8) + '...' }
     }
     return { allowed: false }
@@ -117,6 +120,25 @@ export function checkAllowlist(
   }
 
   return { allowed: false }
+}
+
+/**
+ * Short-lived cache of seen NIP-98 event IDs to prevent replay attacks.
+ * Entries expire after 120s (twice the 60s acceptance window).
+ */
+const seenEventIds = new Map<string, number>()
+const SEEN_ID_TTL_MS = 120_000
+
+function pruneSeenIds(): void {
+  const cutoff = Date.now() - SEEN_ID_TTL_MS
+  for (const [id, ts] of seenEventIds) {
+    if (ts < cutoff) seenEventIds.delete(id)
+  }
+}
+
+/** Exported for testing — clears the seen-ID cache. */
+export function _resetSeenIds(): void {
+  seenEventIds.clear()
 }
 
 /**
@@ -139,6 +161,10 @@ function verifyNip98(
     const now = nowOverride ?? Math.floor(Date.now() / 1000)
     if (Math.abs(now - event.created_at) > 60) return { allowed: false }
 
+    // Reject replayed event IDs
+    if (seenEventIds.has(event.id)) return { allowed: false }
+    pruneSeenIds()
+
     // Validate URL and method tags match the actual request
     const urlTag = event.tags.find(t => t[0] === 'u')?.[1]
     const methodTag = event.tags.find(t => t[0] === 'method')?.[1]
@@ -157,6 +183,7 @@ function verifyNip98(
     // Check pubkey against allowlist (normalise npub → hex)
     const allowedPubkeys = extractPubkeys(allowlist)
     if (allowedPubkeys.includes(event.pubkey)) {
+      seenEventIds.set(event.id, Date.now())
       return { allowed: true, identity: event.pubkey.slice(0, 8) + '...' }
     }
 

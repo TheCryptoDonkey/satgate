@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { checkAllowlist } from './allowlist.js'
+import { describe, it, expect, beforeEach } from 'vitest'
+import { checkAllowlist, _resetSeenIds } from './allowlist.js'
 import { schnorr } from '@noble/curves/secp256k1.js'
 import { bytesToHex, hexToBytes } from '@noble/curves/utils.js'
 import { bech32 } from '@scure/base'
@@ -95,6 +95,10 @@ describe('NIP-98 allowlist', () => {
   const url = 'http://localhost:3000/v1/chat/completions'
   const method = 'POST'
   const now = Math.floor(Date.now() / 1000)
+
+  beforeEach(() => {
+    _resetSeenIds()
+  })
 
   it('allows request with valid NIP-98 event from allowlisted hex pubkey', () => {
     const privKey = schnorr.utils.randomSecretKey()
@@ -254,5 +258,31 @@ describe('NIP-98 allowlist', () => {
     expect(allowed.allowed).toBe(true)
     const denied = checkAllowlist('Bearer my-secret-token-abd', secrets, { url: '', method: '' })
     expect(denied.allowed).toBe(false)
+  })
+
+  it('rejects replayed NIP-98 event (same event ID used twice)', () => {
+    const privKey = schnorr.utils.randomSecretKey()
+    const pubkey = bytesToHex(schnorr.getPublicKey(privKey))
+    const token = createNip98Token(privKey, url, method, now)
+
+    const first = checkAllowlist(`Nostr ${token}`, [pubkey], { url, method }, now)
+    expect(first.allowed).toBe(true)
+
+    const replay = checkAllowlist(`Nostr ${token}`, [pubkey], { url, method }, now)
+    expect(replay.allowed).toBe(false)
+  })
+})
+
+describe('upper-case hex pubkey handling', () => {
+  it('does not treat upper-case hex pubkeys as Bearer secrets', () => {
+    const upperHex = 'A'.repeat(64)
+    const result = checkAllowlist(`Bearer ${upperHex}`, [upperHex], { url: '', method: '' })
+    expect(result.allowed).toBe(false)
+  })
+
+  it('does not treat mixed-case hex pubkeys as Bearer secrets', () => {
+    const mixedHex = 'aAbBcCdDeEfF' + '0'.repeat(52)
+    const result = checkAllowlist(`Bearer ${mixedHex}`, [mixedHex], { url: '', method: '' })
+    expect(result.allowed).toBe(false)
   })
 })

@@ -9,6 +9,6 @@ export { generateWellKnown, type WellKnownInput } from './discovery/well-known.j
 export { generateLlmsTxt, type LlmsTxtInput } from './discovery/llms-txt.js'
 export { generateOpenApiSpec, type OpenApiInput } from './discovery/openapi.js'
 export { createAuthMiddleware, type AuthMiddlewareConfig } from './auth/middleware.js'
-export { checkAllowlist, type AllowlistResult } from './auth/allowlist.js'
+export { checkAllowlist, _resetSeenIds, type AllowlistResult } from './auth/allowlist.js'
 export { createLightningBackend, type LightningConfig } from './lightning.js'
 export { startTunnel, stopTunnel, findCloudflared, parseTunnelUrl } from './tunnel.js'
