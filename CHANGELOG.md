@@ -1,3 +1,10 @@
+## [1.5.1](https://github.com/TheCryptoDonkey/satgate/compare/v1.5.0...v1.5.1) (2026-03-14)
+
+
+### Bug Fixes
+
+* add spacing between payment tier buttons and actions ([9100278](https://github.com/TheCryptoDonkey/satgate/commit/91002785092d29c71818d170c2c1f0eb0c9e4cd4))
+
 # [1.5.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.4.0...v1.5.0) (2026-03-14)
 
 
