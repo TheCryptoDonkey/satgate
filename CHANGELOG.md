@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.0.0...v1.1.0) (2026-03-14)
+
+
+### Features
+
+* switch free tier from per-request to per-usage (creditsPerDay) ([3aec2b3](https://github.com/TheCryptoDonkey/satgate/commit/3aec2b340d08b94b383dfe6e3998c1b7ce27ef17))
+
 # 1.0.0 (2026-03-14)
 
 
