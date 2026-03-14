@@ -154,7 +154,14 @@ export async function main(argv: string[] = process.argv): Promise<void> {
   // Load allowlist file before config validation so --allowlist-file works standalone
   if (args.allowlistFile) {
     const { resolve, relative } = await import('node:path')
-    const resolvedAllowlistPath = resolve(args.allowlistFile)
+    const { realpathSync } = await import('node:fs')
+    let resolvedAllowlistPath: string
+    try {
+      resolvedAllowlistPath = realpathSync(resolve(args.allowlistFile))
+    } catch {
+      console.error(`[satgate] Could not read allowlist file: ${args.allowlistFile}`)
+      process.exit(1)
+    }
     const relFromCwd = relative(process.cwd(), resolvedAllowlistPath)
     if (relFromCwd.startsWith('..')) {
       console.error(`[satgate] --allowlist-file must be within the working directory (got: ${args.allowlistFile})`)

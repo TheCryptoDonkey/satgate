@@ -50,4 +50,13 @@ describe('tokenCostToSats', () => {
   it('handles fractional results with ceil', () => {
     expect(tokenCostToSats(1001, 1)).toBe(2)
   })
+
+  it('returns 0 for negative or zero price', () => {
+    expect(tokenCostToSats(100, -5)).toBe(0)
+    expect(tokenCostToSats(100, 0)).toBe(0)
+  })
+
+  it('returns 0 for negative tokens', () => {
+    expect(tokenCostToSats(-100, 2)).toBe(0)
+  })
 })
