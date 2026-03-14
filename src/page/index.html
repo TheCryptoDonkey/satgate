@@ -204,6 +204,25 @@ body {
   background: #22d3ee; padding: 0.15rem 0.5rem; border-radius: 999px; font-weight: 600;
 }
 
+/* Model selector */
+.model-selector {
+  display: flex; gap: 0.5rem; justify-content: center; margin-bottom: 1.5rem;
+}
+.model-pill {
+  padding: 0.45rem 1rem; border-radius: 999px; font-size: 0.95rem;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: #94a3b8; cursor: pointer;
+  transition: all 0.15s;
+}
+.model-pill:hover { border-color: rgba(6,182,212,0.4); color: #e2e8f0; }
+.model-pill.active {
+  background: rgba(6, 182, 212, 0.15);
+  border-color: rgba(6, 182, 212, 0.5);
+  color: #22d3ee;
+}
+
 /* Footer */
 .footer {
   text-align: center; font-size: 0.9rem; color: #475569;
@@ -224,6 +243,7 @@ body {
   .hero h1 { font-size: 2rem; }
   .hero .tagline { font-size: 1.05rem; }
   .chip { font-size: 0.8rem; padding: 0.3rem 0.7rem; }
+  .model-pill { font-size: 0.8rem; padding: 0.35rem 0.75rem; }
   .msg { font-size: 0.95rem; }
   .input-bar { gap: 0.4rem; padding: 0.65rem 0.7rem; }
   .input-bar input { font-size: 0.95rem; padding: 0.6rem 0.75rem; }
@@ -250,6 +270,9 @@ body {
 
   <!-- LIVE PRICING (populated by JS) -->
   <div id="pricing-chips" class="pricing-chips"></div>
+
+  <!-- MODEL SELECTOR (populated by JS) -->
+  <div id="model-selector" class="model-selector"></div>
 
   <!-- NEW CHAT -->
   <button id="new-chat-btn" class="new-chat-btn" onclick="newChat()">New chat</button>
@@ -290,7 +313,10 @@ body {
   var invoiceData = null;     // current invoice (bolt11, macaroon, qr_svg)
   var scrollPending = false;  // rAF debounce for scrollToBottom
   var pricePerThousand = null; // sats per 1k tokens for current model
+  var modelPricing = {};       // { modelId: perThousandTokens }
+  var defaultPricePerThousand = null;
   var topupTiers = [];         // [{amountSats, approxTokens}] from well-known or defaults
+  var serverTiersRaw = [];     // raw tier data for recalc on model switch
 
   // Free token budget — tracked client-side, resets daily
   var FREE_TOKEN_BUDGET = 250;
@@ -321,6 +347,7 @@ body {
   var sendBtn = document.getElementById('send-btn');
   var statusBar = document.getElementById('status-bar');
   var pricingChips = document.getElementById('pricing-chips');
+  var modelSelectorEl = document.getElementById('model-selector');
   var paymentOverlay = document.getElementById('payment-overlay');
   var newChatBtn = document.getElementById('new-chat-btn');
 
@@ -387,15 +414,23 @@ body {
       var pricing = data.pricing || {};
       var freeTier = data.free_tier || {};
 
+      // Store all model pricing
+      if (pricing.models) {
+        Object.keys(pricing.models).forEach(function(model) {
+          var p = pricing.models[model];
+          modelPricing[model] = (p && p.perThousandTokens !== undefined) ? p.perThousandTokens : p;
+        });
+      }
+      if (pricing.default) {
+        var defp = pricing.default;
+        defaultPricePerThousand = (defp && defp.perThousandTokens !== undefined) ? defp.perThousandTokens : defp;
+      }
+
       // Set current model and resolve price per 1k tokens
       currentModel = models[0] || null;
-      if (currentModel && pricing.models && pricing.models[currentModel]) {
-        var mp = pricing.models[currentModel];
-        pricePerThousand = (mp && mp.perThousandTokens !== undefined) ? mp.perThousandTokens : mp;
-      } else if (pricing.default) {
-        var defp = pricing.default;
-        pricePerThousand = (defp && defp.perThousandTokens !== undefined) ? defp.perThousandTokens : defp;
-      }
+      pricePerThousand = currentModel && modelPricing[currentModel]
+        ? modelPricing[currentModel]
+        : defaultPricePerThousand;
 
       // Clear and populate pricing chips
       while (pricingChips.firstChild) { pricingChips.removeChild(pricingChips.firstChild); }
@@ -403,9 +438,7 @@ body {
       var hasModelChips = false;
       if (pricing.models) {
         Object.keys(pricing.models).forEach(function(model) {
-          var p = pricing.models[model];
-          var cost = (p && p.perThousandTokens !== undefined) ? p.perThousandTokens : p;
-          pricingChips.appendChild(makeChip(model + ' \u2014 ' + cost + ' sats/1k tokens'));
+          pricingChips.appendChild(makeChip(model + ' \u2014 ' + modelPricing[model] + ' sats/1k tokens'));
           hasModelChips = true;
         });
       }
@@ -415,22 +448,22 @@ body {
       }
       pricingChips.appendChild(makeChip(formatTokenCount(FREE_TOKEN_BUDGET) + ' free tokens to start'));
 
-      // Build topup tiers from server data or sensible defaults
-      var serverTiers = (data.payment && data.payment.tiers) || [];
-      if (serverTiers.length > 0) {
-        topupTiers = serverTiers.map(function(t) {
-          var tokens = pricePerThousand ? Math.floor((t.amountSats / pricePerThousand) * 1000) : 0;
-          return { amountSats: t.amountSats, approxTokens: tokens };
-        });
-      } else if (pricePerThousand) {
-        topupTiers = [
-          { amountSats: 100 },
-          { amountSats: 500 },
-          { amountSats: 2100 },
-        ].map(function(t) {
-          return { amountSats: t.amountSats, approxTokens: Math.floor((t.amountSats / pricePerThousand) * 1000) };
+      // Build model selector pills
+      while (modelSelectorEl.firstChild) { modelSelectorEl.removeChild(modelSelectorEl.firstChild); }
+      if (models.length > 1) {
+        models.forEach(function(model) {
+          var pill = el('button', {
+            className: 'model-pill' + (model === currentModel ? ' active' : ''),
+            textContent: model,
+          });
+          pill.onclick = function() { switchModel(model); };
+          modelSelectorEl.appendChild(pill);
         });
       }
+
+      // Store raw tiers for recalc on model switch
+      serverTiersRaw = (data.payment && data.payment.tiers) || [];
+      recalcTopupTiers();
 
       // Show token balance
       if (getToken()) {
@@ -444,6 +477,45 @@ body {
       pricingChips.appendChild(makeChip('Could not load pricing'));
     }
     inputEl.focus();
+  }
+
+  // === MODEL SWITCHING ===
+  function switchModel(model) {
+    currentModel = model;
+    pricePerThousand = modelPricing[model] || defaultPricePerThousand;
+    recalcTopupTiers();
+
+    // Update pill active state
+    var pills = modelSelectorEl.querySelectorAll('.model-pill');
+    for (var i = 0; i < pills.length; i++) {
+      pills[i].className = 'model-pill' + (pills[i].textContent === model ? ' active' : '');
+    }
+
+    // Recalculate status bar token estimate
+    var token = getToken();
+    if (token) {
+      var savedSats = getCreditSats();
+      if (savedSats !== null) updateStatusBar(String(savedSats));
+    } else {
+      updateFreeTokenStatus();
+    }
+  }
+
+  function recalcTopupTiers() {
+    if (serverTiersRaw.length > 0) {
+      topupTiers = serverTiersRaw.map(function(t) {
+        var tokens = pricePerThousand ? Math.floor((t.amountSats / pricePerThousand) * 1000) : 0;
+        return { amountSats: t.amountSats, approxTokens: tokens };
+      });
+    } else if (pricePerThousand) {
+      topupTiers = [
+        { amountSats: 100 },
+        { amountSats: 500 },
+        { amountSats: 2100 },
+      ].map(function(t) {
+        return { amountSats: t.amountSats, approxTokens: Math.floor((t.amountSats / pricePerThousand) * 1000) };
+      });
+    }
   }
 
   // === SEND MESSAGE ===
