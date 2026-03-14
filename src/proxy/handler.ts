@@ -182,12 +182,23 @@ export function createProxyHandler(deps: ProxyDeps) {
           headers: {
             'Content-Type': 'text/event-stream',
             'Cache-Control': 'no-cache',
-            'Connection': 'keep-alive',
           },
         })
       }
 
-      // Handle non-streaming response — enforce size limit before parsing
+      // Handle non-streaming response — check Content-Length before buffering
+      const upstreamContentLength = upstreamRes.headers.get('content-length')
+      if (upstreamContentLength !== null) {
+        const len = parseInt(upstreamContentLength, 10)
+        if (Number.isFinite(len) && len > deps.maxBodySize) {
+          if (paymentHash) deps.reconcile(paymentHash, 0)
+          await upstreamRes.body?.cancel().catch(() => {})
+          return new Response(
+            JSON.stringify({ error: 'Upstream response too large' }),
+            { status: 502, headers: { 'Content-Type': 'application/json' } },
+          )
+        }
+      }
       const responseText = await upstreamRes.text()
       if (new TextEncoder().encode(responseText).byteLength > deps.maxBodySize) {
         if (paymentHash) deps.reconcile(paymentHash, 0)

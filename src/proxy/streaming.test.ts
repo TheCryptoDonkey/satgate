@@ -122,4 +122,25 @@ describe('createStreamingProxy', () => {
     expect(onComplete).toHaveBeenCalledTimes(1)
     expect(onComplete).toHaveBeenCalledWith(1)
   })
+
+  it('closes stream when cumulative size limit is exceeded', async () => {
+    const onComplete = vi.fn()
+    const encoder = new TextEncoder()
+    const bigChunk = 'data: {"choices":[{"delta":{"content":"' + 'x'.repeat(500) + '"}}]}\n\n'
+    const upstream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        // Each chunk is ~530 bytes, limit is 1000 — second chunk should trigger close
+        controller.enqueue(encoder.encode(bigChunk))
+        controller.enqueue(encoder.encode(bigChunk))
+        controller.enqueue(encoder.encode(bigChunk))
+        controller.close()
+      },
+    })
+
+    const { readable } = createStreamingProxy(upstream, onComplete, 120_000, 1000)
+    const output = await collectStream(readable)
+    expect(onComplete).toHaveBeenCalledTimes(1)
+    // Should have received at most 2 chunks (first passes, second exceeds limit)
+    expect(output.length).toBeLessThan(bigChunk.length * 3)
+  })
 })
