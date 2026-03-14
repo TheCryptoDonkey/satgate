@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.2.1...v1.3.0) (2026-03-14)
+
+
+### Features
+
+* replace pricing chips with model selector cards ([540bbdb](https://github.com/TheCryptoDonkey/satgate/commit/540bbdba2586459c4105b45f28a9c9457e43cdf7))
+
 ## [1.2.1](https://github.com/TheCryptoDonkey/satgate/compare/v1.2.0...v1.2.1) (2026-03-14)
 
 
