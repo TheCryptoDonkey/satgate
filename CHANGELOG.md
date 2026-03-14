@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/TheCryptoDonkey/satgate/compare/v1.2.0...v1.2.1) (2026-03-14)
+
+
+### Bug Fixes
+
+* model selector UX improvements ([9a22de3](https://github.com/TheCryptoDonkey/satgate/commit/9a22de36521b17561a98c61879ac77388ab36aa6))
+
 # [1.2.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.1.0...v1.2.0) (2026-03-14)
 
 
