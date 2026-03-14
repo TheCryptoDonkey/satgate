@@ -273,10 +273,50 @@ export async function main(argv: string[] = process.argv): Promise<void> {
               currency: 'sats',
             })),
             paymentMethods,
+            status: 'UP',
             topics: ['ai', 'inference', 'llm', 'openai-compatible'],
             capabilities: models.map(m => ({
               name: m,
               description: `Chat completion with ${m}`,
+              schema: {
+                type: 'object',
+                properties: {
+                  model: { type: 'string', enum: [m] },
+                  messages: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        role: { type: 'string', enum: ['system', 'user', 'assistant'] },
+                        content: { type: 'string' },
+                      },
+                      required: ['role', 'content'],
+                    },
+                  },
+                },
+                required: ['model', 'messages'],
+              },
+              outputSchema: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  choices: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        message: {
+                          type: 'object',
+                          properties: {
+                            role: { type: 'string' },
+                            content: { type: 'string' },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
             })),
           })
           logger.info(`Announced on ${config.announceRelays.length} relay(s) as ${announcement.pubkey}`)
