@@ -318,7 +318,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
               },
             })),
           })
-          logger.info(`Announced on ${config.announceRelays.length} relay(s) as ${announcement.pubkey}`)
+          logger.info(`Announced on ${config.announceRelays.length} relay(s) as ${announcement!.pubkey}`)
           ;(config as unknown as Record<string, unknown>).announceKey = ''
         } catch (err) {
           logger.warn(`Announce failed: ${err instanceof Error ? err.message : err}`)

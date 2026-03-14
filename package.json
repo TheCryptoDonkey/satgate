@@ -31,7 +31,7 @@
     "@hono/node-server": "^1.0.0",
     "@noble/curves": "^2.0.1",
     "@scure/base": "^2.0.0",
-    "402-announce": "file:../402-announce",
+    "402-announce": "^1.1.0",
     "@thecryptodonkey/toll-booth": "^2.0.0",
     "hono": "^4.0.0",
     "js-yaml": "^4.1.1"
