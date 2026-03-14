@@ -16,6 +16,7 @@ export class TokenCounter {
   private bufferedUsage: UsageData | null = null
   private sseUsage: UsageData | null = null
   private contentChunkCount = 0
+  private hasReasoningChunks = false
 
   /** Set usage from a buffered (non-streaming) JSON response. */
   setBufferedUsage(usage: Record<string, unknown>): void {
@@ -46,12 +47,15 @@ export class TokenCounter {
           }
         }
 
-        // Count content chunks
+        // Count content and reasoning chunks
         const choices = parsed.choices
         if (Array.isArray(choices)) {
           for (const choice of choices) {
             if (choice.delta?.content !== undefined && choice.delta.content !== '') {
               this.contentChunkCount++
+            }
+            if (choice.delta?.reasoning !== undefined || choice.delta?.reasoning_content !== undefined) {
+              this.hasReasoningChunks = true
             }
           }
         }
@@ -62,14 +66,32 @@ export class TokenCounter {
   }
 
   /** Returns the final token count using the best available source.
-   *  Uses prompt_tokens from usage stats + content chunk count for completion.
+   *
+   *  For buffered (non-streaming) responses, uses prompt_tokens + completion_tokens
+   *  from the usage object since there are no SSE chunks to count.
+   *
+   *  For streaming responses, uses prompt_tokens + content chunk count.
    *  This avoids billing for reasoning/thinking tokens that some models produce. */
   finalCount(): number {
-    const usage = this.bufferedUsage ?? this.sseUsage
+    // Buffered response — use reported usage directly (no chunks to count)
+    if (this.bufferedUsage) {
+      const prompt = this.bufferedUsage.prompt_tokens ?? 0
+      const completion = this.bufferedUsage.completion_tokens ?? 0
+      return prompt + completion
+    }
+
+    // Streaming response
+    const usage = this.sseUsage
     const promptTokens = usage?.prompt_tokens ?? 0
 
-    // Content chunk count is the most reliable measure of actual output
-    // since it excludes reasoning tokens that models like qwen3 produce
+    // If reasoning chunks were detected, use content chunk count to exclude them.
+    // Otherwise, prefer completion_tokens from SSE usage (more accurate than chunk count).
+    if (this.hasReasoningChunks) {
+      return promptTokens + this.contentChunkCount
+    }
+    if (usage?.completion_tokens !== undefined) {
+      return promptTokens + usage.completion_tokens
+    }
     return promptTokens + this.contentChunkCount
   }
 }

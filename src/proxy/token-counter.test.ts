@@ -3,14 +3,19 @@ import { TokenCounter } from './token-counter.js'
 
 describe('TokenCounter', () => {
   describe('buffered JSON response', () => {
-    it('uses prompt_tokens from usage (no content chunks for buffered)', () => {
+    it('uses prompt_tokens + completion_tokens from usage', () => {
       const counter = new TokenCounter()
       counter.setBufferedUsage({
         prompt_tokens: 100,
         completion_tokens: 50,
         total_tokens: 150,
       })
-      // No content chunks ingested, so finalCount = prompt_tokens + 0
+      expect(counter.finalCount()).toBe(150)
+    })
+
+    it('handles missing completion_tokens gracefully', () => {
+      const counter = new TokenCounter()
+      counter.setBufferedUsage({ prompt_tokens: 100 })
       expect(counter.finalCount()).toBe(100)
     })
 
@@ -66,6 +71,26 @@ describe('TokenCounter', () => {
       counter.ingestSSEChunk('data: not-json\n\n')
       counter.ingestSSEChunk('data: {"choices":[{"delta":{"content":"ok"}}]}\n\n')
       expect(counter.finalCount()).toBe(1)
+    })
+
+    it('prefers SSE completion_tokens over chunk count when no reasoning', () => {
+      const counter = new TokenCounter()
+      // Upstream sends one large content chunk (adversarial)
+      counter.ingestSSEChunk('data: {"choices":[{"delta":{"content":"Hello world this is a long response"}}]}\n\n')
+      counter.ingestSSEChunk('data: {"choices":[],"usage":{"prompt_tokens":10,"completion_tokens":8,"total_tokens":18}}\n\n')
+      counter.ingestSSEChunk('data: [DONE]\n\n')
+      // Should use completion_tokens (8), not chunk count (1)
+      expect(counter.finalCount()).toBe(18)
+    })
+
+    it('falls back to chunk count when reasoning chunks detected', () => {
+      const counter = new TokenCounter()
+      counter.ingestSSEChunk('data: {"choices":[{"delta":{"reasoning":"thinking..."}}]}\n\n')
+      counter.ingestSSEChunk('data: {"choices":[{"delta":{"content":"answer"}}]}\n\n')
+      counter.ingestSSEChunk('data: {"choices":[],"usage":{"prompt_tokens":10,"completion_tokens":50,"total_tokens":60}}\n\n')
+      counter.ingestSSEChunk('data: [DONE]\n\n')
+      // Should use chunk count (1) not completion_tokens (50) — reasoning excluded
+      expect(counter.finalCount()).toBe(11)
     })
 
     it('handles multi-event chunks', () => {
