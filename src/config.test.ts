@@ -68,13 +68,19 @@ describe('loadConfig', () => {
     expect(config.rootKeyGenerated).toBe(false)
   })
 
-  it('rejects rootKey shorter than 32 characters', () => {
+  it('rejects rootKey that is not 64 hex characters', () => {
     expect(() => loadConfig({ upstream: 'http://localhost:11434', rootKey: 'short' }))
-      .toThrow(/rootKey must be at least 32 characters for adequate security/)
+      .toThrow(/rootKey must be exactly 64 hex characters/)
   })
 
-  it('accepts rootKey of exactly 32 characters', () => {
-    const key = 'a'.repeat(32)
+  it('rejects rootKey with non-hex characters', () => {
+    const key = 'g'.repeat(64)
+    expect(() => loadConfig({ upstream: 'http://localhost:11434', rootKey: key }))
+      .toThrow(/rootKey must be exactly 64 hex characters/)
+  })
+
+  it('accepts rootKey of exactly 64 hex characters', () => {
+    const key = 'abcdef0123456789'.repeat(4)
     const config = loadConfig({ upstream: 'http://localhost:11434', rootKey: key })
     expect(config.rootKey).toBe(key)
   })
