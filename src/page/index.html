@@ -491,7 +491,7 @@ body {
       }, [
         el('div', { className: 'model-name', textContent: model }),
         desc ? el('div', { className: 'model-desc', textContent: desc }) : null,
-        el('div', { className: 'model-price', textContent: price + ' sats/1k tokens' }),
+        el('div', { className: 'model-price', textContent: Math.floor(1000 / price) + ' tokens/sat' }),
       ]);
       card.setAttribute('data-model', model);
       card.onclick = function() { switchModel(model); };
