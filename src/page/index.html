@@ -803,6 +803,35 @@ body {
       };
       grid.appendChild(btn);
     });
+    // Custom amount input
+    var customBtn = el('div', { className: 'tier-btn' });
+    var customInput = el('input', {
+      type: 'number',
+      placeholder: 'Custom sats',
+      style: 'width:90px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:#e2e8f0;padding:0.3rem 0.5rem;border-radius:0.4rem;font-size:0.9rem;font-family:inherit;outline:none;-moz-appearance:textfield;',
+    });
+    var customGo = el('button', {
+      className: 'btn-outline',
+      textContent: 'Go',
+      style: 'padding:0.3rem 0.7rem;font-size:0.85rem;',
+    });
+    var doCustom = function() {
+      var amt = parseInt(customInput.value, 10);
+      if (!amt || amt < 1) return;
+      // Deselect tier buttons
+      var btns = grid.querySelectorAll('.tier-btn');
+      for (var i = 0; i < btns.length; i++) btns[i].className = 'tier-btn';
+      customBtn.className = 'tier-btn selected';
+      selectedTierIdx = -1;
+      loadInvoice(amt);
+    };
+    customGo.onclick = doCustom;
+    customInput.onkeydown = function(e) { if (e.key === 'Enter') doCustom(); };
+    customBtn.appendChild(customInput);
+    customBtn.appendChild(customGo);
+    customBtn.onclick = null; // prevent tier-btn default
+    grid.appendChild(customBtn);
+
     paymentOverlay.appendChild(grid);
 
     // Poll status
