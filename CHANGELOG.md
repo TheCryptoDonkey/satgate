@@ -1,3 +1,16 @@
+# [1.2.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.1.0...v1.2.0) (2026-03-14)
+
+
+### Bug Fixes
+
+* show sats balance for paid users instead of estimated tokens ([f64f6dd](https://github.com/TheCryptoDonkey/satgate/commit/f64f6dd85d23fd6d1e389f09aa80c4a9e2f72dd5))
+
+
+### Features
+
+* add gemma3:4b as second model with per-model pricing ([0c5eab6](https://github.com/TheCryptoDonkey/satgate/commit/0c5eab630fa031b93f7fdc78c428574d79b30938))
+* add model selector pills to UI ([7bb3c49](https://github.com/TheCryptoDonkey/satgate/commit/7bb3c49e200566f735c75806b7aceb9fbc29e84c))
+
 # [1.1.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.0.0...v1.1.0) (2026-03-14)
 
 
