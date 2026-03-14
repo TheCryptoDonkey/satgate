@@ -6,6 +6,7 @@ import { createTokenTollServer } from './server.js'
 import { createLightningBackend } from './lightning.js'
 import { startTunnel, stopTunnel, type TunnelResult } from './tunnel.js'
 import { createLogger } from './logger.js'
+import { resolveModelPrice } from './proxy/pricing.js'
 
 function parseArgs(argv: string[]): CliArgs {
   const args: CliArgs = {}
@@ -192,6 +193,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
   } catch { /* ignore */ }
 
   let tunnelResult: TunnelResult | undefined
+  let announcement: { close(): void } | undefined
 
   const server = serve({ fetch: app.fetch, port: config.port }, async () => {
     const lightningLabel = config.lightning
@@ -231,9 +233,54 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     } else {
       logger.info('Tunnel:     disabled')
     }
+
+    // Announce on Nostr relays
+    if (config.announce) {
+      if (config.announceRelays.length === 0) {
+        logger.warn('--announce enabled but no --announce-relays provided')
+      } else {
+        const publicUrl = tunnelResult?.url ?? `http://localhost:${config.port}`
+
+        const { announceService } = await import('@thecryptodonkey/l402-announce')
+        const { randomBytes } = await import('node:crypto')
+
+        const announceKey = config.announceKey || randomBytes(32).toString('hex')
+        if (!config.announceKey) {
+          logger.info(`Generated announce key: ${announceKey} (save this to persist identity)`)
+        }
+
+        const paymentMethods = ['bitcoin-lightning-bolt11']
+
+        try {
+          announcement = await announceService({
+            secretKey: announceKey,
+            relays: config.announceRelays,
+            identifier: `satgate-${new URL(publicUrl).hostname}`,
+            name: `satgate @ ${publicUrl}`,
+            url: publicUrl,
+            about: `Pay-per-token AI inference — ${models.join(', ')}`,
+            pricing: models.map(m => ({
+              capability: m,
+              price: resolveModelPrice(config.pricing, m),
+              currency: 'sats',
+            })),
+            paymentMethods,
+            topics: ['ai', 'inference', 'llm', 'openai-compatible'],
+            capabilities: models.map(m => ({
+              name: m,
+              description: `Chat completion with ${m}`,
+            })),
+          })
+          logger.info(`Announced on ${config.announceRelays.length} relay(s)`)
+        } catch (err) {
+          logger.warn(`Announce failed: ${err instanceof Error ? err.message : err}`)
+        }
+      }
+    }
   })
 
   const shutdown = () => {
+    announcement?.close()
     if (tunnelResult?.process) stopTunnel(tunnelResult.process)
     server.close()
     process.exit(0)
