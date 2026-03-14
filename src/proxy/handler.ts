@@ -186,7 +186,7 @@ export function createProxyHandler(deps: ProxyDeps) {
         })
       }
 
-      // Handle non-streaming response — check Content-Length before buffering
+      // Handle non-streaming response — enforce size limit during read
       const upstreamContentLength = upstreamRes.headers.get('content-length')
       if (upstreamContentLength !== null) {
         const len = parseInt(upstreamContentLength, 10)
@@ -199,13 +199,39 @@ export function createProxyHandler(deps: ProxyDeps) {
           )
         }
       }
-      const responseText = await upstreamRes.text()
-      if (new TextEncoder().encode(responseText).byteLength > deps.maxBodySize) {
-        if (paymentHash) deps.reconcile(paymentHash, 0)
-        return new Response(
-          JSON.stringify({ error: 'Upstream response too large' }),
-          { status: 502, headers: { 'Content-Type': 'application/json' } },
-        )
+      // Read body incrementally to enforce size limit even without Content-Length
+      let responseText: string
+      if (upstreamRes.body) {
+        const reader = upstreamRes.body.getReader()
+        const decoder = new TextDecoder()
+        const chunks: string[] = []
+        let totalBytes = 0
+        try {
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            totalBytes += value.byteLength
+            if (totalBytes > deps.maxBodySize) {
+              await reader.cancel('response too large').catch(() => {})
+              if (paymentHash) deps.reconcile(paymentHash, 0)
+              return new Response(
+                JSON.stringify({ error: 'Upstream response too large' }),
+                { status: 502, headers: { 'Content-Type': 'application/json' } },
+              )
+            }
+            chunks.push(decoder.decode(value, { stream: true }))
+          }
+          chunks.push(decoder.decode()) // flush remaining
+        } catch {
+          if (paymentHash) deps.reconcile(paymentHash, 0)
+          return new Response(
+            JSON.stringify({ error: 'Upstream response read failed' }),
+            { status: 502, headers: { 'Content-Type': 'application/json' } },
+          )
+        }
+        responseText = chunks.join('')
+      } else {
+        responseText = await upstreamRes.text()
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let responseBody: any
