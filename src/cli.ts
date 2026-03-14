@@ -153,7 +153,20 @@ export async function main(argv: string[] = process.argv): Promise<void> {
 
   // Load allowlist file before config validation so --allowlist-file works standalone
   if (args.allowlistFile) {
-    const content = readFileSync(args.allowlistFile, 'utf-8')
+    const { resolve, relative } = await import('node:path')
+    const resolvedAllowlistPath = resolve(args.allowlistFile)
+    const relFromCwd = relative(process.cwd(), resolvedAllowlistPath)
+    if (relFromCwd.startsWith('..')) {
+      console.error(`[satgate] --allowlist-file must be within the working directory (got: ${args.allowlistFile})`)
+      process.exit(1)
+    }
+    let content: string
+    try {
+      content = readFileSync(resolvedAllowlistPath, 'utf-8')
+    } catch {
+      console.error(`[satgate] Could not read allowlist file: ${args.allowlistFile}`)
+      process.exit(1)
+    }
     const entries = content.split('\n').map(l => l.trim()).filter(Boolean)
     args.allowlist = [...(args.allowlist ?? []), ...entries]
   }
@@ -231,6 +244,11 @@ export async function main(argv: string[] = process.argv): Promise<void> {
       logger.warn('Set ROOT_KEY env var for production use')
     }
     logger.info('/.well-known/l402  |  /llms.txt  |  /health')
+
+    if (config.authMode === 'open' && config.tunnel) {
+      logger.warn('Server is publicly tunnelled with NO authentication.')
+      logger.warn('Configure --lightning or --auth allowlist for production use.')
+    }
 
     // Start tunnel if enabled
     if (config.tunnel) {
@@ -330,6 +348,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
           })
           logger.info(`Announced on ${config.announceRelays.length} relay(s) as ${announcement!.pubkey}`)
           ;(config as unknown as Record<string, unknown>).announceKey = ''
+          delete process.env.ANNOUNCE_KEY
         } catch (err) {
           logger.warn(`Announce failed: ${err instanceof Error ? err.message : err}`)
         }

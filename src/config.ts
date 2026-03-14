@@ -276,9 +276,14 @@ export function loadConfig(
 
   const tiers = file.tiers ?? []
 
-  const estimatedCostSats = env.SATGATE_ESTIMATED_COST
+  const estimatedCostRaw = env.SATGATE_ESTIMATED_COST
     ? parseInt(env.SATGATE_ESTIMATED_COST, 10)
-    : file.estimatedCostSats ?? Math.max(pricing.default * 2, 5)
+    : undefined
+  if (estimatedCostRaw !== undefined && !Number.isFinite(estimatedCostRaw)) {
+    throw new Error(`Invalid SATGATE_ESTIMATED_COST: ${env.SATGATE_ESTIMATED_COST}`)
+  }
+  const estimatedCostSats = estimatedCostRaw
+    ?? file.estimatedCostSats ?? Math.max(pricing.default * 2, 5)
   const maxBodySize = file.maxBodySize ?? 10 * 1024 * 1024 // 10 MiB
 
   // Lightning backend config
@@ -343,9 +348,13 @@ export function loadConfig(
       }
     : undefined
 
-  const defaultPriceUsd = env.DEFAULT_PRICE_USD
+  const defaultPriceUsdRaw = env.DEFAULT_PRICE_USD
     ? parseInt(env.DEFAULT_PRICE_USD, 10)
-    : file.defaultPriceUsd
+    : undefined
+  if (defaultPriceUsdRaw !== undefined && !Number.isFinite(defaultPriceUsdRaw)) {
+    throw new Error(`Invalid DEFAULT_PRICE_USD: ${env.DEFAULT_PRICE_USD}`)
+  }
+  const defaultPriceUsd = defaultPriceUsdRaw ?? file.defaultPriceUsd
 
   // Logging
   const verbose = args.verbose

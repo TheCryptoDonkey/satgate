@@ -38,6 +38,6 @@ export function resolveModelPrice(pricing: ModelPricing, model: string): number 
  * Always rounds up (ceil) so the operator is never short-changed.
  */
 export function tokenCostToSats(totalTokens: number, pricePerThousand: number): number {
-  if (totalTokens <= 0) return 0
+  if (totalTokens <= 0 || pricePerThousand <= 0) return 0
   return Math.ceil(totalTokens * pricePerThousand / 1000)
 }
