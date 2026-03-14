@@ -172,7 +172,7 @@ export function createProxyHandler(deps: ProxyDeps) {
             const satCost = tokenCostToSats(tokenCount, pricePerThousand)
             deps.reconcile(paymentHash, satCost)
           }
-        })
+        }, undefined, deps.maxBodySize)
 
         // Mark as streaming so finally doesn't double-release
         streamingResponse = true
