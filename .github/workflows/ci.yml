@@ -55,3 +55,16 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
+
+  deploy:
+    needs: release
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Deploy satgate to satgate.trotters.dev
+        uses: appleboy/ssh-action@v1
+        with:
+          host: 95.217.39.110
+          username: deploy
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: /opt/satgate/deploy.sh
