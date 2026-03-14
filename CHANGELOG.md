@@ -1,3 +1,21 @@
+# [1.7.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.6.0...v1.7.0) (2026-03-14)
+
+
+### Bug Fixes
+
+* correct integration test exclude pattern in CI ([70c6abe](https://github.com/TheCryptoDonkey/satgate/commit/70c6abe54671d1406107a8abaa884f095cf2b3ba))
+* regenerate lockfile to resolve 402-announce from npm registry ([5554825](https://github.com/TheCryptoDonkey/satgate/commit/555482511c116b21af0ef7d526ffca1cabe9cbe3))
+* regenerate lockfile with cross-platform optional deps ([380bd82](https://github.com/TheCryptoDonkey/satgate/commit/380bd826fc407b9dd047e101e2ed6570231a2899))
+* stop logging secret key, write to file with restricted permissions ([788f4e3](https://github.com/TheCryptoDonkey/satgate/commit/788f4e369c6776846c1331fb2dab81b91611dc7e))
+* use npm registry for 402-announce, fix announcement type narrowing ([cb4e077](https://github.com/TheCryptoDonkey/satgate/commit/cb4e07799c7e09b066a0ca69bdaf471bbf347cb4))
+
+
+### Features
+
+* add --announce config options ([4834af2](https://github.com/TheCryptoDonkey/satgate/commit/4834af2672a75974d93d32bdb44832286f99cfe4))
+* add --announce for Nostr discovery via l402-announce ([0d23a48](https://github.com/TheCryptoDonkey/satgate/commit/0d23a48abe603cdf6ca917dc79d021a1a6ae0f00))
+* add status tag and JSON schemas to Nostr service announcement ([1495451](https://github.com/TheCryptoDonkey/satgate/commit/14954513838173b233f3585d1e6e24580b14aca3))
+
 # [1.6.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.5.1...v1.6.0) (2026-03-14)
 
 
