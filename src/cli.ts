@@ -193,7 +193,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
   } catch { /* ignore */ }
 
   let tunnelResult: TunnelResult | undefined
-  let announcement: { close(): void } | undefined
+  let announcement: { close(): void; pubkey: string } | undefined
 
   const server = serve({ fetch: app.fetch, port: config.port }, async () => {
     const lightningLabel = config.lightning
@@ -246,7 +246,15 @@ export async function main(argv: string[] = process.argv): Promise<void> {
 
         const announceKey = config.announceKey || randomBytes(32).toString('hex')
         if (!config.announceKey) {
-          logger.info(`Generated announce key: ${announceKey} (save this to persist identity)`)
+          const { mkdirSync, writeFileSync } = await import('node:fs')
+          const { join } = await import('node:path')
+          const { homedir } = await import('node:os')
+
+          const keyDir = join(homedir(), '.satgate')
+          const keyPath = join(keyDir, 'announce.key')
+          mkdirSync(keyDir, { recursive: true })
+          writeFileSync(keyPath, announceKey, { mode: 0o600 })
+          logger.info(`Announce key saved to ${keyPath} (chmod 600)`)
         }
 
         const paymentMethods = ['bitcoin-lightning-bolt11']
@@ -271,7 +279,8 @@ export async function main(argv: string[] = process.argv): Promise<void> {
               description: `Chat completion with ${m}`,
             })),
           })
-          logger.info(`Announced on ${config.announceRelays.length} relay(s)`)
+          logger.info(`Announced on ${config.announceRelays.length} relay(s) as ${announcement.pubkey}`)
+          ;(config as unknown as Record<string, unknown>).announceKey = ''
         } catch (err) {
           logger.warn(`Announce failed: ${err instanceof Error ? err.message : err}`)
         }
