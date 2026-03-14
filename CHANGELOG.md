@@ -1,3 +1,11 @@
+# [1.6.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.5.1...v1.6.0) (2026-03-14)
+
+
+### Features
+
+* enable npm publishing ([af0735c](https://github.com/TheCryptoDonkey/satgate/commit/af0735c29474ea60374ff69a1a5bd17109102968))
+* remove IP addresses from log output ([4197d68](https://github.com/TheCryptoDonkey/satgate/commit/4197d68d840cd80590826daa7590273bd8cba752))
+
 ## [1.5.1](https://github.com/TheCryptoDonkey/satgate/compare/v1.5.0...v1.5.1) (2026-03-14)
 
 

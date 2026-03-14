@@ -1,6 +1,6 @@
 {
   "name": "satgate",
-  "version": "1.5.1",
+  "version": "1.6.0",
   "description": "Lightning-paid AI inference - monetise any OpenAI-compatible endpoint in 30 seconds",
   "type": "module",
   "main": "./dist/index.js",
