@@ -32,12 +32,12 @@ body {
 }
 .hero .tagline { color: #94a3b8; font-size: 1.3rem; }
 
-/* Pricing chips */
-.pricing-chips {
-  display: flex; flex-wrap: wrap; gap: 0.6rem;
-  justify-content: center; margin-bottom: 2rem;
+/* Free tier chip */
+.free-chip {
+  text-align: center; margin-bottom: 1.5rem;
 }
-.chip {
+.free-chip .chip {
+  display: inline-block;
   background: rgba(6, 182, 212, 0.1);
   border: 1px solid rgba(6, 182, 212, 0.3);
   color: #22d3ee; padding: 0.4rem 0.9rem;
@@ -204,24 +204,41 @@ body {
   background: #22d3ee; padding: 0.15rem 0.5rem; border-radius: 999px; font-weight: 600;
 }
 
-/* Model selector */
+/* Model selector cards */
 .model-selector {
-  display: flex; gap: 0.5rem; justify-content: center; margin-bottom: 1.5rem;
+  display: flex; gap: 0.75rem; justify-content: center; margin-bottom: 1.5rem;
 }
-.model-pill {
-  padding: 0.45rem 1rem; border-radius: 999px; font-size: 0.95rem;
-  font-family: 'SF Mono', 'Fira Code', monospace;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.12);
+.model-card {
+  flex: 1; max-width: 320px; padding: 0.9rem 1.1rem;
+  border-radius: 0.75rem;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.1);
   color: #94a3b8; cursor: pointer;
   transition: all 0.15s;
+  text-align: left;
+  font-family: inherit;
 }
-.model-pill:hover:not(:disabled) { border-color: rgba(6,182,212,0.4); color: #e2e8f0; }
-.model-pill:disabled { opacity: 0.4; cursor: not-allowed; }
-.model-pill.active {
-  background: rgba(6, 182, 212, 0.15);
+.model-card:hover:not(:disabled) {
+  border-color: rgba(6,182,212,0.4);
+  background: rgba(255,255,255,0.05);
+}
+.model-card:disabled { opacity: 0.4; cursor: not-allowed; }
+.model-card.active {
+  background: rgba(6, 182, 212, 0.08);
   border-color: rgba(6, 182, 212, 0.5);
-  color: #22d3ee;
+}
+.model-card .model-name {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 1rem; font-weight: 600; color: #e2e8f0;
+  margin-bottom: 0.25rem;
+}
+.model-card.active .model-name { color: #22d3ee; }
+.model-card .model-desc {
+  font-size: 0.85rem; color: #64748b; margin-bottom: 0.35rem;
+}
+.model-card .model-price {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 0.8rem; color: #475569;
 }
 
 /* Footer */
@@ -243,8 +260,10 @@ body {
   .hero .icon { font-size: 3.5rem; }
   .hero h1 { font-size: 2rem; }
   .hero .tagline { font-size: 1.05rem; }
-  .chip { font-size: 0.8rem; padding: 0.3rem 0.7rem; }
-  .model-pill { font-size: 0.8rem; padding: 0.35rem 0.75rem; }
+  .model-selector { flex-direction: column; gap: 0.5rem; }
+  .model-card { max-width: 100%; }
+  .model-card .model-name { font-size: 0.9rem; }
+  .model-card .model-desc { font-size: 0.8rem; }
   .msg { font-size: 0.95rem; }
   .input-bar { gap: 0.4rem; padding: 0.65rem 0.7rem; }
   .input-bar input { font-size: 0.95rem; padding: 0.6rem 0.75rem; }
@@ -269,11 +288,11 @@ body {
     <p class="tagline">Pay-per-token AI inference. No accounts. Just sats.</p>
   </div>
 
-  <!-- LIVE PRICING (populated by JS) -->
-  <div id="pricing-chips" class="pricing-chips"></div>
-
   <!-- MODEL SELECTOR (populated by JS) -->
   <div id="model-selector" class="model-selector"></div>
+
+  <!-- FREE TIER CHIP -->
+  <div id="free-chip" class="free-chip"></div>
 
   <!-- NEW CHAT -->
   <button id="new-chat-btn" class="new-chat-btn" onclick="newChat()">New chat</button>
@@ -347,8 +366,8 @@ body {
   var inputEl = document.getElementById('prompt-input');
   var sendBtn = document.getElementById('send-btn');
   var statusBar = document.getElementById('status-bar');
-  var pricingChips = document.getElementById('pricing-chips');
   var modelSelectorEl = document.getElementById('model-selector');
+  var freeChipEl = document.getElementById('free-chip');
   var paymentOverlay = document.getElementById('payment-overlay');
   var newChatBtn = document.getElementById('new-chat-btn');
 
@@ -392,10 +411,6 @@ body {
     return node;
   }
 
-  function makeChip(text) {
-    return el('span', { className: 'chip', textContent: text });
-  }
-
   function makeErrorSpan(text) {
     return el('span', { style: 'color:#f87171', textContent: text });
   }
@@ -433,42 +448,18 @@ body {
         ? modelPricing[currentModel]
         : defaultPricePerThousand;
 
-      // Clear and populate pricing chips
-      while (pricingChips.firstChild) { pricingChips.removeChild(pricingChips.firstChild); }
-
-      var hasModelChips = false;
-      if (pricing.models) {
-        Object.keys(pricing.models).forEach(function(model) {
-          pricingChips.appendChild(makeChip(model + ' \u2014 ' + modelPricing[model] + ' sats/1k tokens'));
-          hasModelChips = true;
-        });
-      }
-      if (!hasModelChips && pricing.default !== undefined) {
-        var label = currentModel ? currentModel : 'default';
-        pricingChips.appendChild(makeChip(label + ' \u2014 ' + pricePerThousand + ' sats/1k tokens'));
-      }
-      pricingChips.appendChild(makeChip(formatTokenCount(FREE_TOKEN_BUDGET) + ' free tokens to start'));
-
-      // Build model selector pills with tooltips
+      // Model descriptions
       var modelDescriptions = {
         'qwen3:0.6b': 'Fast & cheap \u2014 simple queries, quick answers',
         'gemma3:4b': 'Capable \u2014 better reasoning, longer answers',
       };
-      while (modelSelectorEl.firstChild) { modelSelectorEl.removeChild(modelSelectorEl.firstChild); }
-      if (models.length > 1) {
-        models.forEach(function(model) {
-          var price = modelPricing[model] || defaultPricePerThousand;
-          var desc = modelDescriptions[model] || '';
-          var tooltip = desc ? desc + ' (' + price + ' sats/1k tokens)' : price + ' sats/1k tokens';
-          var pill = el('button', {
-            className: 'model-pill' + (model === currentModel ? ' active' : ''),
-            textContent: model,
-            title: tooltip,
-          });
-          pill.onclick = function() { switchModel(model); };
-          modelSelectorEl.appendChild(pill);
-        });
-      }
+
+      // Build model selector cards
+      buildModelCards(models, modelDescriptions);
+
+      // Free tier chip
+      while (freeChipEl.firstChild) { freeChipEl.removeChild(freeChipEl.firstChild); }
+      freeChipEl.appendChild(el('span', { className: 'chip', textContent: formatTokenCount(FREE_TOKEN_BUDGET) + ' free tokens to start' }));
 
       // Store raw tiers for recalc on model switch
       serverTiersRaw = (data.payment && data.payment.tiers) || [];
@@ -482,10 +473,30 @@ body {
         updateFreeTokenStatus();
       }
     } catch (e) {
-      while (pricingChips.firstChild) { pricingChips.removeChild(pricingChips.firstChild); }
-      pricingChips.appendChild(makeChip('Could not load pricing'));
+      while (freeChipEl.firstChild) { freeChipEl.removeChild(freeChipEl.firstChild); }
+      freeChipEl.appendChild(el('span', { className: 'chip', textContent: 'Could not load pricing' }));
     }
     inputEl.focus();
+  }
+
+  // === MODEL CARDS ===
+  function buildModelCards(models, descriptions) {
+    while (modelSelectorEl.firstChild) { modelSelectorEl.removeChild(modelSelectorEl.firstChild); }
+    if (models.length <= 1) return;
+    models.forEach(function(model) {
+      var price = modelPricing[model] || defaultPricePerThousand;
+      var desc = descriptions[model] || '';
+      var card = el('button', {
+        className: 'model-card' + (model === currentModel ? ' active' : ''),
+      }, [
+        el('div', { className: 'model-name', textContent: model }),
+        desc ? el('div', { className: 'model-desc', textContent: desc }) : null,
+        el('div', { className: 'model-price', textContent: price + ' sats/1k tokens' }),
+      ]);
+      card.setAttribute('data-model', model);
+      card.onclick = function() { switchModel(model); };
+      modelSelectorEl.appendChild(card);
+    });
   }
 
   // === MODEL SWITCHING ===
@@ -494,10 +505,11 @@ body {
     pricePerThousand = modelPricing[model] || defaultPricePerThousand;
     recalcTopupTiers();
 
-    // Update pill active state
-    var pills = modelSelectorEl.querySelectorAll('.model-pill');
-    for (var i = 0; i < pills.length; i++) {
-      pills[i].className = 'model-pill' + (pills[i].textContent === model ? ' active' : '');
+    // Update card active state
+    var cards = modelSelectorEl.querySelectorAll('.model-card');
+    for (var i = 0; i < cards.length; i++) {
+      var isActive = cards[i].getAttribute('data-model') === model;
+      cards[i].className = 'model-card' + (isActive ? ' active' : '');
     }
 
     // Refresh status bar — paid balance is in sats (model-independent),
@@ -973,15 +985,15 @@ body {
   function setStreaming() {
     sendBtn.textContent = 'Stop';
     inputEl.disabled = true;
-    var pills = modelSelectorEl.querySelectorAll('.model-pill');
-    for (var i = 0; i < pills.length; i++) pills[i].disabled = true;
+    var cards = modelSelectorEl.querySelectorAll('.model-card');
+    for (var i = 0; i < cards.length; i++) cards[i].disabled = true;
   }
 
   function setIdle() {
     sendBtn.textContent = 'Send';
     inputEl.disabled = false;
-    var pills = modelSelectorEl.querySelectorAll('.model-pill');
-    for (var i = 0; i < pills.length; i++) pills[i].disabled = false;
+    var cards = modelSelectorEl.querySelectorAll('.model-card');
+    for (var i = 0; i < cards.length; i++) cards[i].disabled = false;
     if (paymentOverlay.style.display !== 'block') inputEl.focus();
   }
 
