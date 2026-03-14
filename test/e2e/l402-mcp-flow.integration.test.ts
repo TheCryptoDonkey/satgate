@@ -5,14 +5,14 @@ import { createTokenTollServer } from '../../src/server.js'
 import { createMockLightning, createMockPayInvoice } from './helpers/mock-lightning.js'
 import { InMemoryCredentialStore } from './helpers/mock-credential-store.js'
 
-// l402-mcp imports — NO .js suffix (wildcard subpath exports)
-import { handleDiscover } from 'l402-mcp/tools/discover'
-import { handleFetch } from 'l402-mcp/tools/fetch'
-import { ChallengeCache } from 'l402-mcp/l402/challenge-cache'
-import { SpendTracker } from 'l402-mcp/spend-tracker'
-import { decodeBolt11 } from 'l402-mcp/l402/bolt11'
-import { parseL402Challenge } from 'l402-mcp/l402/parse'
-import { detectServer } from 'l402-mcp/l402/detect'
+// 402-mcp imports — NO .js suffix (wildcard subpath exports)
+import { handleDiscover } from '402-mcp/tools/discover'
+import { handleFetch } from '402-mcp/tools/fetch'
+import { ChallengeCache } from '402-mcp/l402/challenge-cache'
+import { SpendTracker } from '402-mcp/spend-tracker'
+import { decodeBolt11 } from '402-mcp/l402/bolt11'
+import { parseL402Challenge } from '402-mcp/l402/parse'
+import { detectServer } from '402-mcp/l402/detect'
 
 import { memoryStorage } from '@thecryptodonkey/toll-booth/storage/memory'
 

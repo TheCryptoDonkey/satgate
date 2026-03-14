@@ -241,7 +241,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
       } else {
         const publicUrl = tunnelResult?.url ?? `http://localhost:${config.port}`
 
-        const { announceService } = await import('@thecryptodonkey/l402-announce')
+        const { announceService } = await import('402-announce')
         const { randomBytes } = await import('node:crypto')
 
         const announceKey = config.announceKey || randomBytes(32).toString('hex')

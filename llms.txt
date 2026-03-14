@@ -120,11 +120,11 @@ The config file (default: `satgate.yaml` in the working directory) accepts all o
 
 satgate is built on top of **toll-booth** — L402 payment middleware that handles the full invoice → credential → credit flow. toll-booth is payment-rail agnostic and supports Lightning (Phoenixd, LND, Core Lightning, LNbits, Alby), Cashu ecash, and NWC. satgate adds the inference-specific layer: model detection, token counting, cost reconciliation, and capacity management.
 
-The natural client counterpart is **l402-mcp** — an MCP server that lets AI agents discover L402 APIs (via `/.well-known/l402`), pay invoices from a connected wallet, and consume the API — all autonomously, with no human in the loop.
+The natural client counterpart is **402-mcp** — an MCP server that lets AI agents discover L402 APIs (via `/.well-known/l402`), pay invoices from a connected wallet, and consume the API — all autonomously, with no human in the loop.
 
 ```
-AI Agent -> l402-mcp -> satgate -> Your inference backend
+AI Agent -> 402-mcp -> satgate -> Your inference backend
 ```
 
 - toll-booth: https://github.com/TheCryptoDonkey/toll-booth
-- l402-mcp: https://github.com/TheCryptoDonkey/l402-mcp
+- 402-mcp: https://github.com/TheCryptoDonkey/402-mcp

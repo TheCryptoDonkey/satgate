@@ -22,7 +22,7 @@ jobs:
 
       - run: npm ci --ignore-scripts
       - run: npm run typecheck
-      - run: npm test -- --exclude 'test/e2e/l402-mcp-flow.integration.test.ts'
+      - run: npm test -- --exclude 'test/e2e/402-mcp-flow.integration.test.ts'
 
   release:
     needs: test

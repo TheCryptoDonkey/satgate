@@ -31,7 +31,7 @@
     "@hono/node-server": "^1.0.0",
     "@noble/curves": "^2.0.1",
     "@scure/base": "^2.0.0",
-    "@thecryptodonkey/l402-announce": "file:../l402-announce",
+    "402-announce": "file:../402-announce",
     "@thecryptodonkey/toll-booth": "^2.0.0",
     "hono": "^4.0.0",
     "js-yaml": "^4.1.1"
@@ -43,7 +43,7 @@
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^25.5.0",
     "bolt11": "^1.4.1",
-    "l402-mcp": "file:../l402-mcp",
+    "402-mcp": "file:../402-mcp",
     "semantic-release": "^25.0.3",
     "tsx": "^4.0.0",
     "typescript": "^5.8.0",

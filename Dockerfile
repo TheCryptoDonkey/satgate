@@ -3,7 +3,7 @@ FROM node:22-slim AS build
 WORKDIR /build
 COPY package.json package-lock.json ./
 # Remove file: dev dependency that won't resolve in Docker context
-RUN node -e "const p=JSON.parse(require('fs').readFileSync('package.json','utf8')); delete p.devDependencies['l402-mcp']; require('fs').writeFileSync('package.json',JSON.stringify(p,null,2))"
+RUN node -e "const p=JSON.parse(require('fs').readFileSync('package.json','utf8')); delete p.devDependencies['402-mcp']; require('fs').writeFileSync('package.json',JSON.stringify(p,null,2))"
 RUN npm install
 COPY tsconfig.json ./
 COPY src/ ./src/

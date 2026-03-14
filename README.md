@@ -63,12 +63,12 @@ Every satgate instance exposes three discovery endpoints — no auth required:
 | `/llms.txt` | AI agents — plain-text description of what you're selling |
 | `/openapi.json` | Code generators — full OpenAPI spec |
 
-Pair with [l402-mcp](https://github.com/TheCryptoDonkey/l402-mcp) and an AI agent can autonomously discover your endpoint, check your prices, pay from its own wallet, and start prompting — no human involved.
+Pair with [402-mcp](https://github.com/TheCryptoDonkey/402-mcp) and an AI agent can autonomously discover your endpoint, check your prices, pay from its own wallet, and start prompting — no human involved.
 
 ```mermaid
 sequenceDiagram
     participant A as AI Agent
-    participant M as l402-mcp
+    participant M as 402-mcp
     participant T as satgate
     participant G as Your GPU
 
@@ -193,7 +193,7 @@ npx satgate --upstream http://your-vllm-server:8000
 ```
 
 → [**toll-booth**](https://github.com/TheCryptoDonkey/toll-booth) — the middleware that powers all of this. Build your own.
-→ [**l402-mcp**](https://github.com/TheCryptoDonkey/l402-mcp) — give AI agents a wallet. Let them pay for your GPU.
+→ [**402-mcp**](https://github.com/TheCryptoDonkey/402-mcp) — give AI agents a wallet. Let them pay for your GPU.
 
 ---
 

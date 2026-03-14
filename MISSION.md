@@ -6,7 +6,7 @@ Running AI inference costs real money — whether it's your own GPU, a cloud ins
 
 satgate sits in front of any OpenAI-compatible backend — Ollama, vLLM, llama.cpp, or any other — and handles the rest. Clients pay per token. The payment settles before the response finishes streaming. The operator earns from the first request.
 
-satgate is built on [toll-booth](https://github.com/TheCryptoDonkey/toll-booth), the payment-rail agnostic L402 middleware. On the client side, [l402-mcp](https://github.com/TheCryptoDonkey/l402-mcp) gives AI agents the ability to discover satgate endpoints, purchase credits, and consume inference autonomously. The full stack: any backend can charge, any agent can pay.
+satgate is built on [toll-booth](https://github.com/TheCryptoDonkey/toll-booth), the payment-rail agnostic L402 middleware. On the client side, [402-mcp](https://github.com/TheCryptoDonkey/402-mcp) gives AI agents the ability to discover satgate endpoints, purchase credits, and consume inference autonomously. The full stack: any backend can charge, any agent can pay.
 
 We believe:
 
