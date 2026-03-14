@@ -1,3 +1,10 @@
+## [1.7.2](https://github.com/TheCryptoDonkey/satgate/compare/v1.7.1...v1.7.2) (2026-03-14)
+
+
+### Bug Fixes
+
+* warn when secrets are passed on the command line ([a357a47](https://github.com/TheCryptoDonkey/satgate/commit/a357a478d65a80a9fd14f6cf62554431d381bed3))
+
 ## [1.7.1](https://github.com/TheCryptoDonkey/satgate/compare/v1.7.0...v1.7.1) (2026-03-14)
 
 
