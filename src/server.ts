@@ -54,6 +54,8 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
     c.header('Referrer-Policy', 'no-referrer')
     c.header('X-Download-Options', 'noopen')
     c.header('Strict-Transport-Security', 'max-age=63072000; includeSubDomains')
+    c.header('Content-Security-Policy', "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'self'; form-action 'none'; frame-ancestors 'none'")
+    c.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
   })
 
   // Create storage

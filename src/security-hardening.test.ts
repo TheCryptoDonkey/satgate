@@ -156,6 +156,24 @@ describe('Security: security headers', () => {
     const res = await app.request('/nonexistent')
     expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff')
   })
+
+  it('includes Content-Security-Policy header', async () => {
+    const { app } = createTokenTollServer(baseConfig())
+    const res = await app.request('/health')
+    const csp = res.headers.get('Content-Security-Policy')
+    expect(csp).toBeTruthy()
+    expect(csp).toContain("default-src 'none'")
+    expect(csp).toContain("frame-ancestors 'none'")
+  })
+
+  it('includes Permissions-Policy header', async () => {
+    const { app } = createTokenTollServer(baseConfig())
+    const res = await app.request('/health')
+    const pp = res.headers.get('Permissions-Policy')
+    expect(pp).toBeTruthy()
+    expect(pp).toContain('camera=()')
+    expect(pp).toContain('microphone=()')
+  })
 })
 
 describe('Security: /v1/models response sanitisation', () => {
