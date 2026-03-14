@@ -26,7 +26,7 @@ That's it. satgate auto-detects your models, starts accepting payments, and prox
 A public instance is running at [satgate.trotters.dev](https://satgate.trotters.dev). Open it in a browser for the chat playground, or use curl:
 
 ```bash
-# Free request (5 per day per IP — once exhausted you'll get a 402 + invoice)
+# 5 free requests per day per IP — after that you'll get a 402 + invoice
 curl -s -w '\n%{http_code}\n' https://satgate.trotters.dev/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{"model":"qwen3:0.6b","messages":[{"role":"user","content":"What is Bitcoin?"}]}'
