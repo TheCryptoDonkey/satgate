@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.4.0...v1.5.0) (2026-03-14)
+
+
+### Features
+
+* add custom sats amount option to payment flow ([f3b9e68](https://github.com/TheCryptoDonkey/satgate/commit/f3b9e68439c859ab83340782fcea31f29d3ce0e5))
+
 # [1.4.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.3.1...v1.4.0) (2026-03-14)
 
 
