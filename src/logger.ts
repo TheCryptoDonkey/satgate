@@ -32,16 +32,16 @@ function jsonLine(obj: Record<string, unknown>): void {
 function createJsonLogger(): Logger {
   return {
     payment(event) {
-      jsonLine({ ts: event.timestamp, level: 'info', event: 'payment', ...event })
+      jsonLine({ ...event, ts: event.timestamp, level: 'info', event: 'payment' })
     },
     request(event) {
-      jsonLine({ ts: event.timestamp, level: 'info', event: 'request', ...event })
+      jsonLine({ ...event, ts: event.timestamp, level: 'info', event: 'request' })
     },
     challenge(event) {
-      jsonLine({ ts: event.timestamp, level: 'info', event: 'challenge', ...event })
+      jsonLine({ ...event, ts: event.timestamp, level: 'info', event: 'challenge' })
     },
     error(message, context) {
-      jsonLine({ ts: new Date().toISOString(), level: 'error', event: 'error', message, ...context })
+      jsonLine({ ...context, ts: new Date().toISOString(), level: 'error', event: 'error', message })
     },
     info(message) {
       jsonLine({ ts: new Date().toISOString(), level: 'info', event: 'info', message })
