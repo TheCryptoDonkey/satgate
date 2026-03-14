@@ -9,7 +9,7 @@ SSH_CMD="ssh -o IdentityFile=$SSH_KEY -o IdentitiesOnly=yes $VPS_USER@$VPS_HOST"
 REMOTE_DIR="/opt/satgate"
 CONTAINER_NAME="satgate"
 OLLAMA_CONTAINER="ollama"
-OLLAMA_MODEL="qwen3:0.6b"
+OLLAMA_MODELS=("qwen3:0.6b" "gemma3:4b")
 PORT=3002
 
 echo "=== satgate deploy ==="
@@ -62,15 +62,18 @@ if [ -z "$OLLAMA_RUNNING" ]; then
       --network host \
       --restart always \
       -e OLLAMA_HOST=127.0.0.1:11434 \
+      -e OLLAMA_MAX_LOADED_MODELS=2 \
       -v /opt/ollama/models:/root/.ollama \
       ollama/ollama:latest"
   echo "  Waiting for Ollama to start..."
   sleep 5
 fi
 
-# Pull model if not already present
-echo "  Ensuring model $OLLAMA_MODEL is available..."
-$SSH_CMD "docker exec $OLLAMA_CONTAINER ollama pull $OLLAMA_MODEL" || true
+# Pull all models
+for MODEL in "${OLLAMA_MODELS[@]}"; do
+  echo "  Pulling $MODEL..."
+  $SSH_CMD "docker exec $OLLAMA_CONTAINER ollama pull $MODEL"
+done
 
 # --- Step 6: Deploy satgate container ---
 echo "[6/6] Deploying satgate container..."
@@ -95,8 +98,8 @@ $SSH_CMD "docker run -d \
   -e PORT=$PORT \
   -e ROOT_KEY=$ROOT_KEY \
   -e SATGATE_TOKEN_PRICE=5 \
-  -e 'SATGATE_MODEL_PRICE=$OLLAMA_MODEL:10' \
-  -e SATGATE_ESTIMATED_COST=2 \
+  -e 'SATGATE_MODEL_PRICE=qwen3:0.6b:10,gemma3:4b:30' \
+  -e SATGATE_ESTIMATED_COST=10 \
   -e FREE_TIER_CREDITS=250 \
   -e STORAGE=sqlite \
   -e SATGATE_DB_PATH=./data/satgate.db \
