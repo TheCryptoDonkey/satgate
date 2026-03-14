@@ -59,9 +59,9 @@ describe('generateWellKnown', () => {
   it('includes free tier when configured', () => {
     const result = generateWellKnown({
       ...input,
-      freeTier: { requestsPerDay: 10 },
+      freeTier: { creditsPerDay: 250 },
     })
-    expect(result.free_tier).toEqual({ requests_per_day: 10 })
+    expect(result.free_tier).toEqual({ credits_per_day: 250 })
   })
 
   it('omits free tier when not configured', () => {

@@ -107,7 +107,7 @@ async function main() {
     upstream: UPSTREAM,
     pricing: tollBoothPricing,
     defaultInvoiceAmount: 100,
-    freeTier: { requestsPerDay: 1 },
+    freeTier: { creditsPerDay: 100 },
     onPayment: (e) => logger.payment(e),
     onRequest: (e) => logger.request(e),
     onChallenge: (e) => logger.challenge(e),
@@ -227,7 +227,7 @@ async function main() {
     process.stderr.write(`  ${DIM}Models${RESET}      ${modelList}\n`)
     process.stderr.write('\n')
     process.stderr.write(`  ${DIM}Pricing${RESET}     1 sat / 1k tokens (flat: 100 sats/req)\n`)
-    process.stderr.write(`  ${DIM}Free tier${RESET}   1 request/day\n`)
+    process.stderr.write(`  ${DIM}Free tier${RESET}   100 sats/day\n`)
     process.stderr.write('\n')
     process.stderr.write(`  ${GREEN}listening on :${PORT}${RESET}\n`)
     process.stderr.write('\n')

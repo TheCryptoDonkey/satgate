@@ -27,7 +27,7 @@ function baseConfig(overrides: Partial<TokenTollConfig> = {}): TokenTollConfig {
     storage: 'memory',
     dbPath: '',
     pricing: { default: 1, models: {} },
-    freeTier: { requestsPerDay: 0 },
+    freeTier: { creditsPerDay: 0 },
     capacity: { maxConcurrent: 0 },
     tiers: [],
     trustProxy: false,

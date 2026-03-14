@@ -15,7 +15,7 @@ pricing:
     mixtral-8x22b: 3
 
 freeTier:
-  requestsPerDay: 5
+  creditsPerDay: 250
 
 capacity:
   maxConcurrent: 4

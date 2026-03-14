@@ -18,7 +18,7 @@ export interface TokenTollConfig {
   storage: 'memory' | 'sqlite'
   dbPath: string
   pricing: ModelPricing
-  freeTier: { requestsPerDay: number }
+  freeTier: { creditsPerDay: number }
   capacity: { maxConcurrent: number }
   tiers: Array<{ amountSats: number; creditSats: number; label: string }>
   trustProxy: boolean
@@ -88,7 +88,7 @@ export interface FileConfig {
   storage?: string
   dbPath?: string
   pricing?: { default?: number; models?: Record<string, number> }
-  freeTier?: { requestsPerDay?: number }
+  freeTier?: { creditsPerDay?: number; requestsPerDay?: number }
   capacity?: { maxConcurrent?: number }
   tiers?: Array<{ amountSats: number; creditSats: number; label: string }>
   trustProxy?: boolean
@@ -235,12 +235,17 @@ export function loadConfig(
   const flatPricing = flatPrice !== undefined || !hasPricingConfig
   const price = flatPrice ?? 1
 
-  const freeTierRequests = args.freeTier
+  if (env.FREE_TIER_REQUESTS && !env.FREE_TIER_CREDITS) {
+    console.warn('[satgate] WARNING: FREE_TIER_REQUESTS is deprecated, use FREE_TIER_CREDITS instead')
+  }
+  const freeTierCredits = args.freeTier
+    ?? (env.FREE_TIER_CREDITS ? parseInt(env.FREE_TIER_CREDITS, 10) : undefined)
     ?? (env.FREE_TIER_REQUESTS ? parseInt(env.FREE_TIER_REQUESTS, 10) : undefined)
+    ?? file.freeTier?.creditsPerDay
     ?? file.freeTier?.requestsPerDay
     ?? 0
-  if (!Number.isFinite(freeTierRequests) || freeTierRequests < 0) {
-    throw new Error(`Invalid free tier value: ${freeTierRequests} (must be a non-negative integer)`)
+  if (!Number.isFinite(freeTierCredits) || freeTierCredits < 0) {
+    throw new Error(`Invalid free tier value: ${freeTierCredits} (must be a non-negative integer)`)
   }
 
   const maxConcurrent = args.maxConcurrent
@@ -351,7 +356,7 @@ export function loadConfig(
     storage,
     dbPath,
     pricing,
-    freeTier: { requestsPerDay: freeTierRequests },
+    freeTier: { creditsPerDay: freeTierCredits },
     capacity: { maxConcurrent },
     tiers,
     trustProxy,

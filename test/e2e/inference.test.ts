@@ -38,7 +38,7 @@ const baseConfig = {
   storage: 'memory' as const,
   dbPath: '',
   pricing: { default: 1, models: {} },
-  freeTier: { requestsPerDay: 0 },
+  freeTier: { creditsPerDay: 0 },
   capacity: { maxConcurrent: 0 },
   tiers: [],
   trustProxy: false,
@@ -90,7 +90,7 @@ describe('E2E: satgate', () => {
       const { app } = createTokenTollServer({
         ...baseConfig,
         upstream: upstreamUrl,
-        freeTier: { requestsPerDay: 1 },
+        freeTier: { creditsPerDay: 10 },
       })
 
       // First request - free tier

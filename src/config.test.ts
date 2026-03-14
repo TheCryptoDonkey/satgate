@@ -9,7 +9,7 @@ describe('loadConfig', () => {
     expect(config.pricing.default).toBe(1)
     expect(config.storage).toBe('memory')
     expect(config.capacity.maxConcurrent).toBe(0)
-    expect(config.freeTier.requestsPerDay).toBe(0)
+    expect(config.freeTier.creditsPerDay).toBe(0)
   })
 
   it('requires upstream URL', () => {

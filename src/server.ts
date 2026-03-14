@@ -102,7 +102,7 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
       '/v1/embeddings': pricingEntry,
     },
     defaultInvoiceAmount: config.tiers[0]?.amountSats ?? 1000,
-    freeTier: config.freeTier.requestsPerDay > 0 ? { requestsPerDay: config.freeTier.requestsPerDay } : undefined,
+    freeTier: config.freeTier.creditsPerDay > 0 ? { creditsPerDay: config.freeTier.creditsPerDay } : undefined,
     ...(rails.length > 0 && { rails }),
     serviceName: config.serviceName,
     onPayment: (e) => logger.payment(e),

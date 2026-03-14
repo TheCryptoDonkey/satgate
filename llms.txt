@@ -34,7 +34,7 @@ pricing:
     mixtral-8x22b: 3
 
 freeTier:
-  requestsPerDay: 5
+  creditsPerDay: 250
 
 capacity:
   maxConcurrent: 4
@@ -103,7 +103,7 @@ Configuration precedence: **CLI flags > environment variables > config file > de
 | `PORT` | Port to listen on |
 | `STORAGE` | `memory` or `sqlite` |
 | `DEFAULT_PRICE` | Default sats per 1k tokens |
-| `FREE_TIER_REQUESTS` | Free requests per IP per day |
+| `FREE_TIER_CREDITS` | Free credits (sats) per IP per day |
 | `MAX_CONCURRENT` | Max concurrent inference requests |
 
 ### YAML config file

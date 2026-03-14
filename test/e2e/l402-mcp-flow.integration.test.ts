@@ -73,7 +73,7 @@ describe('E2E: l402-mcp → satgate', () => {
       storage: 'memory',
       dbPath: '',
       pricing: { default: 1, models: {} },
-      freeTier: { requestsPerDay: 0 },
+      freeTier: { creditsPerDay: 0 },
       capacity: { maxConcurrent: 0 },
       tiers: [
         { amountSats: 100, creditSats: 100, label: '100 sats' },

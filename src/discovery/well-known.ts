@@ -5,7 +5,7 @@ export interface WellKnownInput {
   models: string[]
   tiers: Array<{ amountSats: number; creditSats: number; label: string }>
   paymentMethods: string[]
-  freeTier?: { requestsPerDay: number }
+  freeTier?: { creditsPerDay: number }
   x402?: {
     receiverAddress: string
     network: string
@@ -44,8 +44,8 @@ export function generateWellKnown(input: WellKnownInput): Record<string, any> {
       streaming: true,
       models: input.models,
     },
-    ...(input.freeTier && input.freeTier.requestsPerDay > 0 && {
-      free_tier: { requests_per_day: input.freeTier.requestsPerDay },
+    ...(input.freeTier && input.freeTier.creditsPerDay > 0 && {
+      free_tier: { credits_per_day: input.freeTier.creditsPerDay },
     }),
   }
 

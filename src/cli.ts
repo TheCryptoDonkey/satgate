@@ -96,7 +96,7 @@ function printHelp(): void {
   Other:
     --config <path>            Config file (JSON or YAML)
     --max-concurrent <n>       Max concurrent inference requests
-    --free-tier <n>            Free requests per IP per day (default: 0)
+    --free-tier <n>            Free credits (sats) per IP per day (default: 0)
     --trust-proxy              Trust X-Forwarded-For headers
     --root-key <key>           Root key for macaroon minting
     --verbose                  Show extra fields in log output
@@ -152,13 +152,25 @@ export async function main(argv: string[] = process.argv): Promise<void> {
   const config = loadConfig(args, process.env as Record<string, string>, fileConfig)
   const logger = createLogger({ format: config.logFormat, verbose: config.verbose })
 
-  // Auto-detect models from upstream
+  // Auto-detect models from upstream (retry to handle startup races with Ollama)
   let models: string[] = []
-  try {
-    const res = await fetch(`${config.upstream}/v1/models`)
-    const body = await res.json() as { data?: Array<{ id: string }> }
-    models = body.data?.map(m => m.id) ?? []
-  } catch {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await fetch(`${config.upstream}/v1/models`, {
+        signal: AbortSignal.timeout(5000),
+      })
+      const body = await res.json() as { data?: Array<{ id: string }> }
+      models = body.data?.map(m => m.id) ?? []
+      if (models.length > 0) break
+    } catch {
+      // Fall through to retry
+    }
+    if (attempt < 3) {
+      console.warn(`[satgate] Upstream not ready, retrying model detection (${attempt}/3)...`)
+      await new Promise(r => setTimeout(r, 2000))
+    }
+  }
+  if (models.length === 0) {
     console.warn('[satgate] Could not auto-detect models from upstream')
   }
 
