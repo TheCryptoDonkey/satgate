@@ -1,3 +1,10 @@
+## [1.3.1](https://github.com/TheCryptoDonkey/satgate/compare/v1.3.0...v1.3.1) (2026-03-14)
+
+
+### Bug Fixes
+
+* show tokens/sat instead of sats/1k tokens on model cards ([2ba5714](https://github.com/TheCryptoDonkey/satgate/commit/2ba5714dafe1e7ca4f4bdbd7c8a84c79ae68437f))
+
 # [1.3.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.2.1...v1.3.0) (2026-03-14)
 
 
