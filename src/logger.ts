@@ -84,7 +84,7 @@ function createPrettyLogger(verbose: boolean): Logger {
 
     request(event) {
       const satLabel = event.satsDeducted === 1 ? '1 sat' : `${event.satsDeducted} sats`
-      let line = `${DIM}→ REQUEST   ${event.endpoint} ${event.latencyMs}ms ${satLabel} deducted (${event.remainingBalance} remaining) from ${event.clientIp}${RESET}`
+      let line = `${DIM}→ REQUEST   ${event.endpoint} ${event.latencyMs}ms ${satLabel} deducted (${event.remainingBalance} remaining)${RESET}`
       if (verbose) {
         const extras: string[] = [`authenticated=${event.authenticated}`]
         if (extras.length > 0) line += ` ${extras.join(' ')}`
@@ -93,7 +93,7 @@ function createPrettyLogger(verbose: boolean): Logger {
     },
 
     challenge(event) {
-      write(`${CYAN}🔒 CHALLENGE ${event.endpoint} → 402 sent to ${event.clientIp} (${event.amountSats} sats)${RESET}`)
+      write(`${CYAN}🔒 CHALLENGE ${event.endpoint} → 402 (${event.amountSats} sats)${RESET}`)
     },
 
     error(message, context) {

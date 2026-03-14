@@ -16,14 +16,12 @@ const sampleRequest: RequestEvent = {
   remainingBalance: 79,
   latencyMs: 347,
   authenticated: true,
-  clientIp: '192.168.1.1',
 }
 
 const sampleChallenge: ChallengeEvent = {
   timestamp: '2026-03-13T12:00:00.000Z',
   endpoint: '/v1/chat/completions',
   amountSats: 100,
-  clientIp: '192.168.1.1',
 }
 
 describe('Logger', () => {
@@ -88,7 +86,6 @@ describe('Logger', () => {
       expect(parsed.satsDeducted).toBe(1)
       expect(parsed.remainingBalance).toBe(79)
       expect(parsed.latencyMs).toBe(347)
-      expect(parsed.clientIp).toBe('192.168.1.1')
     })
 
     it('emits challenge as JSON line', () => {
@@ -97,7 +94,6 @@ describe('Logger', () => {
       const parsed = JSON.parse(output[0])
       expect(parsed.event).toBe('challenge')
       expect(parsed.amountSats).toBe(100)
-      expect(parsed.clientIp).toBe('192.168.1.1')
     })
 
     it('emits error as JSON line', () => {
@@ -168,17 +164,15 @@ describe('Logger', () => {
       expect(line).toContain('347ms')
       expect(line).toContain('1 sat')
       expect(line).toContain('79 remaining')
-      expect(line).toContain('192.168.1.1')
     })
 
-    it('formats challenge with endpoint, amount, and IP', () => {
+    it('formats challenge with endpoint and amount', () => {
       const logger = createLogger({ format: 'pretty', verbose: false })
       logger.challenge(sampleChallenge)
       const line = strip(output[0])
       expect(line).toContain('CHALLENGE')
       expect(line).toContain('/v1/chat/completions')
       expect(line).toContain('100 sats')
-      expect(line).toContain('192.168.1.1')
     })
 
     it('formats error with message', () => {
