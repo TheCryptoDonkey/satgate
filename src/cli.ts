@@ -158,6 +158,16 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     args.allowlist = [...(args.allowlist ?? []), ...entries]
   }
 
+  // Warn when secrets are passed on the command line (visible in `ps aux`)
+  const cliSecrets: string[] = []
+  if (args.lightningKey) cliSecrets.push('--lightning-key')
+  if (args.rootKey) cliSecrets.push('--root-key')
+  if (args.announceKey) cliSecrets.push('--announce-key')
+  if (cliSecrets.length > 0) {
+    console.warn(`[satgate] WARNING: ${cliSecrets.join(', ')} passed on command line — visible to other users via \`ps\`.`)
+    console.warn('[satgate] Use environment variables (LIGHTNING_KEY, ROOT_KEY, ANNOUNCE_KEY) instead.')
+  }
+
   const config = loadConfig(args, process.env as Record<string, string>, fileConfig)
   const logger = createLogger({ format: config.logFormat, verbose: config.verbose })
 
