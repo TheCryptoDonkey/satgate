@@ -70,7 +70,7 @@ describe('loadConfig', () => {
 
   it('rejects rootKey shorter than 32 characters', () => {
     expect(() => loadConfig({ upstream: 'http://localhost:11434', rootKey: 'short' }))
-      .toThrow(/rootKey must be at least 32 characters/)
+      .toThrow(/rootKey must be at least 32 characters for adequate security/)
   })
 
   it('accepts rootKey of exactly 32 characters', () => {

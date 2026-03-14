@@ -163,7 +163,7 @@ export function loadConfig(
   const rootKeyRaw = args.rootKey ?? env.ROOT_KEY ?? file.rootKey
   const rootKeyGenerated = !rootKeyRaw
   if (rootKeyRaw && rootKeyRaw.length < 32) {
-    throw new Error('rootKey must be at least 32 characters (16 bytes of entropy)')
+    throw new Error('rootKey must be at least 32 characters for adequate security')
   }
   const rootKey = rootKeyRaw ?? randomBytes(32).toString('hex')
 

@@ -57,6 +57,8 @@ export function createStreamingProxy(
           totalBytes += value.byteLength
           if (totalBytes > maxStreamBytes) {
             reader.cancel('stream size limit exceeded').catch(() => {})
+            const errMsg = new TextEncoder().encode('data: {"error":"stream size limit exceeded"}\n\n')
+            controller.enqueue(errMsg)
             controller.close()
             finish()
             return

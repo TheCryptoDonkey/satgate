@@ -128,6 +128,7 @@ export function checkAllowlist(
  */
 const seenEventIds = new Map<string, number>()
 const SEEN_ID_TTL_MS = 120_000
+const SEEN_ID_MAX_SIZE = 10_000
 
 function pruneSeenIds(): void {
   const cutoff = Date.now() - SEEN_ID_TTL_MS
@@ -163,7 +164,7 @@ function verifyNip98(
 
     // Reject replayed event IDs
     if (seenEventIds.has(event.id)) return { allowed: false }
-    pruneSeenIds()
+    if (seenEventIds.size >= SEEN_ID_MAX_SIZE) pruneSeenIds()
 
     // Validate URL and method tags match the actual request
     const urlTag = event.tags.find(t => t[0] === 'u')?.[1]
