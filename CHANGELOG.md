@@ -1,3 +1,10 @@
+## [1.7.3](https://github.com/TheCryptoDonkey/satgate/compare/v1.7.2...v1.7.3) (2026-03-14)
+
+
+### Bug Fixes
+
+* upgrade GitHub Actions to v6 (Node.js 24), bump 402-announce to 1.1.2 ([509894c](https://github.com/TheCryptoDonkey/satgate/commit/509894ce2718644ccca60a8b35eb58318f96cb53))
+
 ## [1.7.2](https://github.com/TheCryptoDonkey/satgate/compare/v1.7.1...v1.7.2) (2026-03-14)
 
 
