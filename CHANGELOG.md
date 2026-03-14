@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.3.1...v1.4.0) (2026-03-14)
+
+
+### Features
+
+* streamline payment flow — auto-load QR code like sats-for-laughs ([8d80fee](https://github.com/TheCryptoDonkey/satgate/commit/8d80fee4f0a50a329aaae45a1c98ebd249333090))
+
 ## [1.3.1](https://github.com/TheCryptoDonkey/satgate/compare/v1.3.0...v1.3.1) (2026-03-14)
 
 
