@@ -39,7 +39,63 @@ export function createProxyHandler(deps: ProxyDeps) {
     req: Request,
     paymentHash: string | undefined,
   ): Promise<Response> {
-    // Capacity check (before any payment deduction)
+    // Validate request before acquiring capacity — cheap checks first to avoid
+    // tying up capacity slots during body reads or for invalid requests
+    const requestPath = new URL(req.url).pathname
+    if (!ALLOWED_PATH_PREFIXES.some(p => requestPath === p)) {
+      return new Response(
+        JSON.stringify({ error: 'Not found' }),
+        { status: 404, headers: { 'Content-Type': 'application/json' } },
+      )
+    }
+
+    const contentType = req.headers.get('content-type')
+    const mediaType = contentType?.split(';')[0]?.trim().toLowerCase()
+    if (mediaType !== 'application/json') {
+      return new Response(
+        JSON.stringify({ error: 'Content-Type must be application/json' }),
+        { status: 415, headers: { 'Content-Type': 'application/json' } },
+      )
+    }
+
+    const contentLength = req.headers.get('content-length')
+    if (contentLength !== null) {
+      const len = parseInt(contentLength, 10)
+      if (!Number.isFinite(len) || len > deps.maxBodySize) {
+        return new Response(
+          JSON.stringify({ error: 'Request body too large' }),
+          { status: 413, headers: { 'Content-Type': 'application/json' } },
+        )
+      }
+    }
+
+    // Read and parse body BEFORE acquiring capacity to prevent slow uploads from holding slots
+    const bodyText = await req.text()
+    if (new TextEncoder().encode(bodyText).byteLength > deps.maxBodySize) {
+      return new Response(
+        JSON.stringify({ error: 'Request body too large' }),
+        { status: 413, headers: { 'Content-Type': 'application/json' } },
+      )
+    }
+
+    let body: Record<string, unknown>
+    try {
+      const parsed = JSON.parse(bodyText)
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        return new Response(
+          JSON.stringify({ error: 'Request body must be a JSON object' }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } },
+        )
+      }
+      body = parsed
+    } catch {
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON body' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } },
+      )
+    }
+
+    // Now acquire capacity — body is validated and parsed, no slow client can hold a slot
     if (!deps.capacity.tryAcquire()) {
       return new Response(
         JSON.stringify({ error: 'Service at capacity, try again later' }),
@@ -50,63 +106,6 @@ export function createProxyHandler(deps: ProxyDeps) {
     const start = Date.now()
     let streamingResponse = false
     try {
-      // Validate request path — only allow known OpenAI-compatible endpoints
-      const requestPath = new URL(req.url).pathname
-      if (!ALLOWED_PATH_PREFIXES.some(p => requestPath === p)) {
-        return new Response(
-          JSON.stringify({ error: 'Not found' }),
-          { status: 404, headers: { 'Content-Type': 'application/json' } },
-        )
-      }
-
-      // Validate Content-Type
-      const contentType = req.headers.get('content-type')
-      const mediaType = contentType?.split(';')[0]?.trim().toLowerCase()
-      if (mediaType !== 'application/json') {
-        return new Response(
-          JSON.stringify({ error: 'Content-Type must be application/json' }),
-          { status: 415, headers: { 'Content-Type': 'application/json' } },
-        )
-      }
-
-      // Enforce body size limit
-      const contentLength = req.headers.get('content-length')
-      if (contentLength !== null) {
-        const len = parseInt(contentLength, 10)
-        if (!Number.isFinite(len) || len > deps.maxBodySize) {
-          return new Response(
-            JSON.stringify({ error: 'Request body too large' }),
-            { status: 413, headers: { 'Content-Type': 'application/json' } },
-          )
-        }
-      }
-
-      // Parse the request body to extract model name
-      const bodyText = await req.text()
-      if (new TextEncoder().encode(bodyText).byteLength > deps.maxBodySize) {
-        return new Response(
-          JSON.stringify({ error: 'Request body too large' }),
-          { status: 413, headers: { 'Content-Type': 'application/json' } },
-        )
-      }
-
-      let body: Record<string, unknown>
-      try {
-        const parsed = JSON.parse(bodyText)
-        if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-          return new Response(
-            JSON.stringify({ error: 'Request body must be a JSON object' }),
-            { status: 400, headers: { 'Content-Type': 'application/json' } },
-          )
-        }
-        body = parsed
-      } catch {
-        return new Response(
-          JSON.stringify({ error: 'Invalid JSON body' }),
-          { status: 400, headers: { 'Content-Type': 'application/json' } },
-        )
-      }
-
       const model = extractModel(body)
       const pricePerThousand = resolveModelPrice(deps.pricing, model)
       const isStreaming = body.stream === true

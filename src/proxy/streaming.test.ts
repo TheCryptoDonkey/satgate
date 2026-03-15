@@ -123,6 +123,31 @@ describe('createStreamingProxy', () => {
     expect(onComplete).toHaveBeenCalledWith(1)
   })
 
+  it('cancels upstream reader when client disconnects', async () => {
+    let upstreamCancelled = false
+    const upstream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const encoder = new TextEncoder()
+        controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":"a"}}]}\n\n'))
+        // Don't close — simulate a long-running stream
+      },
+      cancel() {
+        upstreamCancelled = true
+      },
+    })
+
+    const onComplete = vi.fn()
+    const { readable } = createStreamingProxy(upstream, onComplete)
+    const reader = readable.getReader()
+    // Read the first chunk
+    await reader.read()
+    // Client disconnects
+    await reader.cancel('client gone')
+    await new Promise((r) => setTimeout(r, 50))
+    expect(upstreamCancelled).toBe(true)
+    expect(onComplete).toHaveBeenCalledTimes(1)
+  })
+
   it('closes stream when cumulative size limit is exceeded', async () => {
     const onComplete = vi.fn()
     const encoder = new TextEncoder()

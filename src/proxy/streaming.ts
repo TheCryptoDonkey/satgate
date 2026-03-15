@@ -34,14 +34,17 @@ export function createStreamingProxy(
     onComplete(counter.finalCount())
   }
 
+  // Hoist reader so cancel() can abort the upstream when the client disconnects
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined
+
   const readable = new ReadableStream<Uint8Array>({
     async start(controller) {
-      const reader = upstream.getReader()
+      reader = upstream.getReader()
 
       function resetTimer() {
         clearTimeout(inactivityTimer)
         inactivityTimer = setTimeout(() => {
-          reader.cancel('inactivity timeout').catch(() => {})
+          reader!.cancel('inactivity timeout').catch(() => {})
           controller.close()
           finish()
         }, inactivityTimeoutMs)
@@ -77,7 +80,8 @@ export function createStreamingProxy(
       }
     },
     cancel() {
-      // Client disconnected
+      // Client disconnected — cancel upstream to stop inference and free resources
+      reader?.cancel('client disconnected').catch(() => {})
       clearTimeout(inactivityTimer)
       finish()
     },
