@@ -1,3 +1,12 @@
+## [1.7.5](https://github.com/TheCryptoDonkey/satgate/compare/v1.7.4...v1.7.5) (2026-03-15)
+
+
+### Bug Fixes
+
+* cancel upstream on client disconnect, defer capacity until body parsed ([1e8ecf0](https://github.com/TheCryptoDonkey/satgate/commit/1e8ecf0a78537153ad800ac58e5467e67fab9d77))
+* complete log sanitisation coverage, align demo health endpoint ([babd904](https://github.com/TheCryptoDonkey/satgate/commit/babd904d2a25e990ecb5bc2353d44676e705dd83))
+* security audit hardening — response limits, input validation, log injection ([f2b8c69](https://github.com/TheCryptoDonkey/satgate/commit/f2b8c69edd63fe67bf58b33aa540eddf1b15a682))
+
 ## [1.7.4](https://github.com/TheCryptoDonkey/satgate/compare/v1.7.3...v1.7.4) (2026-03-15)
 
 
