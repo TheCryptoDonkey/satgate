@@ -104,6 +104,9 @@ $SSH_CMD "docker run -d \
   -e STORAGE=sqlite \
   -e SATGATE_DB_PATH=./data/satgate.db \
   -e TUNNEL=false \
+  -e ANNOUNCE=true \
+  -e ANNOUNCE_RELAYS=wss://relay.damus.io,wss://nos.lol,wss://relay.nostr.band \
+  -e PUBLIC_URL=https://satgate.trotters.dev \
   satgate:latest"
 
 # Wait for health check
