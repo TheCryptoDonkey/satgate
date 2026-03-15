@@ -87,7 +87,8 @@ describe('timing-safe Bearer comparison', () => {
     const allowlist = ['secret-one', 'secret-two', 'secret-three']
     const result = checkAllowlist('Bearer secret-two', allowlist, { url: '', method: '' })
     expect(result.allowed).toBe(true)
-    expect(result.identity).toBe('secret-t...')
+    // Identity is now a SHA-256 hash prefix (not raw secret prefix) to avoid leaking secret material
+    expect(result.identity).toMatch(/^[0-9a-f]{8}\.\.\.$/)
   })
 })
 
@@ -259,6 +260,20 @@ describe('NIP-98 allowlist', () => {
     expect(allowed.allowed).toBe(true)
     const denied = checkAllowlist('Bearer my-secret-token-abd', secrets, { url: '', method: '' })
     expect(denied.allowed).toBe(false)
+  })
+
+  it('rejects NIP-98 event with malformed hex fields', () => {
+    // Pubkey too short
+    const badPubkey = { pubkey: 'abc', created_at: now, kind: 27235, tags: [['u', url], ['method', method]], content: '', id: 'a'.repeat(64), sig: 'b'.repeat(128) }
+    const token1 = btoa(JSON.stringify(badPubkey))
+    expect(checkAllowlist(`Nostr ${token1}`, ['abc'], { url, method }, now).allowed).toBe(false)
+
+    // Sig too short
+    const privKey = schnorr.utils.randomSecretKey()
+    const pubkey = bytesToHex(schnorr.getPublicKey(privKey))
+    const badSig = { pubkey, created_at: now, kind: 27235, tags: [['u', url], ['method', method]], content: '', id: 'a'.repeat(64), sig: 'short' }
+    const token2 = btoa(JSON.stringify(badSig))
+    expect(checkAllowlist(`Nostr ${token2}`, [pubkey], { url, method }, now).allowed).toBe(false)
   })
 
   it('rejects replayed NIP-98 event (same event ID used twice)', () => {

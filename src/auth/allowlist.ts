@@ -110,7 +110,9 @@ export function checkAllowlist(
       if (constantTimeEqual(s, credential)) matched = true
     }
     if (matched) {
-      return { allowed: true, identity: credential.slice(0, 8) + '...' }
+      // Use hash-derived identifier to avoid leaking secret material in logs
+      const idHash = createHash('sha256').update(credential).digest('hex').slice(0, 8)
+      return { allowed: true, identity: idHash + '...' }
     }
     return { allowed: false }
   }
@@ -166,8 +168,15 @@ function verifyNip98(
     if (seenEventIds.has(event.id)) return { allowed: false }
     if (seenEventIds.size >= SEEN_ID_MAX_SIZE) {
       pruneSeenIds()
-      // If still at capacity after pruning, reject to prevent unbounded growth
-      if (seenEventIds.size >= SEEN_ID_MAX_SIZE) return { allowed: false }
+      // If still at capacity after pruning, evict oldest entries to make room
+      if (seenEventIds.size >= SEEN_ID_MAX_SIZE) {
+        const entriesToEvict = Math.max(1, Math.floor(SEEN_ID_MAX_SIZE * 0.1))
+        const iter = seenEventIds.keys()
+        for (let i = 0; i < entriesToEvict; i++) {
+          const key = iter.next().value
+          if (key !== undefined) seenEventIds.delete(key)
+        }
+      }
     }
 
     // Validate URL and method tags match the actual request
@@ -175,6 +184,13 @@ function verifyNip98(
     const methodTag = event.tags.find(t => t[0] === 'method')?.[1]
     if (urlTag !== request.url) return { allowed: false }
     if (methodTag?.toUpperCase() !== request.method.toUpperCase()) return { allowed: false }
+
+    // Validate hex field formats before expensive crypto operations
+    const HEX_64 = /^[0-9a-fA-F]{64}$/
+    const HEX_128 = /^[0-9a-fA-F]{128}$/
+    if (!HEX_64.test(event.pubkey) || !HEX_64.test(event.id) || !HEX_128.test(event.sig)) {
+      return { allowed: false }
+    }
 
     // Verify event ID
     const serialised = JSON.stringify([0, event.pubkey, event.created_at, event.kind, event.tags, event.content])
@@ -185,9 +201,9 @@ function verifyNip98(
     const valid = schnorr.verify(hexToBytes(event.sig), hexToBytes(event.id), hexToBytes(event.pubkey))
     if (!valid) return { allowed: false }
 
-    // Check pubkey against allowlist (normalise npub → hex)
+    // Check pubkey against allowlist (normalise npub → hex, case-insensitive)
     const allowedPubkeys = extractPubkeys(allowlist)
-    if (allowedPubkeys.includes(event.pubkey)) {
+    if (allowedPubkeys.includes(event.pubkey.toLowerCase())) {
       seenEventIds.set(event.id, Date.now())
       return { allowed: true, identity: event.pubkey.slice(0, 8) + '...' }
     }
