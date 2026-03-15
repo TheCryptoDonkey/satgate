@@ -9,7 +9,7 @@
 
 satgate sits in front of Ollama, vLLM, llama.cpp — any OpenAI-compatible backend — and turns it into a pay-per-token API. No accounts. No API keys. No Stripe. Clients pay per token, you earn sats before the response finishes streaming.
 
-![satgate demo](demo/satgate-demo.gif)
+![satgate demo](demo/token-toll-demo.gif)
 
 ## Quick start
 
@@ -179,6 +179,17 @@ capacity:
 ```
 
 CLI flags > environment variables > config file > defaults.
+
+---
+
+## Examples
+
+The [`examples/`](examples/) directory contains runnable scripts and config templates:
+
+- **[basic.sh](examples/basic.sh)** — start satgate in front of Ollama
+- **[client.sh](examples/client.sh)** — discovery and inference requests against a running instance
+- **[production.yaml](examples/production.yaml)** — production config template with SQLite, per-model pricing, volume tiers
+- **[caddy-reverse-proxy.Caddyfile](examples/caddy-reverse-proxy.Caddyfile)** — Caddyfile for TLS termination
 
 ---
 

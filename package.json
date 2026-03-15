@@ -56,7 +56,14 @@
     "inference",
     "llm",
     "bitcoin",
-    "payments"
+    "payments",
+    "openai-compatible",
+    "gpu",
+    "proxy",
+    "pay-per-use",
+    "monetise",
+    "ollama",
+    "vllm"
   ],
   "license": "MIT",
   "repository": {

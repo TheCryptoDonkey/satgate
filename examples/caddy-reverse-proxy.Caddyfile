@@ -1,0 +1,13 @@
+# Caddyfile for running satgate behind Caddy with automatic HTTPS.
+#
+# Usage:
+#   1. Copy this file to /etc/caddy/Caddyfile (or your Caddy config location)
+#   2. Replace "satgate.example.com" with your domain
+#   3. Start satgate with: satgate --upstream http://localhost:11434 --no-tunnel
+#   4. Reload Caddy: sudo systemctl reload caddy
+#
+# Caddy handles TLS certificates automatically via Let's Encrypt.
+
+satgate.example.com {
+	reverse_proxy localhost:3000
+}
