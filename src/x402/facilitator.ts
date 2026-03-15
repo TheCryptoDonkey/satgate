@@ -23,10 +23,30 @@ export function createHttpFacilitator(config: HttpFacilitatorConfig): X402Facili
       })
 
       if (!res.ok) {
+        await res.body?.cancel().catch(() => {})
         return { valid: false, txHash: '', amount: 0, sender: '' }
       }
 
-      const result = await res.json() as Record<string, unknown>
+      // Read body incrementally with a 64 KiB size cap to prevent memory exhaustion
+      const maxFacilitatorBytes = 64 * 1024
+      const reader = res.body?.getReader()
+      if (!reader) {
+        return { valid: false, txHash: '', amount: 0, sender: '' }
+      }
+      const chunks: Uint8Array[] = []
+      let totalBytes = 0
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        totalBytes += value.byteLength
+        if (totalBytes > maxFacilitatorBytes) {
+          await reader.cancel('response too large').catch(() => {})
+          return { valid: false, txHash: '', amount: 0, sender: '' }
+        }
+        chunks.push(value)
+      }
+      const bodyText = new TextDecoder().decode(Buffer.concat(chunks))
+      const result = JSON.parse(bodyText) as Record<string, unknown>
       // Validate response shape — don't trust arbitrary JSON from external facilitator
       if (typeof result !== 'object' || result === null) {
         return { valid: false, txHash: '', amount: 0, sender: '' }

@@ -69,8 +69,47 @@ export function createProxyHandler(deps: ProxyDeps) {
       }
     }
 
-    // Read and parse body BEFORE acquiring capacity to prevent slow uploads from holding slots
-    const bodyText = await req.text()
+    // Read and parse body BEFORE acquiring capacity to prevent slow uploads from holding slots.
+    // Enforce a 30-second deadline to prevent slow-trickle clients from tying up connections.
+    let bodyText: string
+    if (req.body) {
+      const reader = req.body.getReader()
+      const decoder = new TextDecoder()
+      const chunks: string[] = []
+      let totalBytes = 0
+      const bodyDeadline = Date.now() + 30_000
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          totalBytes += value.byteLength
+          if (totalBytes > deps.maxBodySize) {
+            await reader.cancel('body too large').catch(() => {})
+            return new Response(
+              JSON.stringify({ error: 'Request body too large' }),
+              { status: 413, headers: { 'Content-Type': 'application/json' } },
+            )
+          }
+          if (Date.now() > bodyDeadline) {
+            await reader.cancel('body read deadline exceeded').catch(() => {})
+            return new Response(
+              JSON.stringify({ error: 'Request body read timed out' }),
+              { status: 408, headers: { 'Content-Type': 'application/json' } },
+            )
+          }
+          chunks.push(decoder.decode(value, { stream: true }))
+        }
+        chunks.push(decoder.decode()) // flush remaining
+      } catch {
+        return new Response(
+          JSON.stringify({ error: 'Request body read failed' }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } },
+        )
+      }
+      bodyText = chunks.join('')
+    } else {
+      bodyText = ''
+    }
     if (new TextEncoder().encode(bodyText).byteLength > deps.maxBodySize) {
       return new Response(
         JSON.stringify({ error: 'Request body too large' }),
@@ -115,9 +154,8 @@ export function createProxyHandler(deps: ProxyDeps) {
         body.stream_options = { include_usage: true }
       }
 
-      // Build upstream URL
-      const url = new URL(req.url)
-      const upstreamUrl = `${deps.upstream}${url.pathname}`
+      // Build upstream URL using the already-validated requestPath
+      const upstreamUrl = `${deps.upstream}${requestPath}`
 
       // Fetch from upstream
       const timeout = deps.upstreamTimeout ?? 120_000
