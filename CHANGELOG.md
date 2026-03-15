@@ -1,3 +1,10 @@
+# [1.8.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.7.8...v1.8.0) (2026-03-15)
+
+
+### Features
+
+* bump toll-booth to ^3.3.0 for credit_tiers and custom top-ups ([51f8353](https://github.com/TheCryptoDonkey/satgate/commit/51f83533f4d74045f9865ea2a4f5d8063fe39d98))
+
 ## [1.7.8](https://github.com/TheCryptoDonkey/satgate/compare/v1.7.7...v1.7.8) (2026-03-15)
 
 
