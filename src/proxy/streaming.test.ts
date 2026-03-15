@@ -148,6 +148,43 @@ describe('createStreamingProxy', () => {
     expect(onComplete).toHaveBeenCalledTimes(1)
   })
 
+  it('closes stream when absolute duration limit is exceeded', async () => {
+    const onComplete = vi.fn()
+    let intervalRef: ReturnType<typeof setInterval> | undefined
+    const upstream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const encoder = new TextEncoder()
+        controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":"a"}}]}\n\n'))
+        let count = 0
+        intervalRef = setInterval(() => {
+          if (count++ >= 20) {
+            clearInterval(intervalRef)
+            try { controller.close() } catch { /* already closed by duration cap */ }
+            return
+          }
+          try {
+            controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":"b"}}]}\n\n'))
+          } catch {
+            clearInterval(intervalRef)
+          }
+        }, 30)
+      },
+      cancel() {
+        clearInterval(intervalRef)
+      },
+    })
+
+    // inactivity = 500ms (won't fire), size = unlimited, duration = 150ms
+    const { readable } = createStreamingProxy(upstream, onComplete, 500, 100 * 1024 * 1024, 150)
+    await collectStream(readable)
+    // Clean up interval
+    clearInterval(intervalRef)
+    await new Promise(r => setTimeout(r, 50))
+    expect(onComplete).toHaveBeenCalledTimes(1)
+    const tokenCount = onComplete.mock.calls[0][0]
+    expect(tokenCount).toBeLessThan(20)
+  })
+
   it('closes stream when cumulative size limit is exceeded', async () => {
     const onComplete = vi.fn()
     const encoder = new TextEncoder()

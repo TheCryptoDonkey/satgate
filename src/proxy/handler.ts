@@ -214,19 +214,29 @@ export function createProxyHandler(deps: ProxyDeps) {
 
       // Handle streaming response
       if (isStreaming && upstreamRes.body) {
-        const { readable } = createStreamingProxy(upstreamRes.body, (tokenCount) => {
-          // Release capacity slot when stream ends (not in finally)
-          deps.capacity.release()
-          if (!deps.flatPricing && paymentHash) {
-            const satCost = tokenCostToSats(tokenCount, pricePerThousand)
-            deps.reconcile(paymentHash, satCost)
-          }
-        }, undefined, deps.maxBodySize)
+        let proxy: { readable: ReadableStream<Uint8Array> }
+        try {
+          proxy = createStreamingProxy(upstreamRes.body, (tokenCount) => {
+            // Release capacity slot when stream ends (not in finally)
+            deps.capacity.release()
+            if (!deps.flatPricing && paymentHash) {
+              const satCost = tokenCostToSats(tokenCount, pricePerThousand)
+              deps.reconcile(paymentHash, satCost)
+            }
+          }, undefined, deps.maxBodySize)
+        } catch {
+          // createStreamingProxy failed — capacity will be released by finally
+          if (paymentHash) deps.reconcile(paymentHash, 0)
+          return new Response(
+            JSON.stringify({ error: 'Internal streaming error' }),
+            { status: 500, headers: { 'Content-Type': 'application/json' } },
+          )
+        }
 
         // Mark as streaming so finally doesn't double-release
         streamingResponse = true
 
-        return new Response(readable, {
+        return new Response(proxy.readable, {
           status: 200,
           headers: {
             'Content-Type': 'text/event-stream',
@@ -290,7 +300,7 @@ export function createProxyHandler(deps: ProxyDeps) {
         }
         responseText = chunks.join('')
       } else {
-        responseText = await upstreamRes.text()
+        responseText = ''
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let responseBody: any
