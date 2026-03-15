@@ -1,3 +1,18 @@
+## [1.7.7](https://github.com/TheCryptoDonkey/satgate/compare/v1.7.6...v1.7.7) (2026-03-15)
+
+
+### Bug Fixes
+
+* add body-read deadline, facilitator size cap, upstream URL hardening ([c566a33](https://github.com/TheCryptoDonkey/satgate/commit/c566a33bc848d88a389787366af2c4af9ca3d1a2))
+* canonicalise cwd in dbPath check for symlinked working directories ([a2cb859](https://github.com/TheCryptoDonkey/satgate/commit/a2cb85978414cdc0a5c995eea5080e0cc4fbe3e0))
+* defer replay cache eviction until after NIP-98 authentication ([84482ef](https://github.com/TheCryptoDonkey/satgate/commit/84482ef1d1b1cb0bc5770f9852e0b23adc83c084))
+* harden NIP-98 verification, case-normalise pubkeys, improve replay cache ([3a58432](https://github.com/TheCryptoDonkey/satgate/commit/3a584325fb3ee2fb98037aad93d10ba40ef56328))
+* prevent prototype pollution in pricing, validate config bounds, add token byte floor ([bc15608](https://github.com/TheCryptoDonkey/satgate/commit/bc15608f3e5b5b79c3139d4fc03a669389c9110c))
+* race body reads against AbortSignal to interrupt stalled clients ([553f0fc](https://github.com/TheCryptoDonkey/satgate/commit/553f0fcbeec966cdfc4f777e7b620df6a165f174))
+* re-review fixes — resolve dbPath fully, remove redundant size check, guard facilitator JSON ([4f8a6a2](https://github.com/TheCryptoDonkey/satgate/commit/4f8a6a2cf0017f3ef04469b642e985d0a60f93ba))
+* reconcile Lightning payment on body-read timeout and failure ([9634876](https://github.com/TheCryptoDonkey/satgate/commit/96348765dcb7a08eff883b349af8c72811a61db8))
+* resolve dbPath fallback relative to canonical cwd ([9fe0781](https://github.com/TheCryptoDonkey/satgate/commit/9fe07812a2011ac11c0342f35fea240dfff125a3))
+
 ## [1.7.6](https://github.com/TheCryptoDonkey/satgate/compare/v1.7.5...v1.7.6) (2026-03-15)
 
 
