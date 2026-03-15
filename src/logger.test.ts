@@ -149,6 +149,17 @@ describe('Logger', () => {
       expect(parsed.key).not.toContain('\x1b')
     })
 
+    it('sanitises control characters in nested context objects', () => {
+      const logger = createLogger({ format: 'json', verbose: false })
+      logger.error('nested test', { nested: { inner: 'val\x1b[31mred\nnewline' } as unknown as string })
+      const parsed = JSON.parse(output[0])
+      const nested = parsed.nested as Record<string, string>
+      expect(nested.inner).toContain('\\x1b')
+      expect(nested.inner).toContain('\\x0a')
+      expect(nested.inner).not.toContain('\x1b')
+      expect(nested.inner).not.toContain('\n')
+    })
+
     it('prevents context keys from shadowing reserved fields', () => {
       const logger = createLogger({ format: 'json', verbose: false })
       logger.error('real message', { message: 'injected', level: 'critical', event: 'pwned' })

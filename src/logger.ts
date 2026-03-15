@@ -28,7 +28,13 @@ export interface LoggerOptions {
 function sanitiseRecord(obj: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(obj)) {
-    out[k] = typeof v === 'string' ? sanitiseLogValue(v) : v
+    if (typeof v === 'string') {
+      out[k] = sanitiseLogValue(v)
+    } else if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
+      out[k] = sanitiseRecord(v as Record<string, unknown>)
+    } else {
+      out[k] = v
+    }
   }
   return out
 }
