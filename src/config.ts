@@ -182,7 +182,10 @@ export function loadConfig(
   } catch {
     resolvedDbDir = resolve(dirname(dbPathRaw))
   }
-  const relFromCwd = relative(process.cwd(), resolvedDbDir)
+  // Canonicalise cwd to handle symlinked working directories
+  let canonCwd: string
+  try { canonCwd = realpathSync(process.cwd()) } catch { canonCwd = process.cwd() }
+  const relFromCwd = relative(canonCwd, resolvedDbDir)
   if (relFromCwd.startsWith('..')) {
     throw new Error(`dbPath must be within the working directory (got: ${dbPathRaw})`)
   }
