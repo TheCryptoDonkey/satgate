@@ -70,19 +70,33 @@ export function createProxyHandler(deps: ProxyDeps) {
     }
 
     // Read and parse body BEFORE acquiring capacity to prevent slow uploads from holding slots.
-    // Enforce a 30-second deadline to prevent slow-trickle clients from tying up connections.
+    // Enforce a 30-second hard deadline using AbortSignal.timeout so stalled reads are interrupted.
     let bodyText: string
     if (req.body) {
+      const bodyAbort = AbortSignal.timeout(30_000)
       const reader = req.body.getReader()
       const decoder = new TextDecoder()
       const chunks: string[] = []
       let totalBytes = 0
-      const bodyDeadline = Date.now() + 30_000
       try {
         while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          totalBytes += value.byteLength
+          if (bodyAbort.aborted) {
+            await reader.cancel('body read deadline exceeded').catch(() => {})
+            return new Response(
+              JSON.stringify({ error: 'Request body read timed out' }),
+              { status: 408, headers: { 'Content-Type': 'application/json' } },
+            )
+          }
+          // Race the read against the abort signal so stalled clients don't block forever
+          const result = await Promise.race([
+            reader.read(),
+            new Promise<never>((_, reject) => {
+              if (bodyAbort.aborted) reject(new DOMException('body read deadline exceeded', 'TimeoutError'))
+              bodyAbort.addEventListener('abort', () => reject(new DOMException('body read deadline exceeded', 'TimeoutError')), { once: true })
+            }),
+          ])
+          if (result.done) break
+          totalBytes += result.value.byteLength
           if (totalBytes > deps.maxBodySize) {
             await reader.cancel('body too large').catch(() => {})
             return new Response(
@@ -90,17 +104,17 @@ export function createProxyHandler(deps: ProxyDeps) {
               { status: 413, headers: { 'Content-Type': 'application/json' } },
             )
           }
-          if (Date.now() > bodyDeadline) {
-            await reader.cancel('body read deadline exceeded').catch(() => {})
-            return new Response(
-              JSON.stringify({ error: 'Request body read timed out' }),
-              { status: 408, headers: { 'Content-Type': 'application/json' } },
-            )
-          }
-          chunks.push(decoder.decode(value, { stream: true }))
+          chunks.push(decoder.decode(result.value, { stream: true }))
         }
         chunks.push(decoder.decode()) // flush remaining
-      } catch {
+      } catch (err) {
+        await reader.cancel('body read failed').catch(() => {})
+        if (err instanceof DOMException && err.name === 'TimeoutError') {
+          return new Response(
+            JSON.stringify({ error: 'Request body read timed out' }),
+            { status: 408, headers: { 'Content-Type': 'application/json' } },
+          )
+        }
         return new Response(
           JSON.stringify({ error: 'Request body read failed' }),
           { status: 400, headers: { 'Content-Type': 'application/json' } },
