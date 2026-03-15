@@ -110,13 +110,6 @@ export function createProxyHandler(deps: ProxyDeps) {
     } else {
       bodyText = ''
     }
-    if (new TextEncoder().encode(bodyText).byteLength > deps.maxBodySize) {
-      return new Response(
-        JSON.stringify({ error: 'Request body too large' }),
-        { status: 413, headers: { 'Content-Type': 'application/json' } },
-      )
-    }
-
     let body: Record<string, unknown>
     try {
       const parsed = JSON.parse(bodyText)

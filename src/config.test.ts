@@ -250,7 +250,8 @@ describe('loadConfig', () => {
       upstream: 'http://localhost:11434',
       dbPath: './data/satgate.db',
     })
-    expect(config.dbPath).toBe('./data/satgate.db')
+    // dbPath is now resolved from the validated parent directory + basename
+    expect(config.dbPath).toMatch(/data[/\\]satgate\.db$/)
   })
 
   it('rejects invalid lightning backend', () => {

@@ -46,7 +46,12 @@ export function createHttpFacilitator(config: HttpFacilitatorConfig): X402Facili
         chunks.push(value)
       }
       const bodyText = new TextDecoder().decode(Buffer.concat(chunks))
-      const result = JSON.parse(bodyText) as Record<string, unknown>
+      let result: Record<string, unknown>
+      try {
+        result = JSON.parse(bodyText) as Record<string, unknown>
+      } catch {
+        return { valid: false, txHash: '', amount: 0, sender: '' }
+      }
       // Validate response shape — don't trust arbitrary JSON from external facilitator
       if (typeof result !== 'object' || result === null) {
         return { valid: false, txHash: '', amount: 0, sender: '' }

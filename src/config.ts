@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import { realpathSync } from 'node:fs'
-import { resolve, relative, dirname } from 'node:path'
+import { resolve, relative, dirname, basename, join } from 'node:path'
 import type { LightningBackend } from '@thecryptodonkey/toll-booth'
 import type { Logger } from './logger.js'
 
@@ -186,7 +186,8 @@ export function loadConfig(
   if (relFromCwd.startsWith('..')) {
     throw new Error(`dbPath must be within the working directory (got: ${dbPathRaw})`)
   }
-  const dbPath = dbPathRaw
+  // Re-assemble from the resolved directory + original filename to close symlink gaps
+  const dbPath = join(resolvedDbDir, basename(dbPathRaw))
 
   // Pricing: three sources
   // 1. File: pricing.default / pricing.models (per-token via config file)
