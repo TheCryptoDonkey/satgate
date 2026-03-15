@@ -175,16 +175,17 @@ export function loadConfig(
   const storage = storageRaw as 'memory' | 'sqlite'
 
   const dbPathRaw = args.dbPath ?? env.SATGATE_DB_PATH ?? file.dbPath ?? './satgate.db'
-  // Resolve symlinks on the parent directory (the DB file itself may not exist yet)
+  // Canonicalise cwd to handle symlinked working directories
+  let canonCwd: string
+  try { canonCwd = realpathSync(process.cwd()) } catch { canonCwd = process.cwd() }
+  // Resolve symlinks on the parent directory (the DB file itself may not exist yet).
+  // Fallback resolves relative to canonCwd so new subdirs in symlinked checkouts work.
   let resolvedDbDir: string
   try {
     resolvedDbDir = realpathSync(resolve(dirname(dbPathRaw)))
   } catch {
-    resolvedDbDir = resolve(dirname(dbPathRaw))
+    resolvedDbDir = resolve(canonCwd, dirname(dbPathRaw))
   }
-  // Canonicalise cwd to handle symlinked working directories
-  let canonCwd: string
-  try { canonCwd = realpathSync(process.cwd()) } catch { canonCwd = process.cwd() }
   const relFromCwd = relative(canonCwd, resolvedDbDir)
   if (relFromCwd.startsWith('..')) {
     throw new Error(`dbPath must be within the working directory (got: ${dbPathRaw})`)
