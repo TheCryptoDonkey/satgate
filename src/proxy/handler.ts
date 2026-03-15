@@ -61,7 +61,8 @@ export function createProxyHandler(deps: ProxyDeps) {
 
       // Validate Content-Type
       const contentType = req.headers.get('content-type')
-      if (!contentType || !contentType.includes('application/json')) {
+      const mediaType = contentType?.split(';')[0]?.trim().toLowerCase()
+      if (mediaType !== 'application/json') {
         return new Response(
           JSON.stringify({ error: 'Content-Type must be application/json' }),
           { status: 415, headers: { 'Content-Type': 'application/json' } },

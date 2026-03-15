@@ -185,9 +185,13 @@ export function loadConfig(
   // 1. File: pricing.default / pricing.models (per-token via config file)
   // 2. CLI flat: --price / file.price (flat per-request)
   // 3. CLI per-token: --token-price / --model-price (per-token via CLI)
-  const pricingDefault = (env.DEFAULT_PRICE ? parseInt(env.DEFAULT_PRICE, 10) : undefined)
+  const pricingDefaultRaw = (env.DEFAULT_PRICE ? parseInt(env.DEFAULT_PRICE, 10) : undefined)
     ?? file.pricing?.default
     ?? 1
+  if (!Number.isFinite(pricingDefaultRaw) || pricingDefaultRaw <= 0) {
+    throw new Error(`Invalid default price: ${pricingDefaultRaw} (must be a positive number)`)
+  }
+  const pricingDefault = pricingDefaultRaw
 
   const pricing: ModelPricing = {
     default: pricingDefault,
@@ -337,11 +341,23 @@ export function loadConfig(
   // x402 stablecoin config
   const x402Receiver = env.X402_RECEIVER ?? file.x402?.receiverAddress
   const x402Network = env.X402_NETWORK ?? file.x402?.network
+  const x402FacilitatorUrl = env.X402_FACILITATOR_URL ?? file.x402?.facilitatorUrl
+  if (x402FacilitatorUrl) {
+    try {
+      const parsed = new URL(x402FacilitatorUrl)
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        throw new Error('X402 facilitator URL must use http or https')
+      }
+    } catch (e) {
+      if (e instanceof Error && e.message.includes('http or https')) throw e
+      throw new Error(`X402 facilitator URL is not a valid URL: ${x402FacilitatorUrl}`)
+    }
+  }
   const x402 = x402Receiver && x402Network
     ? {
         receiverAddress: x402Receiver,
         network: x402Network,
-        facilitatorUrl: env.X402_FACILITATOR_URL ?? file.x402?.facilitatorUrl,
+        facilitatorUrl: x402FacilitatorUrl,
         facilitatorKey: env.X402_FACILITATOR_KEY ?? file.x402?.facilitatorKey,
         asset: env.X402_ASSET ?? file.x402?.asset,
         creditMode: file.x402?.creditMode,

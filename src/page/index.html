@@ -934,7 +934,7 @@ body {
     if (window.webln && invoiceData && invoiceData.bolt11) {
       try {
         await window.webln.enable();
-        await window.webln.sendPayment(window._invoiceData.bolt11);
+        await window.webln.sendPayment(invoiceData.bolt11);
         // WebLN payment sent — polling will pick up the settlement
       } catch (e) {
         // WebLN failed — user can still scan QR
@@ -1030,14 +1030,18 @@ body {
   }
 
   function sanitiseSvg(svgEl) {
-    // Remove <script> elements and event-handler attributes
-    var scripts = svgEl.querySelectorAll('script');
-    for (var i = 0; i < scripts.length; i++) scripts[i].remove();
+    // Remove dangerous elements: script, foreignObject, a, use, image
+    var dangerous = svgEl.querySelectorAll('script, foreignObject, a, use, image');
+    for (var i = 0; i < dangerous.length; i++) dangerous[i].remove();
     var all = svgEl.querySelectorAll('*');
     for (var j = 0; j < all.length; j++) {
       var attrs = all[j].attributes;
       for (var k = attrs.length - 1; k >= 0; k--) {
-        if (attrs[k].name.startsWith('on')) all[j].removeAttribute(attrs[k].name);
+        var name = attrs[k].name.toLowerCase();
+        // Remove event handlers and dangerous href attributes
+        if (name.startsWith('on') || name === 'href' || name === 'xlink:href') {
+          all[j].removeAttribute(attrs[k].name);
+        }
       }
     }
   }

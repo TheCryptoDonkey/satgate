@@ -171,8 +171,9 @@ describe('NIP-98 allowlist', () => {
     const pubkey = bytesToHex(schnorr.getPublicKey(privKey))
     const token = createNip98Token(privKey, url, method, now)
     const decoded = JSON.parse(atob(token))
-    // Flip a byte in the signature
-    decoded.sig = 'ff' + decoded.sig.slice(2)
+    // Flip a byte in the signature (XOR with 01 to guarantee it changes)
+    const firstByte = parseInt(decoded.sig.slice(0, 2), 16)
+    decoded.sig = (firstByte ^ 0x01).toString(16).padStart(2, '0') + decoded.sig.slice(2)
     const tampered = btoa(JSON.stringify(decoded))
 
     const result = checkAllowlist(`Nostr ${tampered}`, [pubkey], { url, method }, now)

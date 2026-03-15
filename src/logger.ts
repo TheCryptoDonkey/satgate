@@ -65,6 +65,11 @@ function truncHash(hash: string): string {
   return hash.length > 12 ? `${hash.slice(0, 6)}…${hash.slice(-6)}` : hash
 }
 
+/** Strip control characters (CR, LF, ANSI escapes) from user-controlled strings to prevent log injection. */
+function sanitiseLogValue(s: string): string {
+  return s.replace(/[\x00-\x1f\x7f]/g, (ch) => `\\x${ch.charCodeAt(0).toString(16).padStart(2, '0')}`)
+}
+
 function createPrettyLogger(verbose: boolean): Logger {
   function write(line: string): void {
     process.stderr.write(line + '\n')
@@ -84,7 +89,7 @@ function createPrettyLogger(verbose: boolean): Logger {
 
     request(event) {
       const satLabel = event.satsDeducted === 1 ? '1 sat' : `${event.satsDeducted} sats`
-      let line = `${DIM}→ REQUEST   ${event.endpoint} ${event.latencyMs}ms ${satLabel} deducted (${event.remainingBalance} remaining)${RESET}`
+      let line = `${DIM}→ REQUEST   ${sanitiseLogValue(event.endpoint)} ${event.latencyMs}ms ${satLabel} deducted (${event.remainingBalance} remaining)${RESET}`
       if (verbose) {
         const extras: string[] = [`authenticated=${event.authenticated}`]
         if (extras.length > 0) line += ` ${extras.join(' ')}`
@@ -97,9 +102,9 @@ function createPrettyLogger(verbose: boolean): Logger {
     },
 
     error(message, context) {
-      let line = `${RED}⚠ ERROR     ${message}${RESET}`
+      let line = `${RED}⚠ ERROR     ${sanitiseLogValue(message)}${RESET}`
       if (context) {
-        const extras = Object.entries(context).map(([k, v]) => `${k}=${v}`).join(' ')
+        const extras = Object.entries(context).map(([k, v]) => `${k}=${sanitiseLogValue(String(v))}`).join(' ')
         line += ` ${DIM}${extras}${RESET}`
       }
       write(line)

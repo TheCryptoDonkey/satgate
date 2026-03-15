@@ -164,8 +164,6 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
     return c.json({
       status: 'ok',
       models,
-      activeRequests: capacity.active,
-      maxConcurrent: capacity.maxConcurrent,
     })
   })
 
@@ -199,10 +197,27 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
       return c.json(modelsCache.data)
     }
     try {
+      const maxModelsBytes = 1024 * 1024 // 1 MiB limit for /v1/models response
       const res = await fetch(`${config.upstream}/v1/models`, {
         signal: AbortSignal.timeout(10_000),
       })
-      const body = await res.json() as Record<string, unknown>
+      // Read body incrementally to enforce size limit
+      const reader = res.body?.getReader()
+      if (!reader) return c.json({ data: [] })
+      const chunks: Uint8Array[] = []
+      let totalBytes = 0
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        totalBytes += value.byteLength
+        if (totalBytes > maxModelsBytes) {
+          await reader.cancel('response too large').catch(() => {})
+          return c.json({ data: [] })
+        }
+        chunks.push(value)
+      }
+      const bodyText = new TextDecoder().decode(Buffer.concat(chunks))
+      const body = JSON.parse(bodyText) as Record<string, unknown>
       // Sanitise upstream response — only forward model IDs, not arbitrary fields
       const sanitised = sanitiseModelsResponse(body)
       modelsCache = { data: sanitised, expires: Date.now() + 60_000 }

@@ -204,5 +204,26 @@ describe('Logger', () => {
       const line = strip(output[0])
       expect(line).not.toContain('rail=')
     })
+
+    it('sanitises control characters in request endpoint', () => {
+      const logger = createLogger({ format: 'pretty', verbose: false })
+      logger.request({
+        ...sampleRequest,
+        endpoint: '/v1/chat\r\nINFO FAKE LOG LINE',
+      })
+      const line = output[0]
+      expect(line).not.toContain('\r')
+      expect(line).not.toContain('\n' + 'INFO FAKE')
+      expect(line).toContain('\\x0d')
+      expect(line).toContain('\\x0a')
+    })
+
+    it('sanitises control characters in error message and context', () => {
+      const logger = createLogger({ format: 'pretty', verbose: false })
+      logger.error('bad\r\ninjected', { key: 'val\x1b[31mred' })
+      const line = output[0]
+      expect(line).not.toContain('\r\n')
+      expect(line).toContain('\\x0d')
+    })
   })
 })

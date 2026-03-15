@@ -560,3 +560,49 @@ describe('per-token CLI pricing', () => {
     expect(config.pricing.models.llama3).toBe(3)
   })
 })
+
+describe('security validations', () => {
+  it('rejects DEFAULT_PRICE=0 from env', () => {
+    expect(() => loadConfig(
+      { upstream: 'http://localhost:11434' },
+      { DEFAULT_PRICE: '0' },
+    )).toThrow(/Invalid default price/)
+  })
+
+  it('rejects negative DEFAULT_PRICE from env', () => {
+    expect(() => loadConfig(
+      { upstream: 'http://localhost:11434' },
+      { DEFAULT_PRICE: '-5' },
+    )).toThrow(/Invalid default price/)
+  })
+
+  it('rejects zero default pricing from config file', () => {
+    expect(() => loadConfig(
+      { upstream: 'http://localhost:11434' },
+      {},
+      { pricing: { default: 0 } },
+    )).toThrow(/Invalid default price/)
+  })
+
+  it('rejects X402 facilitator URL with ftp scheme', () => {
+    expect(() => loadConfig(
+      { upstream: 'http://localhost:11434' },
+      { X402_RECEIVER: '0xabc', X402_NETWORK: 'base-sepolia', X402_FACILITATOR_URL: 'ftp://evil.com' },
+    )).toThrow(/X402 facilitator URL must use http or https/)
+  })
+
+  it('rejects invalid X402 facilitator URL', () => {
+    expect(() => loadConfig(
+      { upstream: 'http://localhost:11434' },
+      { X402_RECEIVER: '0xabc', X402_NETWORK: 'base-sepolia', X402_FACILITATOR_URL: 'not-a-url' },
+    )).toThrow(/X402 facilitator URL is not a valid URL/)
+  })
+
+  it('accepts valid X402 facilitator URL with https', () => {
+    const config = loadConfig(
+      { upstream: 'http://localhost:11434' },
+      { X402_RECEIVER: '0xabc', X402_NETWORK: 'base-sepolia', X402_FACILITATOR_URL: 'https://facilitator.example.com' },
+    )
+    expect(config.x402?.facilitatorUrl).toBe('https://facilitator.example.com')
+  })
+})
