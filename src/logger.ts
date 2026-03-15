@@ -25,6 +25,14 @@ export interface LoggerOptions {
   verbose: boolean
 }
 
+function sanitiseRecord(obj: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(obj)) {
+    out[k] = typeof v === 'string' ? sanitiseLogValue(v) : v
+  }
+  return out
+}
+
 function jsonLine(obj: Record<string, unknown>): void {
   process.stderr.write(JSON.stringify(obj) + '\n')
 }
@@ -32,22 +40,22 @@ function jsonLine(obj: Record<string, unknown>): void {
 function createJsonLogger(): Logger {
   return {
     payment(event) {
-      jsonLine({ ...event, ts: event.timestamp, level: 'info', event: 'payment' })
+      jsonLine({ ...sanitiseRecord(event as unknown as Record<string, unknown>), ts: event.timestamp, level: 'info', event: 'payment' })
     },
     request(event) {
-      jsonLine({ ...event, ts: event.timestamp, level: 'info', event: 'request' })
+      jsonLine({ ...sanitiseRecord(event as unknown as Record<string, unknown>), ts: event.timestamp, level: 'info', event: 'request' })
     },
     challenge(event) {
-      jsonLine({ ...event, ts: event.timestamp, level: 'info', event: 'challenge' })
+      jsonLine({ ...sanitiseRecord(event as unknown as Record<string, unknown>), ts: event.timestamp, level: 'info', event: 'challenge' })
     },
     error(message, context) {
-      jsonLine({ ...context, ts: new Date().toISOString(), level: 'error', event: 'error', message })
+      jsonLine({ ...(context ? sanitiseRecord(context) : {}), ts: new Date().toISOString(), level: 'error', event: 'error', message: sanitiseLogValue(message) })
     },
     info(message) {
-      jsonLine({ ts: new Date().toISOString(), level: 'info', event: 'info', message })
+      jsonLine({ ts: new Date().toISOString(), level: 'info', event: 'info', message: sanitiseLogValue(message) })
     },
     warn(message) {
-      jsonLine({ ts: new Date().toISOString(), level: 'warn', event: 'warn', message })
+      jsonLine({ ts: new Date().toISOString(), level: 'warn', event: 'warn', message: sanitiseLogValue(message) })
     },
   }
 }

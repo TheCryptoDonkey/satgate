@@ -199,13 +199,15 @@ export function createProxyHandler(deps: ProxyDeps) {
           )
         }
       }
-      // Read body incrementally to enforce size limit even without Content-Length
+      // Read body incrementally to enforce size limit even without Content-Length.
+      // Also enforce a total elapsed deadline to prevent slow-trickle body attacks.
       let responseText: string
       if (upstreamRes.body) {
         const reader = upstreamRes.body.getReader()
         const decoder = new TextDecoder()
         const chunks: string[] = []
         let totalBytes = 0
+        const deadline = start + (timeout * 2)
         try {
           while (true) {
             const { done, value } = await reader.read()
@@ -217,6 +219,14 @@ export function createProxyHandler(deps: ProxyDeps) {
               return new Response(
                 JSON.stringify({ error: 'Upstream response too large' }),
                 { status: 502, headers: { 'Content-Type': 'application/json' } },
+              )
+            }
+            if (Date.now() > deadline) {
+              await reader.cancel('deadline exceeded').catch(() => {})
+              if (paymentHash) deps.reconcile(paymentHash, 0)
+              return new Response(
+                JSON.stringify({ error: 'Upstream response timed out' }),
+                { status: 504, headers: { 'Content-Type': 'application/json' } },
               )
             }
             chunks.push(decoder.decode(value, { stream: true }))

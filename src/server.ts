@@ -220,7 +220,12 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
       const body = JSON.parse(bodyText) as Record<string, unknown>
       // Sanitise upstream response — only forward model IDs, not arbitrary fields
       const sanitised = sanitiseModelsResponse(body)
-      modelsCache = { data: sanitised, expires: Date.now() + 60_000 }
+      // Only cache non-empty model lists — transient upstream errors should not
+      // poison the cache with empty data for 60 seconds
+      const dataArr = sanitised.data as unknown[]
+      if (Array.isArray(dataArr) && dataArr.length > 0) {
+        modelsCache = { data: sanitised, expires: Date.now() + 60_000 }
+      }
       return c.json(sanitised)
     } catch {
       return c.json({ data: [] })

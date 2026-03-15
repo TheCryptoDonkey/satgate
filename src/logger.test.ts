@@ -16,12 +16,14 @@ const sampleRequest: RequestEvent = {
   remainingBalance: 79,
   latencyMs: 347,
   authenticated: true,
+  clientIp: '127.0.0.1',
 }
 
 const sampleChallenge: ChallengeEvent = {
   timestamp: '2026-03-13T12:00:00.000Z',
   endpoint: '/v1/chat/completions',
   amountSats: 100,
+  clientIp: '127.0.0.1',
 }
 
 describe('Logger', () => {
@@ -121,6 +123,39 @@ describe('Logger', () => {
       expect(parsed.event).toBe('warn')
       expect(parsed.level).toBe('warn')
       expect(parsed.message).toBe('high load')
+    })
+
+    it('sanitises control characters in JSON request endpoint', () => {
+      const logger = createLogger({ format: 'json', verbose: false })
+      logger.request({
+        ...sampleRequest,
+        endpoint: '/v1/chat\r\nINFO FAKE LOG LINE',
+      })
+      const raw = output[0]
+      const parsed = JSON.parse(raw)
+      expect(parsed.endpoint).toContain('\\x0d')
+      expect(parsed.endpoint).toContain('\\x0a')
+      expect(parsed.endpoint).not.toContain('\r')
+      expect(parsed.endpoint).not.toContain('\n')
+    })
+
+    it('sanitises control characters in JSON error message and context', () => {
+      const logger = createLogger({ format: 'json', verbose: false })
+      logger.error('bad\r\ninjected', { key: 'val\x1b[31mred' })
+      const parsed = JSON.parse(output[0])
+      expect(parsed.message).toContain('\\x0d')
+      expect(parsed.message).not.toContain('\r')
+      expect(parsed.key).toContain('\\x1b')
+      expect(parsed.key).not.toContain('\x1b')
+    })
+
+    it('prevents context keys from shadowing reserved fields', () => {
+      const logger = createLogger({ format: 'json', verbose: false })
+      logger.error('real message', { message: 'injected', level: 'critical', event: 'pwned' })
+      const parsed = JSON.parse(output[0])
+      expect(parsed.message).toBe('real message')
+      expect(parsed.level).toBe('error')
+      expect(parsed.event).toBe('error')
     })
   })
 
