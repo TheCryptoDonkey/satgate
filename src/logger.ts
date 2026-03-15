@@ -25,16 +25,18 @@ export interface LoggerOptions {
   verbose: boolean
 }
 
-function sanitiseRecord(obj: Record<string, unknown>): Record<string, unknown> {
+function sanitiseValue(v: unknown, depth: number): unknown {
+  if (depth > 10) return v
+  if (typeof v === 'string') return sanitiseLogValue(v)
+  if (Array.isArray(v)) return v.map(item => sanitiseValue(item, depth + 1))
+  if (typeof v === 'object' && v !== null) return sanitiseRecord(v as Record<string, unknown>, depth + 1)
+  return v
+}
+
+function sanitiseRecord(obj: Record<string, unknown>, depth = 0): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(obj)) {
-    if (typeof v === 'string') {
-      out[k] = sanitiseLogValue(v)
-    } else if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
-      out[k] = sanitiseRecord(v as Record<string, unknown>)
-    } else {
-      out[k] = v
-    }
+    out[k] = sanitiseValue(v, depth)
   }
   return out
 }

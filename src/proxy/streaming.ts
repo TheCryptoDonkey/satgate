@@ -52,7 +52,7 @@ export function createStreamingProxy(
         clearTimeout(inactivityTimer)
         inactivityTimer = setTimeout(() => {
           reader!.cancel('inactivity timeout').catch(() => {})
-          controller.close()
+          try { controller.close() } catch { /* already closed */ }
           finish()
         }, inactivityTimeoutMs)
       }
@@ -63,7 +63,7 @@ export function createStreamingProxy(
       // under the inactivity timeout from holding a capacity slot indefinitely
       durationTimer = setTimeout(() => {
         reader!.cancel('stream duration limit exceeded').catch(() => {})
-        controller.close()
+        try { controller.close() } catch { /* already closed */ }
         finish()
       }, maxStreamDurationMs)
 
