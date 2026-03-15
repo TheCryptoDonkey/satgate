@@ -1,3 +1,10 @@
+# [1.9.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.8.0...v1.9.0) (2026-03-15)
+
+
+### Features
+
+* add --public-url flag for explicit announce URL ([bb9b186](https://github.com/TheCryptoDonkey/satgate/commit/bb9b186b295d9c6dba955209875f31bc2ac4eb2e))
+
 # [1.8.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.7.8...v1.8.0) (2026-03-15)
 
 
