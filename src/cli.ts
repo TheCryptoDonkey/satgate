@@ -162,7 +162,9 @@ export async function main(argv: string[] = process.argv): Promise<void> {
       console.error(`[satgate] Could not read allowlist file: ${args.allowlistFile}`)
       process.exit(1)
     }
-    const relFromCwd = relative(process.cwd(), resolvedAllowlistPath)
+    let canonCwd: string
+    try { canonCwd = realpathSync(process.cwd()) } catch { canonCwd = process.cwd() }
+    const relFromCwd = relative(canonCwd, resolvedAllowlistPath)
     if (relFromCwd.startsWith('..')) {
       console.error(`[satgate] --allowlist-file must be within the working directory (got: ${args.allowlistFile})`)
       process.exit(1)
@@ -283,17 +285,24 @@ export async function main(argv: string[] = process.argv): Promise<void> {
         const { announceService } = await import('402-announce')
         const { randomBytes } = await import('node:crypto')
 
-        const announceKey = config.announceKey || randomBytes(32).toString('hex')
-        if (!config.announceKey) {
-          const { mkdirSync, writeFileSync } = await import('node:fs')
+        let announceKey = config.announceKey
+        if (!announceKey) {
+          const { mkdirSync, writeFileSync, existsSync: fileExists, readFileSync: readFile } = await import('node:fs')
           const { join } = await import('node:path')
           const { homedir } = await import('node:os')
 
           const keyDir = join(homedir(), '.satgate')
           const keyPath = join(keyDir, 'announce.key')
-          mkdirSync(keyDir, { recursive: true, mode: 0o700 })
-          writeFileSync(keyPath, announceKey, { mode: 0o600 })
-          logger.info(`Announce key saved to ${keyPath} (chmod 600)`)
+
+          if (fileExists(keyPath)) {
+            announceKey = readFile(keyPath, 'utf-8').trim()
+            logger.info(`Announce key loaded from ${keyPath}`)
+          } else {
+            announceKey = randomBytes(32).toString('hex')
+            mkdirSync(keyDir, { recursive: true, mode: 0o700 })
+            writeFileSync(keyPath, announceKey, { mode: 0o600 })
+            logger.info(`Announce key saved to ${keyPath} (chmod 600)`)
+          }
         }
 
         const paymentMethods = ['bitcoin-lightning-bolt11']
