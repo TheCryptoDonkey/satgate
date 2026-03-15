@@ -164,20 +164,9 @@ function verifyNip98(
     const now = nowOverride ?? Math.floor(Date.now() / 1000)
     if (Math.abs(now - event.created_at) > 60) return { allowed: false }
 
-    // Reject replayed event IDs
+    // Reject replayed event IDs (eviction deferred until after full validation
+    // to prevent unauthenticated requests from flushing the replay cache)
     if (seenEventIds.has(event.id)) return { allowed: false }
-    if (seenEventIds.size >= SEEN_ID_MAX_SIZE) {
-      pruneSeenIds()
-      // If still at capacity after pruning, evict oldest entries to make room
-      if (seenEventIds.size >= SEEN_ID_MAX_SIZE) {
-        const entriesToEvict = Math.max(1, Math.floor(SEEN_ID_MAX_SIZE * 0.1))
-        const iter = seenEventIds.keys()
-        for (let i = 0; i < entriesToEvict; i++) {
-          const key = iter.next().value
-          if (key !== undefined) seenEventIds.delete(key)
-        }
-      }
-    }
 
     // Validate URL and method tags match the actual request
     const urlTag = event.tags.find(t => t[0] === 'u')?.[1]
@@ -204,6 +193,19 @@ function verifyNip98(
     // Check pubkey against allowlist (normalise npub → hex, case-insensitive)
     const allowedPubkeys = extractPubkeys(allowlist)
     if (allowedPubkeys.includes(event.pubkey.toLowerCase())) {
+      // Evict oldest entries only after full authentication succeeds —
+      // prevents unauthenticated requests from flushing the replay cache
+      if (seenEventIds.size >= SEEN_ID_MAX_SIZE) {
+        pruneSeenIds()
+        if (seenEventIds.size >= SEEN_ID_MAX_SIZE) {
+          const entriesToEvict = Math.max(1, Math.floor(SEEN_ID_MAX_SIZE * 0.1))
+          const iter = seenEventIds.keys()
+          for (let i = 0; i < entriesToEvict; i++) {
+            const key = iter.next().value
+            if (key !== undefined) seenEventIds.delete(key)
+          }
+        }
+      }
       seenEventIds.set(event.id, Date.now())
       return { allowed: true, identity: event.pubkey.slice(0, 8) + '...' }
     }
