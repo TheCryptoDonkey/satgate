@@ -453,6 +453,63 @@ describe('AI proxy handler', () => {
     expect(errorSpy.mock.calls[0][0]).toBe('upstream error')
   })
 
+  it('handles slow body trickle from upstream (signal aborts during body read)', async () => {
+    // Upstream sends headers immediately but trickles body slowly.
+    // The fetch AbortSignal fires during body read, caught as read failure.
+    const slowBodyApp = new Hono()
+    slowBodyApp.post('/v1/chat/completions', () => {
+      const encoder = new TextEncoder()
+      const stream = new ReadableStream({
+        async start(controller) {
+          controller.enqueue(encoder.encode('{"choices'))
+          await new Promise((r) => setTimeout(r, 500))
+          controller.enqueue(encoder.encode('":[]'))
+          await new Promise((r) => setTimeout(r, 500))
+          controller.enqueue(encoder.encode('}'))
+          controller.close()
+        },
+      })
+      return new Response(stream, {
+        headers: { 'Content-Type': 'application/json' },
+      })
+    })
+
+    let slowServer: ReturnType<typeof serve>
+    let slowUrl: string
+    await new Promise<void>((resolve) => {
+      slowServer = serve({ fetch: slowBodyApp.fetch, port: 0 }, (info) => {
+        slowUrl = `http://localhost:${info.port}`
+        resolve()
+      })
+    })
+
+    try {
+      const reconcile = vi.fn().mockReturnValue({ adjusted: true, newBalance: 1000, delta: 0 })
+      const handler = createProxyHandler({
+        upstream: slowUrl!,
+        pricing,
+        capacity: new CapacityTracker(0),
+        reconcile,
+        maxBodySize: 10 * 1024 * 1024,
+        upstreamTimeout: 100, // fires at 100ms during slow body read
+      })
+
+      const req = new Request('http://test/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'test', messages: [] }),
+      })
+
+      const res = await handler(req, 'deadline-hash')
+      // AbortSignal or deadline catch fires — either way, client gets an error
+      expect(res.status).toBeGreaterThanOrEqual(502)
+      expect(res.status).toBeLessThanOrEqual(504)
+      expect(reconcile).toHaveBeenCalledWith('deadline-hash', 0)
+    } finally {
+      slowServer!.close()
+    }
+  })
+
   it('skips reconciliation when flatPricing is true (streaming)', async () => {
     let reconcileCalled = false
     const capacity = new CapacityTracker(0)
