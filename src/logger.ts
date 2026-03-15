@@ -98,7 +98,7 @@ function createPrettyLogger(verbose: boolean): Logger {
     },
 
     challenge(event) {
-      write(`${CYAN}🔒 CHALLENGE ${event.endpoint} → 402 (${event.amountSats} sats)${RESET}`)
+      write(`${CYAN}🔒 CHALLENGE ${sanitiseLogValue(event.endpoint)} → 402 (${event.amountSats} sats)${RESET}`)
     },
 
     error(message, context) {
@@ -111,11 +111,11 @@ function createPrettyLogger(verbose: boolean): Logger {
     },
 
     info(message) {
-      write(`${WHITE}ℹ INFO      ${message}${RESET}`)
+      write(`${WHITE}ℹ INFO      ${sanitiseLogValue(message)}${RESET}`)
     },
 
     warn(message) {
-      write(`${YELLOW}⚠ WARN      ${message}${RESET}`)
+      write(`${YELLOW}⚠ WARN      ${sanitiseLogValue(message)}${RESET}`)
     },
   }
 }

@@ -159,8 +159,6 @@ async function main() {
     return c.json({
       status: 'ok',
       models,
-      activeRequests: capacity.active,
-      maxConcurrent: capacity.maxConcurrent,
     })
   })
 
