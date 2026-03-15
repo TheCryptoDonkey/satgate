@@ -99,6 +99,8 @@ export function checkAllowlist(
   const scheme = authHeader.slice(0, spaceIdx)
   const credential = authHeader.slice(spaceIdx + 1)
 
+  if (!credential) return { allowed: false }
+
   if (scheme === 'Bearer') {
     // Only match entries that are NOT pubkeys (hex or npub)
     const secrets = allowlist.filter(

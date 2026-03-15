@@ -49,6 +49,16 @@ describe('checkAllowlist', () => {
     expect(result.allowed).toBe(false)
   })
 
+  it('rejects Bearer with empty credential', () => {
+    const result = checkAllowlist('Bearer ', secrets, { url: '', method: '' })
+    expect(result.allowed).toBe(false)
+  })
+
+  it('rejects Nostr with empty credential', () => {
+    const result = checkAllowlist('Nostr ', secrets, { url: '', method: '' })
+    expect(result.allowed).toBe(false)
+  })
+
   it('handles empty allowlist', () => {
     const result = checkAllowlist('Bearer anything', [], { url: '', method: '' })
     expect(result.allowed).toBe(false)
