@@ -1,3 +1,10 @@
+## [1.7.6](https://github.com/TheCryptoDonkey/satgate/compare/v1.7.5...v1.7.6) (2026-03-15)
+
+
+### Bug Fixes
+
+* sanitise JSON logger values, add body-read deadline, prevent models cache poisoning ([d6cbb7c](https://github.com/TheCryptoDonkey/satgate/commit/d6cbb7cfa661f4b1d55e55be47ee98b2d558e4a6))
+
 ## [1.7.5](https://github.com/TheCryptoDonkey/satgate/compare/v1.7.4...v1.7.5) (2026-03-15)
 
 
