@@ -38,6 +38,7 @@ function parseArgs(argv: string[]): CliArgs {
       case '--announce': args.announce = true; break
       case '--announce-relays': args.announceRelays = argv[++i]; break
       case '--announce-key': args.announceKey = argv[++i]; break
+      case '--public-url': args.publicUrl = argv[++i]; break
       case '-h': case '--help': printHelp(); process.exit(0);
       case '-v': case '--version': printVersion(); process.exit(0);
       default:
@@ -97,6 +98,7 @@ function printHelp(): void {
     --announce                 Publish service on Nostr relays for discovery
     --announce-relays <urls>   Comma-separated relay URLs (wss://...)
     --announce-key <hex>       Nostr secret key for signing (auto-generated if omitted)
+    --public-url <url>         Public URL for announcements (overrides tunnel URL)
 
   Storage:
     --storage <type>           memory | sqlite (default: memory)
@@ -280,7 +282,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
       if (config.announceRelays.length === 0) {
         logger.warn('--announce enabled but no --announce-relays provided')
       } else {
-        const publicUrl = tunnelResult?.url ?? `http://localhost:${config.port}`
+        const publicUrl = config.publicUrl ?? tunnelResult?.url ?? `http://localhost:${config.port}`
 
         const { announceService } = await import('402-announce')
         const { randomBytes } = await import('node:crypto')

@@ -61,6 +61,8 @@ export interface TokenTollConfig {
   announceRelays: string[]
   /** Hex Nostr secret key for signing announcements. */
   announceKey: string
+  /** Explicit public URL for announcements (overrides tunnel URL). */
+  publicUrl?: string
 }
 
 export interface CliArgs {
@@ -89,6 +91,7 @@ export interface CliArgs {
   announce?: boolean
   announceRelays?: string
   announceKey?: string
+  publicUrl?: string
 }
 
 export interface FileConfig {
@@ -406,6 +409,7 @@ export function loadConfig(
   const announce = args.announce ?? (env.ANNOUNCE === 'true' || false)
   const announceRelays = (args.announceRelays ?? env.ANNOUNCE_RELAYS ?? '').split(',').filter(Boolean)
   const announceKey = args.announceKey ?? env.ANNOUNCE_KEY ?? ''
+  const publicUrl = args.publicUrl ?? env.PUBLIC_URL ?? undefined
 
   return {
     upstream: upstream.replace(/\/+$/, ''),
@@ -437,5 +441,6 @@ export function loadConfig(
     announce,
     announceRelays,
     announceKey,
+    publicUrl,
   }
 }
