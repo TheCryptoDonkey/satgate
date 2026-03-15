@@ -32,7 +32,8 @@ describe('TokenCounter', () => {
       counter.ingestSSEChunk('data: {"choices":[{"delta":{"content":"Hello"}}]}\n\n')
       counter.ingestSSEChunk('data: {"choices":[{"delta":{"content":" world"}}]}\n\n')
       counter.ingestSSEChunk('data: [DONE]\n\n')
-      expect(counter.finalCount()).toBe(2)
+      // 2 chunks, but byte floor = ceil(11/4) = 3 (prevents single-chunk manipulation)
+      expect(counter.finalCount()).toBe(3)
     })
 
     it('uses prompt_tokens from usage + content chunk count', () => {
@@ -54,8 +55,8 @@ describe('TokenCounter', () => {
       // Usage includes all tokens (reasoning + content + prompt)
       counter.ingestSSEChunk('data: {"choices":[],"usage":{"prompt_tokens":10,"completion_tokens":50,"total_tokens":60}}\n\n')
       counter.ingestSSEChunk('data: [DONE]\n\n')
-      // Should bill: prompt(10) + content_chunks(1) = 11, NOT total_tokens(60)
-      expect(counter.finalCount()).toBe(11)
+      // Should bill: prompt(10) + max(content_chunks(1), byte_floor(ceil(6/4)=2)) = 12, NOT total_tokens(60)
+      expect(counter.finalCount()).toBe(12)
     })
 
     it('ignores non-content chunks in count', () => {
@@ -89,8 +90,8 @@ describe('TokenCounter', () => {
       counter.ingestSSEChunk('data: {"choices":[{"delta":{"content":"answer"}}]}\n\n')
       counter.ingestSSEChunk('data: {"choices":[],"usage":{"prompt_tokens":10,"completion_tokens":50,"total_tokens":60}}\n\n')
       counter.ingestSSEChunk('data: [DONE]\n\n')
-      // Should use chunk count (1) not completion_tokens (50) — reasoning excluded
-      expect(counter.finalCount()).toBe(11)
+      // Should use max(chunk_count(1), byte_floor(ceil(6/4)=2)) not completion_tokens (50) — reasoning excluded
+      expect(counter.finalCount()).toBe(12)
     })
 
     it('handles multi-event chunks', () => {
@@ -100,6 +101,15 @@ describe('TokenCounter', () => {
         'data: {"choices":[{"delta":{"content":"b"}}]}\n\n'
       counter.ingestSSEChunk(multiChunk)
       expect(counter.finalCount()).toBe(2)
+    })
+
+    it('applies byte-based floor to prevent single-chunk manipulation', () => {
+      const counter = new TokenCounter()
+      // Single chunk with a long response (40 bytes) — without usage data
+      counter.ingestSSEChunk('data: {"choices":[{"delta":{"content":"This is a long response with many tokens"}}]}\n\n')
+      counter.ingestSSEChunk('data: [DONE]\n\n')
+      // chunk_count = 1, byte_floor = ceil(40/4) = 10, max(1, 10) = 10
+      expect(counter.finalCount()).toBe(10)
     })
   })
 

@@ -12,8 +12,8 @@ import type { ModelPricing } from '../config.js'
 export function resolveModelPrice(pricing: ModelPricing, model: string): number {
   if (!model) return pricing.default
 
-  // Exact match
-  if (model in pricing.models) return pricing.models[model]
+  // Exact match (use hasOwn to avoid prototype property lookup)
+  if (Object.hasOwn(pricing.models, model)) return pricing.models[model]
 
   // Case-insensitive match
   const lower = model.toLowerCase()

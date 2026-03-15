@@ -33,6 +33,13 @@ describe('resolveModelPrice', () => {
   it('returns default for empty model name', () => {
     expect(resolveModelPrice(pricing, '')).toBe(1)
   })
+
+  it('returns default for prototype property names (no prototype pollution)', () => {
+    expect(resolveModelPrice(pricing, 'constructor')).toBe(1)
+    expect(resolveModelPrice(pricing, 'toString')).toBe(1)
+    expect(resolveModelPrice(pricing, '__proto__')).toBe(1)
+    expect(resolveModelPrice(pricing, 'hasOwnProperty')).toBe(1)
+  })
 })
 
 describe('tokenCostToSats', () => {

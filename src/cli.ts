@@ -191,6 +191,10 @@ export async function main(argv: string[] = process.argv): Promise<void> {
   const config = loadConfig(args, process.env as Record<string, string>, fileConfig)
   const logger = createLogger({ format: config.logFormat, verbose: config.verbose })
 
+  if (config.flatPricing && config.price === 0) {
+    logger.warn('Flat price is 0 sats — all inference is free')
+  }
+
   // Auto-detect models from upstream (retry to handle startup races with Ollama)
   let models: string[] = []
   for (let attempt = 1; attempt <= 3; attempt++) {

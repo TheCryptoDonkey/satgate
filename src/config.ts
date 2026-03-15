@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto'
-import { resolve, relative } from 'node:path'
+import { realpathSync } from 'node:fs'
+import { resolve, relative, dirname } from 'node:path'
 import type { LightningBackend } from '@thecryptodonkey/toll-booth'
 import type { Logger } from './logger.js'
 
@@ -174,8 +175,14 @@ export function loadConfig(
   const storage = storageRaw as 'memory' | 'sqlite'
 
   const dbPathRaw = args.dbPath ?? env.SATGATE_DB_PATH ?? file.dbPath ?? './satgate.db'
-  const resolvedDbPath = resolve(dbPathRaw)
-  const relFromCwd = relative(process.cwd(), resolvedDbPath)
+  // Resolve symlinks on the parent directory (the DB file itself may not exist yet)
+  let resolvedDbDir: string
+  try {
+    resolvedDbDir = realpathSync(resolve(dirname(dbPathRaw)))
+  } catch {
+    resolvedDbDir = resolve(dirname(dbPathRaw))
+  }
+  const relFromCwd = relative(process.cwd(), resolvedDbDir)
   if (relFromCwd.startsWith('..')) {
     throw new Error(`dbPath must be within the working directory (got: ${dbPathRaw})`)
   }
@@ -288,7 +295,12 @@ export function loadConfig(
   }
   const estimatedCostSats = estimatedCostRaw
     ?? file.estimatedCostSats ?? Math.max(pricing.default * 2, 5)
-  const maxBodySize = file.maxBodySize ?? 10 * 1024 * 1024 // 10 MiB
+  const maxBodySizeRaw = file.maxBodySize ?? 10 * 1024 * 1024 // 10 MiB
+  const MAX_BODY_SIZE_LIMIT = 100 * 1024 * 1024 // 100 MiB hard cap
+  if (typeof maxBodySizeRaw !== 'number' || !Number.isFinite(maxBodySizeRaw) || maxBodySizeRaw <= 0 || maxBodySizeRaw > MAX_BODY_SIZE_LIMIT) {
+    throw new Error(`Invalid maxBodySize: ${maxBodySizeRaw} (must be 1 byte to ${MAX_BODY_SIZE_LIMIT} bytes)`)
+  }
+  const maxBodySize = maxBodySizeRaw
 
   // Lightning backend config
   const VALID_BACKENDS = ['phoenixd', 'lnbits', 'lnd', 'cln'] as const

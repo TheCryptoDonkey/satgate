@@ -16,6 +16,7 @@ export class TokenCounter {
   private bufferedUsage: UsageData | null = null
   private sseUsage: UsageData | null = null
   private contentChunkCount = 0
+  private totalContentBytes = 0
   private hasReasoningChunks = false
 
   /** Set usage from a buffered (non-streaming) JSON response. */
@@ -53,6 +54,7 @@ export class TokenCounter {
           for (const choice of choices) {
             if (choice.delta?.content !== undefined && choice.delta.content !== '') {
               this.contentChunkCount++
+              this.totalContentBytes += new TextEncoder().encode(choice.delta.content).byteLength
             }
             if (choice.delta?.reasoning !== undefined || choice.delta?.reasoning_content !== undefined) {
               this.hasReasoningChunks = true
@@ -84,14 +86,19 @@ export class TokenCounter {
     const usage = this.sseUsage
     const promptTokens = usage?.prompt_tokens ?? 0
 
+    // Byte-based floor: ~4 bytes per token is a conservative estimate.
+    // Prevents a malicious upstream from bundling all content in one chunk to avoid billing.
+    const byteFloor = Math.ceil(this.totalContentBytes / 4)
+
     // If reasoning chunks were detected, use content chunk count to exclude them.
     // Otherwise, prefer completion_tokens from SSE usage (more accurate than chunk count).
     if (this.hasReasoningChunks) {
-      return promptTokens + this.contentChunkCount
+      const completionEstimate = Math.max(this.contentChunkCount, byteFloor)
+      return promptTokens + completionEstimate
     }
     if (usage?.completion_tokens !== undefined) {
       return promptTokens + usage.completion_tokens
     }
-    return promptTokens + this.contentChunkCount
+    return promptTokens + Math.max(this.contentChunkCount, byteFloor)
   }
 }
