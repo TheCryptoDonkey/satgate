@@ -82,6 +82,7 @@ export function createProxyHandler(deps: ProxyDeps) {
         while (true) {
           if (bodyAbort.aborted) {
             await reader.cancel('body read deadline exceeded').catch(() => {})
+            if (paymentHash) deps.reconcile(paymentHash, 0)
             return new Response(
               JSON.stringify({ error: 'Request body read timed out' }),
               { status: 408, headers: { 'Content-Type': 'application/json' } },
@@ -99,6 +100,7 @@ export function createProxyHandler(deps: ProxyDeps) {
           totalBytes += result.value.byteLength
           if (totalBytes > deps.maxBodySize) {
             await reader.cancel('body too large').catch(() => {})
+            if (paymentHash) deps.reconcile(paymentHash, 0)
             return new Response(
               JSON.stringify({ error: 'Request body too large' }),
               { status: 413, headers: { 'Content-Type': 'application/json' } },
@@ -109,6 +111,8 @@ export function createProxyHandler(deps: ProxyDeps) {
         chunks.push(decoder.decode()) // flush remaining
       } catch (err) {
         await reader.cancel('body read failed').catch(() => {})
+        // Refund any pre-reserved Lightning payment on body read failure
+        if (paymentHash) deps.reconcile(paymentHash, 0)
         if (err instanceof DOMException && err.name === 'TimeoutError') {
           return new Response(
             JSON.stringify({ error: 'Request body read timed out' }),
