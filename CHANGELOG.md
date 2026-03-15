@@ -1,3 +1,15 @@
+## [1.7.8](https://github.com/TheCryptoDonkey/satgate/compare/v1.7.7...v1.7.8) (2026-03-15)
+
+
+### Bug Fixes
+
+* add absolute stream duration cap and guard capacity slot leak ([43eeceb](https://github.com/TheCryptoDonkey/satgate/commit/43eeceb4dbe6d972874746ef39bae73d2695050c))
+* guard controller.close() in timer callbacks and sanitise array elements in logger ([5d19591](https://github.com/TheCryptoDonkey/satgate/commit/5d195919d02c6cc23a9c88988ca11db39fee9850))
+* prevent facilitator redirect-based SSRF and add error handling ([633936f](https://github.com/TheCryptoDonkey/satgate/commit/633936f2fcf828ad8ea734cdb25187bbdd32cfe8))
+* reject empty credentials in allowlist auth ([d24701e](https://github.com/TheCryptoDonkey/satgate/commit/d24701ec0db747325d7f43e1e4c6ac479064dff5))
+* sanitise nested objects in JSON logger context ([b1df041](https://github.com/TheCryptoDonkey/satgate/commit/b1df0418b4ca947cd9250958427593efc180d212))
+* use canonical cwd for allowlist file containment check ([65d5ea7](https://github.com/TheCryptoDonkey/satgate/commit/65d5ea770ced9c808b3e6e8ba625defccdf83487))
+
 ## [1.7.7](https://github.com/TheCryptoDonkey/satgate/compare/v1.7.6...v1.7.7) (2026-03-15)
 
 
