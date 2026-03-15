@@ -267,6 +267,36 @@ describe('Security: /v1/models response sanitisation', () => {
   })
 })
 
+describe('Security: X402 facilitator redirect prevention', () => {
+  it('rejects facilitator that responds with redirect', async () => {
+    const { createHttpFacilitator } = await import('./x402/facilitator.js')
+
+    let facilitatorServer: ReturnType<typeof serve>
+    const app = new Hono()
+    app.post('*', (c) => {
+      return c.redirect('http://169.254.169.254/latest/meta-data/', 302)
+    })
+
+    let facilitatorUrl: string
+    await new Promise<void>((resolve) => {
+      facilitatorServer = serve({ fetch: app.fetch, port: 0 }, (info) => {
+        facilitatorUrl = `http://localhost:${info.port}`
+        resolve()
+      })
+    })
+
+    try {
+      const facilitator = createHttpFacilitator({ facilitatorUrl: facilitatorUrl! })
+      // redirect: 'error' causes fetch to throw — facilitator should not follow redirects
+      await expect(facilitator.verify({} as any)).resolves.toEqual(
+        expect.objectContaining({ valid: false }),
+      )
+    } finally {
+      facilitatorServer!.close()
+    }
+  })
+})
+
 describe('Security: X402 facilitator response validation', () => {
   it('handles facilitator returning unexpected shape', async () => {
     // This is a unit test of the validation logic — import directly

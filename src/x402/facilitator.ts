@@ -15,12 +15,18 @@ export function createHttpFacilitator(config: HttpFacilitatorConfig): X402Facili
         headers['Authorization'] = `Bearer ${config.facilitatorKey}`
       }
 
-      const res = await fetch(config.facilitatorUrl, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(10_000),
-      })
+      let res: Response
+      try {
+        res = await fetch(config.facilitatorUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(10_000),
+          redirect: 'error',
+        })
+      } catch {
+        return { valid: false, txHash: '', amount: 0, sender: '' }
+      }
 
       if (!res.ok) {
         await res.body?.cancel().catch(() => {})
