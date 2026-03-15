@@ -1,3 +1,15 @@
+## [1.7.4](https://github.com/TheCryptoDonkey/satgate/compare/v1.7.3...v1.7.4) (2026-03-15)
+
+
+### Bug Fixes
+
+* bill completion tokens for non-streaming responses, harden streaming token counting ([fa74342](https://github.com/TheCryptoDonkey/satgate/commit/fa743427916548ccd0fe566bbd33af7a4fe93091))
+* harden config validation, path-scope allowlist-file, warn on open+tunnel ([c917590](https://github.com/TheCryptoDonkey/satgate/commit/c91759020a1055ec39593e990c1d26e8f158c6b2))
+* prevent JSON log field overwrite by spreading event data before explicit fields ([a6668c5](https://github.com/TheCryptoDonkey/satgate/commit/a6668c5f12a4bff0f0c626157aa28b7d506c137c))
+* read non-streaming upstream response incrementally to enforce size limit ([2c32b2e](https://github.com/TheCryptoDonkey/satgate/commit/2c32b2e6c39e3a96d8ded3278cd59fd148b9c63d))
+* reject NIP-98 events when seen-ID cache is at capacity after pruning ([bf21b69](https://github.com/TheCryptoDonkey/satgate/commit/bf21b69f7b14a461fb0470b968bc20a00e51e4aa))
+* resolve symlinks in allowlist-file path check, add negative pricing tests ([b2b68c1](https://github.com/TheCryptoDonkey/satgate/commit/b2b68c18e1e6811a2fb4b4c0dfd2e49bb31f46d5))
+
 ## [1.7.3](https://github.com/TheCryptoDonkey/satgate/compare/v1.7.2...v1.7.3) (2026-03-14)
 
 
