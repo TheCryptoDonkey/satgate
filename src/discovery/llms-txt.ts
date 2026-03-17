@@ -4,6 +4,7 @@ export interface LlmsTxtInput {
   pricing: ModelPricing
   models: string[]
   x402?: { network: string }
+  cashu?: boolean
 }
 
 export function generateLlmsTxt(input: LlmsTxtInput): string {
@@ -16,7 +17,7 @@ export function generateLlmsTxt(input: LlmsTxtInput): string {
   return `# satgate - Lightning-paid AI inference
 
 > This endpoint provides OpenAI-compatible inference behind L402 payments.
-> Pay with Lightning or Cashu. No account required.
+> Pay with ${['Lightning', input.cashu ? 'Cashu ecash' : ''].filter(Boolean).join(' or ')}. No account required.
 
 ## Available Models
 ${modelLines.join('\n')}
@@ -28,6 +29,6 @@ Pay the invoice, then retry with the L402 credential.
 
 ## Payment
 POST /create-invoice to get a Lightning invoice.
-Supports Lightning, NWC, and Cashu.
+Supports Lightning${input.cashu ? ', Cashu ecash,' : ''} and NWC.
 ${input.x402 ? `Also accepts x402 stablecoin payments (${input.x402.network} network).\n` : ''}`
 }

@@ -12,6 +12,10 @@ export interface WellKnownInput {
     asset?: string
     facilitatorUrl?: string
   }
+  cashu?: {
+    mints: string[]
+    unit: string
+  }
 }
 
 export function generateWellKnown(input: WellKnownInput): Record<string, any> {
@@ -47,6 +51,13 @@ export function generateWellKnown(input: WellKnownInput): Record<string, any> {
     ...(input.freeTier && input.freeTier.creditsPerDay > 0 && {
       free_tier: { credits_per_day: input.freeTier.creditsPerDay },
     }),
+  }
+
+  if (input.cashu) {
+    result.payment.cashu = {
+      mints: input.cashu.mints,
+      unit: input.cashu.unit,
+    }
   }
 
   if (input.x402) {

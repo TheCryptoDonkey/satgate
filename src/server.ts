@@ -147,6 +147,7 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
       paymentMethods,
       freeTier: config.freeTier,
       x402: config.x402,
+      cashu: config.cashu ? { mints: config.cashu.mints, unit: config.cashu.unit } : undefined,
     }))
   })
 
@@ -155,6 +156,7 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
       pricing: config.pricing,
       models,
       ...(config.x402 && { x402: { network: config.x402.network } }),
+      ...(config.cashu && { cashu: true }),
     }))
   })
 
