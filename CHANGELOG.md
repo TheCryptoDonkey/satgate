@@ -1,3 +1,19 @@
+# [1.10.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.9.0...v1.10.0) (2026-03-17)
+
+
+### Bug Fixes
+
+* add missing x402 and transport deps to E2E test ([dc28029](https://github.com/TheCryptoDonkey/satgate/commit/dc28029be0b207b80a775b9d8f18e7c7c684ecc0))
+* update AuthMiddlewareConfig for cashu auth mode, revert cli.ts ([5df9738](https://github.com/TheCryptoDonkey/satgate/commit/5df9738134a02e6b610b708b4a3a57a049fc6484))
+
+
+### Features
+
+* add --cashu-mints/--cashu-unit CLI flags and Cashu Nostr announcement ([f9c1faf](https://github.com/TheCryptoDonkey/satgate/commit/f9c1fafa288ef22a6891ccf72b5c7445cecc1220))
+* add Cashu ecash config parsing and auth mode inference ([8dba32d](https://github.com/TheCryptoDonkey/satgate/commit/8dba32dbc96d07b3902ac83b9c431fc6a19e4dc2))
+* add Cashu metadata to well-known and llms.txt discovery ([91a9341](https://github.com/TheCryptoDonkey/satgate/commit/91a9341a4c45b92bfbfedc295b02aef33b229ae0))
+* wire xcashu rail, fix paymentMethods, broaden auth for Cashu ([3ca5436](https://github.com/TheCryptoDonkey/satgate/commit/3ca54366dc7b7cacdbeafc4dbbf59f08981aebc0))
+
 # [1.9.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.8.0...v1.9.0) (2026-03-15)
 
 
