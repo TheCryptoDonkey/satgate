@@ -13,6 +13,8 @@ import { SpendTracker } from '402-mcp/spend-tracker'
 import { decodeBolt11 } from '402-mcp/l402/bolt11'
 import { parseL402Challenge } from '402-mcp/l402/parse'
 import { detectServer } from '402-mcp/l402/detect'
+import { isX402Challenge, parseX402Challenge } from '402-mcp/x402/parse'
+import { formatX402PaymentRequest } from '402-mcp/x402/payment'
 
 import { memoryStorage } from '@thecryptodonkey/toll-booth/storage/memory'
 
@@ -136,6 +138,8 @@ describe('E2E: l402-mcp → satgate', () => {
     const spendTracker = new SpendTracker()
     const { payInvoice, getCallCount } = createMockPayInvoice(preimageMap)
 
+    const cache = new ChallengeCache()
+
     const result = await handleFetch(
       {
         url: `${baseUrl}/v1/chat/completions`,
@@ -150,6 +154,7 @@ describe('E2E: l402-mcp → satgate', () => {
       {
         credentialStore: credStore as any,
         fetchFn: fetch,
+        transportFetch: async (urls, init) => fetch(urls[0], init),
         payInvoice,
         maxAutoPaySats: 10_000,
         maxSpendPerMinuteSats: 100_000,
@@ -157,6 +162,12 @@ describe('E2E: l402-mcp → satgate', () => {
         parseL402: parseL402Challenge,
         decodeBolt11,
         detectServer,
+        challengeCache: cache,
+        generateQr: async () => ({ png: '', text: '' }),
+        walletMethod: () => undefined,
+        isX402: isX402Challenge,
+        parseX402: parseX402Challenge,
+        formatX402: formatX402PaymentRequest,
       },
     )
 
@@ -186,9 +197,12 @@ describe('E2E: l402-mcp → satgate', () => {
     const spendTracker = new SpendTracker()
     const { payInvoice, getCallCount } = createMockPayInvoice(preimageMap)
 
+    const cache = new ChallengeCache()
+
     const fetchDeps = {
       credentialStore: credStore as any,
       fetchFn: fetch,
+      transportFetch: async (urls: string[], init: RequestInit) => fetch(urls[0], init),
       payInvoice,
       maxAutoPaySats: 10_000,
       maxSpendPerMinuteSats: 100_000,
@@ -196,6 +210,12 @@ describe('E2E: l402-mcp → satgate', () => {
       parseL402: parseL402Challenge,
       decodeBolt11,
       detectServer,
+      challengeCache: cache,
+      generateQr: async () => ({ png: '', text: '' }),
+      walletMethod: () => undefined,
+      isX402: isX402Challenge,
+      parseX402: parseX402Challenge,
+      formatX402: formatX402PaymentRequest,
     }
 
     const body = JSON.stringify({
@@ -231,10 +251,12 @@ describe('E2E: l402-mcp → satgate', () => {
     const credStore = new InMemoryCredentialStore()
     const spendTracker = new SpendTracker()
     const { payInvoice, getCallCount } = createMockPayInvoice(preimageMap)
+    const cache = new ChallengeCache()
 
     const fetchDeps = {
       credentialStore: credStore as any,
       fetchFn: fetch,
+      transportFetch: async (urls: string[], init: RequestInit) => fetch(urls[0], init),
       payInvoice,
       maxAutoPaySats: 10_000,
       maxSpendPerMinuteSats: 100_000,
@@ -242,6 +264,12 @@ describe('E2E: l402-mcp → satgate', () => {
       parseL402: parseL402Challenge,
       decodeBolt11,
       detectServer,
+      challengeCache: cache,
+      generateQr: async () => ({ png: '', text: '' }),
+      walletMethod: () => undefined,
+      isX402: isX402Challenge,
+      parseX402: parseX402Challenge,
+      formatX402: formatX402PaymentRequest,
     }
 
     const body = JSON.stringify({
@@ -287,6 +315,7 @@ describe('E2E: l402-mcp → satgate', () => {
     const credStore = new InMemoryCredentialStore()
     const spendTracker = new SpendTracker()
     const { payInvoice, getCallCount } = createMockPayInvoice(preimageMap)
+    const cache = new ChallengeCache()
 
     const result = await handleFetch(
       {
@@ -303,6 +332,7 @@ describe('E2E: l402-mcp → satgate', () => {
       {
         credentialStore: credStore as any,
         fetchFn: fetch,
+        transportFetch: async (urls, init) => fetch(urls[0], init),
         payInvoice,
         maxAutoPaySats: 10_000,
         maxSpendPerMinuteSats: 100_000,
@@ -310,6 +340,12 @@ describe('E2E: l402-mcp → satgate', () => {
         parseL402: parseL402Challenge,
         decodeBolt11,
         detectServer,
+        challengeCache: cache,
+        generateQr: async () => ({ png: '', text: '' }),
+        walletMethod: () => undefined,
+        isX402: isX402Challenge,
+        parseX402: parseX402Challenge,
+        formatX402: formatX402PaymentRequest,
       },
     )
 
