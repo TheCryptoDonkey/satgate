@@ -6,6 +6,7 @@ import type { Context } from 'hono'
 import {
   createTollBooth,
   createX402Rail,
+  createXCashuRail,
   memoryStorage,
   sqliteStorage,
 } from '@thecryptodonkey/toll-booth'
@@ -87,6 +88,10 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
     }
   }
 
+  if (config.cashu) {
+    rails.push(createXCashuRail(config.cashu, storage))
+  }
+
   // Dual-currency pricing entry
   const pricingEntry = config.defaultPriceUsd !== undefined
     ? { sats: config.estimatedCostSats, usd: config.defaultPriceUsd }
@@ -129,7 +134,9 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
   // Discoverability endpoints (no auth required)
   const models: string[] = config.models ?? []
 
-  const paymentMethods = ['lightning', 'cashu']
+  const paymentMethods: string[] = []
+  if (config.lightning) paymentMethods.push('lightning')
+  if (config.cashu) paymentMethods.push('cashu')
   if (config.x402) paymentMethods.push('x402')
 
   app.get('/.well-known/l402', (c) => {
@@ -243,7 +250,7 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
     logger,
   })
 
-  if (config.authMode === 'lightning') {
+  if (config.authMode === 'lightning' || config.authMode === 'cashu') {
     app.use('/v1/*', tollBooth.authMiddleware)
   } else {
     const authMiddleware = createAuthMiddleware({
@@ -272,17 +279,17 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
   })
 
   app.post('/v1/chat/completions', async (c: Context<TollBoothEnv>) => {
-    const paymentHash = config.authMode === 'lightning' ? c.get('tollBoothPaymentHash') : undefined
+    const paymentHash = (config.authMode === 'lightning' || config.authMode === 'cashu') ? c.get('tollBoothPaymentHash') : undefined
     return proxyHandler(c.req.raw, paymentHash)
   })
 
   app.post('/v1/completions', async (c: Context<TollBoothEnv>) => {
-    const paymentHash = config.authMode === 'lightning' ? c.get('tollBoothPaymentHash') : undefined
+    const paymentHash = (config.authMode === 'lightning' || config.authMode === 'cashu') ? c.get('tollBoothPaymentHash') : undefined
     return proxyHandler(c.req.raw, paymentHash)
   })
 
   app.post('/v1/embeddings', async (c: Context<TollBoothEnv>) => {
-    const paymentHash = config.authMode === 'lightning' ? c.get('tollBoothPaymentHash') : undefined
+    const paymentHash = (config.authMode === 'lightning' || config.authMode === 'cashu') ? c.get('tollBoothPaymentHash') : undefined
     return proxyHandler(c.req.raw, paymentHash)
   })
 
