@@ -268,6 +268,11 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     }
     logger.info('/.well-known/l402  |  /llms.txt  |  /health')
 
+    if (config.cashu && !config.lightning) {
+      logger.warn('Cashu payments accepted but cannot be melted — no Lightning backend.')
+      logger.warn('Received ecash will be discarded. Configure --lightning to auto-melt.')
+    }
+
     if (config.authMode === 'open' && config.tunnel) {
       logger.warn('Server is publicly tunnelled with NO authentication.')
       logger.warn('Configure --lightning or --auth allowlist for production use.')

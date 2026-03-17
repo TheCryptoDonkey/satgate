@@ -7,6 +7,7 @@ import {
   createTollBooth,
   createX402Rail,
   createXCashuRail,
+  meltToLightning,
   memoryStorage,
   sqliteStorage,
 } from '@thecryptodonkey/toll-booth'
@@ -89,7 +90,30 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
   }
 
   if (config.cashu) {
-    rails.push(createXCashuRail(config.cashu, storage))
+    rails.push(createXCashuRail({
+      ...config.cashu,
+      onProofsReceived: config.backend
+        ? async (proofs, mintUrl, amount) => {
+            try {
+              const result = await meltToLightning({
+                mintUrl,
+                proofs,
+                createInvoice: async (amountSats) => {
+                  const inv = await config.backend!.createInvoice(amountSats, 'satgate cashu melt')
+                  return inv.bolt11
+                },
+              })
+              if (result.paid) {
+                logger.info(`Cashu melt: ${result.amountSats} sats from ${mintUrl}`)
+              } else {
+                logger.warn(`Cashu melt failed (${amount} sats from ${mintUrl}): ${result.error}`)
+              }
+            } catch (err) {
+              logger.warn(`Cashu melt error (${amount} sats from ${mintUrl}): ${err instanceof Error ? err.message : err}`)
+            }
+          }
+        : undefined,
+    }, storage))
   }
 
   // Dual-currency pricing entry
