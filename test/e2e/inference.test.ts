@@ -49,6 +49,12 @@ const baseConfig = {
   flatPricing: false,
   price: 0,
   tunnel: false,
+  verbose: false,
+  logFormat: 'pretty' as const,
+  serviceName: 'satgate',
+  announce: false,
+  announceRelays: [],
+  announceKey: '',
 }
 
 describe('E2E: satgate', () => {
@@ -307,6 +313,77 @@ describe('E2E: satgate', () => {
       expect(res.status).toBe(200)
       const body = await res.json()
       expect(body.choices).toBeDefined()
+    })
+  })
+
+  describe('Cashu auth mode', () => {
+    it('returns 402 with X-Cashu challenge when cashu-only', async () => {
+      const { app } = createTokenTollServer({
+        ...baseConfig,
+        upstream: upstreamUrl,
+        authMode: 'cashu' as const,
+        cashu: { mints: ['https://mint.example.com'], unit: 'sat' as const },
+      })
+
+      const res = await app.request('/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'llama3',
+          messages: [{ role: 'user', content: 'hello' }],
+        }),
+      })
+
+      expect(res.status).toBe(402)
+      const xcashu = res.headers.get('X-Cashu')
+      expect(xcashu).toBeTruthy()
+      expect(xcashu).toMatch(/^creqA/)
+    })
+
+    it('well-known includes cashu payment method when configured', async () => {
+      const { app } = createTokenTollServer({
+        ...baseConfig,
+        upstream: upstreamUrl,
+        authMode: 'cashu' as const,
+        cashu: { mints: ['https://mint.example.com'], unit: 'sat' as const },
+      })
+
+      const res = await app.request('/.well-known/l402')
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body.payment.methods).toContain('cashu')
+      expect(body.payment.cashu).toEqual({
+        mints: ['https://mint.example.com'],
+        unit: 'sat',
+      })
+    })
+
+    it('well-known does NOT include cashu when not configured', async () => {
+      const { app } = createTokenTollServer({
+        ...baseConfig,
+        upstream: upstreamUrl,
+      })
+
+      const res = await app.request('/.well-known/l402')
+      const body = await res.json()
+      expect(body.payment.methods).not.toContain('cashu')
+      expect(body.payment.cashu).toBeUndefined()
+    })
+
+    it('dual mode: well-known includes both lightning and cashu', async () => {
+      const { app } = createTokenTollServer({
+        ...baseConfig,
+        upstream: upstreamUrl,
+        authMode: 'lightning' as const,
+        lightning: 'phoenixd',
+        cashu: { mints: ['https://mint.example.com'], unit: 'sat' as const },
+      })
+
+      const res = await app.request('/.well-known/l402')
+      const body = await res.json()
+      expect(body.payment.methods).toContain('lightning')
+      expect(body.payment.methods).toContain('cashu')
+      expect(body.payment.cashu).toBeDefined()
     })
   })
 })
