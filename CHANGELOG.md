@@ -1,3 +1,10 @@
+# [1.11.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.10.0...v1.11.0) (2026-03-17)
+
+
+### Features
+
+* auto-melt Cashu ecash to operator Lightning node ([9baa006](https://github.com/TheCryptoDonkey/satgate/commit/9baa0065cd54687db4f0455aed294ed273740f2e))
+
 # [1.10.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.9.0...v1.10.0) (2026-03-17)
 
 
