@@ -2,7 +2,7 @@ import type { MiddlewareHandler } from 'hono'
 import { checkAllowlist } from './allowlist.js'
 
 export interface AuthMiddlewareConfig {
-  authMode: 'open' | 'lightning' | 'allowlist'
+  authMode: 'open' | 'lightning' | 'cashu' | 'allowlist'
   allowlist: string[]
 }
 

@@ -315,7 +315,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
             relays: config.announceRelays,
             identifier: `satgate-${new URL(publicUrl).hostname}`,
             name: `satgate @ ${publicUrl}`,
-            urls: [publicUrl],
+            url: publicUrl,
             about: `Pay-per-token AI inference — ${models.join(', ')}`,
             pricing: models.map(m => ({
               capability: m,
