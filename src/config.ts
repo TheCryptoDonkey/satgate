@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import { realpathSync } from 'node:fs'
 import { resolve, relative, dirname, basename, join } from 'node:path'
-import type { LightningBackend } from '@thecryptodonkey/toll-booth'
+import type { LightningBackend, Currency } from '@thecryptodonkey/toll-booth'
 import type { Logger } from './logger.js'
 
 export interface ModelPricing {
@@ -33,7 +33,7 @@ export interface TokenTollConfig {
   lightning?: 'phoenixd' | 'lnbits' | 'lnd' | 'cln'
   lightningUrl?: string
   lightningKey?: string
-  authMode: 'open' | 'lightning' | 'allowlist'
+  authMode: 'open' | 'lightning' | 'cashu' | 'allowlist'
   allowlist: string[]
   flatPricing: boolean
   /** Flat per-request price in sats (only used when flatPricing is true). */
@@ -48,6 +48,10 @@ export interface TokenTollConfig {
     facilitatorKey?: string
     asset?: string
     creditMode?: boolean
+  }
+  cashu?: {
+    mints: string[]
+    unit: Currency
   }
   defaultPriceUsd?: number
   verbose: boolean
@@ -92,6 +96,8 @@ export interface CliArgs {
   announceRelays?: string
   announceKey?: string
   publicUrl?: string
+  cashuMints?: string
+  cashuUnit?: string
 }
 
 export interface FileConfig {
@@ -122,6 +128,10 @@ export interface FileConfig {
     facilitatorKey?: string
     asset?: string
     creditMode?: boolean
+  }
+  cashu?: {
+    mints?: string[]
+    unit?: string
   }
   defaultPriceUsd?: number
   verbose?: boolean
@@ -332,8 +342,36 @@ export function loadConfig(
   }
   const lightningKey = args.lightningKey ?? env.LIGHTNING_KEY ?? file.lightningKey
 
+  // Cashu ecash config
+  const cashuMintsRaw = args.cashuMints ?? env.CASHU_MINTS
+  const cashuMintsFromCli = cashuMintsRaw?.split(',').filter(Boolean)
+  const cashuMints = cashuMintsFromCli ?? file.cashu?.mints
+  if (cashuMints && cashuMints.length === 0) {
+    throw new Error('Cashu config requires at least one mint URL')
+  }
+  if (cashuMints) {
+    for (const mintUrl of cashuMints) {
+      try {
+        const parsed = new URL(mintUrl)
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+          throw new Error('Cashu mint URL must use http or https')
+        }
+      } catch (e) {
+        if (e instanceof Error && e.message.includes('http or https')) throw e
+        throw new Error(`Cashu mint URL is not a valid URL: ${mintUrl}`)
+      }
+    }
+  }
+  const cashuUnitRaw = args.cashuUnit ?? env.CASHU_UNIT ?? file.cashu?.unit ?? (cashuMints ? 'sat' : undefined)
+  if (cashuUnitRaw && cashuUnitRaw !== 'sat' && cashuUnitRaw !== 'usd') {
+    throw new Error(`Invalid Cashu unit: ${cashuUnitRaw} (must be 'sat' or 'usd')`)
+  }
+  const cashu = cashuMints
+    ? { mints: cashuMints, unit: (cashuUnitRaw ?? 'sat') as Currency }
+    : undefined
+
   // Auth mode inference
-  const VALID_AUTH_MODES = ['open', 'lightning', 'allowlist'] as const
+  const VALID_AUTH_MODES = ['open', 'lightning', 'cashu', 'allowlist'] as const
   const explicitAuth = args.authMode ?? env.AUTH_MODE ?? file.auth
   if (explicitAuth && !VALID_AUTH_MODES.includes(explicitAuth as any)) {
     throw new Error(`Invalid auth mode: ${explicitAuth} (must be one of: ${VALID_AUTH_MODES.join(', ')})`)
@@ -344,8 +382,11 @@ export function loadConfig(
     if (authMode === 'lightning' && !lightning) {
       throw new Error("auth mode 'lightning' requires --lightning <backend>")
     }
+    if (authMode === 'cashu' && !cashu) {
+      throw new Error("auth mode 'cashu' requires --cashu-mints <urls>")
+    }
   } else {
-    authMode = lightning ? 'lightning' : 'open'
+    authMode = lightning ? 'lightning' : cashu ? 'cashu' : 'open'
   }
 
   // Allowlist
@@ -434,6 +475,7 @@ export function loadConfig(
     price,
     tunnel,
     x402,
+    cashu,
     defaultPriceUsd,
     verbose,
     logFormat,
