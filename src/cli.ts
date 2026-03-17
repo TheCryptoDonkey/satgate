@@ -39,6 +39,8 @@ function parseArgs(argv: string[]): CliArgs {
       case '--announce-relays': args.announceRelays = argv[++i]; break
       case '--announce-key': args.announceKey = argv[++i]; break
       case '--public-url': args.publicUrl = argv[++i]; break
+      case '--cashu-mints': args.cashuMints = argv[++i]; break
+      case '--cashu-unit': args.cashuUnit = argv[++i]; break
       case '-h': case '--help': printHelp(); process.exit(0);
       case '-v': case '--version': printVersion(); process.exit(0);
       default:
@@ -79,6 +81,10 @@ function printHelp(): void {
     --lightning <backend>      phoenixd | lnbits | lnd | cln
     --lightning-url <url>      Backend URL (defaults per backend)
     --lightning-key <secret>   Password / API key / macaroon / rune
+
+  Cashu:
+    --cashu-mints <urls>       Comma-separated accepted mint URLs
+    --cashu-unit <unit>        sat | usd (default: sat)
 
   Auth:
     --auth <mode>              open | lightning | allowlist (inferred from context)
@@ -239,9 +245,11 @@ export async function main(argv: string[] = process.argv): Promise<void> {
       : 'none (free mode)'
     const authLabel = config.authMode === 'lightning'
       ? 'lightning (pay-per-request)'
-      : config.authMode === 'allowlist'
-        ? `allowlist (${config.allowlist.length} identities)`
-        : 'open'
+      : config.authMode === 'cashu'
+        ? `cashu (${config.cashu!.mints.length} mint${config.cashu!.mints.length > 1 ? 's' : ''})`
+        : config.authMode === 'allowlist'
+          ? `allowlist (${config.allowlist.length} identities)`
+          : 'open'
     const priceLabel = config.flatPricing
       ? `${config.price} sat/request`
       : `${config.pricing.default} sat/1k tokens`
@@ -307,7 +315,9 @@ export async function main(argv: string[] = process.argv): Promise<void> {
           }
         }
 
-        const paymentMethods = ['bitcoin-lightning-bolt11']
+        const paymentMethods: string[] = []
+        if (config.lightning) paymentMethods.push('bitcoin-lightning-bolt11')
+        if (config.cashu) paymentMethods.push('bitcoin-cashu')
 
         try {
           announcement = await announceService({
@@ -316,7 +326,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
             identifier: `satgate-${new URL(publicUrl).hostname}`,
             name: `satgate @ ${publicUrl}`,
             url: publicUrl,
-            about: `Pay-per-token AI inference — ${models.join(', ')}`,
+            about: `Pay-per-token AI inference — ${models.join(', ')}${config.cashu ? ` | Cashu mints: ${config.cashu.mints.join(', ')}` : ''}`,
             pricing: models.map(m => ({
               capability: m,
               price: resolveModelPrice(config.pricing, m),
