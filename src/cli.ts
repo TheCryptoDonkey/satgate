@@ -331,7 +331,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
             relays: config.announceRelays,
             identifier: `satgate-${new URL(publicUrl).hostname}`,
             name: `satgate @ ${publicUrl}`,
-            url: publicUrl,
+            urls: [publicUrl],
             about: `Pay-per-token AI inference — ${models.join(', ')}${config.cashu ? ` | Cashu mints: ${config.cashu.mints.join(', ')}` : ''}`,
             pricing: models.map(m => ({
               capability: m,
