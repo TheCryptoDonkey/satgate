@@ -1,3 +1,10 @@
+## [1.12.1](https://github.com/TheCryptoDonkey/satgate/compare/v1.12.0...v1.12.1) (2026-03-24)
+
+
+### Bug Fixes
+
+* add explicit L402 rail for dual-scheme challenges ([4756ae4](https://github.com/TheCryptoDonkey/satgate/commit/4756ae43e572bd1e14790d4e6e8591c522274915))
+
 # [1.12.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.11.0...v1.12.0) (2026-03-24)
 
 
