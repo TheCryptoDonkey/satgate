@@ -1,3 +1,10 @@
+# [1.14.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.13.1...v1.14.0) (2026-03-24)
+
+
+### Features
+
+* redesign landing page — amber/gold terminal aesthetic ([44ae58a](https://github.com/TheCryptoDonkey/satgate/commit/44ae58a7c3629cb4cc611c232bfa7b03560510ff)), closes [#E0AC2B](https://github.com/TheCryptoDonkey/satgate/issues/E0AC2B)
+
 ## [1.13.1](https://github.com/TheCryptoDonkey/satgate/compare/v1.13.0...v1.13.1) (2026-03-24)
 
 
