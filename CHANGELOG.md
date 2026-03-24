@@ -1,3 +1,10 @@
+# [1.13.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.12.1...v1.13.0) (2026-03-24)
+
+
+### Features
+
+* dual-scheme discovery — llms.txt and .well-known/l402 ([e9d4559](https://github.com/TheCryptoDonkey/satgate/commit/e9d455949d49c21ba6aef22dc7a2a2e4c9105b3e))
+
 ## [1.12.1](https://github.com/TheCryptoDonkey/satgate/compare/v1.12.0...v1.12.1) (2026-03-24)
 
 
