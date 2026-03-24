@@ -1,3 +1,10 @@
+# [1.12.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.11.0...v1.12.0) (2026-03-24)
+
+
+### Features
+
+* upgrade to @forgesworn/toll-booth + IETF Payment auth ([150a470](https://github.com/TheCryptoDonkey/satgate/commit/150a4706f483fcaa026028ad8c85a02ecb899466))
+
 # [1.11.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.10.0...v1.11.0) (2026-03-17)
 
 
