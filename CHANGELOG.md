@@ -1,3 +1,10 @@
+## [1.14.1](https://github.com/TheCryptoDonkey/satgate/compare/v1.14.0...v1.14.1) (2026-03-24)
+
+
+### Bug Fixes
+
+* allow Google Fonts in CSP for landing page typography ([3dc4a50](https://github.com/TheCryptoDonkey/satgate/commit/3dc4a50286c03219bf49d39f35fc508a098cd16f))
+
 # [1.14.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.13.1...v1.14.0) (2026-03-24)
 
 
