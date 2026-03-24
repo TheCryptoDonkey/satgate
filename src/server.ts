@@ -8,6 +8,7 @@ import {
   createTollBooth,
   createL402Rail,
   createIETFPaymentRail,
+  createIETFSessionRail,
   createX402Rail,
   createXCashuRail,
   meltToLightning,
@@ -141,6 +142,25 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
       storage,
       serviceName: config.serviceName,
     }))
+
+    // IETF Payment session intent (deposit/bearer/top-up/close for streaming)
+    if (config.sessionIntent) {
+      const sessionRail = createIETFSessionRail({
+        hmacSecret,
+        realm: config.realm ?? 'satgate',
+        backend: config.backend,
+        storage,
+        session: {
+          maxDepositSats: config.maxSessionDepositSats,
+          maxSessionDurationMs: config.maxSessionDurationMs,
+        },
+        serviceName: config.serviceName,
+        onSessionEvent: (e) => logger.info(`session:${e.type} id=${e.sessionId} amount=${e.amountSats ?? 0} balance=${e.balanceSats ?? 0}`),
+      })
+      rails.push(sessionRail)
+      // Start auto-close sweep for expired sessions
+      sessionRail.startSweep()
+    }
   }
 
   // Dual-currency pricing entry
@@ -200,6 +220,7 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
       x402: config.x402,
       cashu: config.cashu ? { mints: config.cashu.mints, unit: config.cashu.unit } : undefined,
       ...(config.realm && { ietfPayment: { realm: config.realm } }),
+      sessionIntent: config.sessionIntent,
     }))
   })
 

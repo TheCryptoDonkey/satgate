@@ -19,6 +19,7 @@ export interface WellKnownInput {
   ietfPayment?: {
     realm: string
   }
+  sessionIntent?: boolean
 }
 
 export function generateWellKnown(input: WellKnownInput): Record<string, any> {
@@ -64,12 +65,14 @@ export function generateWellKnown(input: WellKnownInput): Record<string, any> {
   }
 
   if (input.ietfPayment) {
+    const intents = ['charge']
+    if (input.sessionIntent) intents.push('session')
     result.payment.ietf_payment = {
       scheme: 'Payment',
       draft: 'draft-ryan-httpauth-payment-01',
       realm: input.ietfPayment.realm,
       method: 'lightning',
-      intent: 'charge',
+      intent: intents.length === 1 ? intents[0] : intents,
       spec: 'https://github.com/forgesworn/payment-methods',
     }
   }

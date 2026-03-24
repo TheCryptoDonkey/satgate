@@ -61,6 +61,12 @@ export interface TokenTollConfig {
   serviceName?: string
   /** IETF Payment auth realm (e.g. 'satgate.trotters.dev'). Enables dual-scheme challenges. */
   realm?: string
+  /** Enable IETF Payment session intent (deposit/bearer/top-up/close for streaming). */
+  sessionIntent: boolean
+  /** Maximum session deposit in satoshis. Default: 100,000. */
+  maxSessionDepositSats: number
+  /** Maximum session duration in milliseconds. Default: 86,400,000 (24h). */
+  maxSessionDurationMs: number
   /** Announce service on Nostr relays for discovery. */
   announce: boolean
   /** Nostr relay URLs for service announcement. */
@@ -448,6 +454,9 @@ export function loadConfig(
 
   const serviceName = env.SATGATE_SERVICE_NAME ?? 'satgate'
   const realm = env.SATGATE_REALM ?? undefined
+  const sessionIntent = env.SATGATE_SESSION_INTENT === 'true'
+  const maxSessionDepositSats = parseInt(env.SATGATE_MAX_SESSION_DEPOSIT ?? '100000', 10)
+  const maxSessionDurationMs = parseInt(env.SATGATE_MAX_SESSION_DURATION_MS ?? '86400000', 10)
 
   // Announce
   const announce = args.announce ?? (env.ANNOUNCE === 'true' || false)
@@ -484,6 +493,9 @@ export function loadConfig(
     logFormat,
     serviceName,
     realm,
+    sessionIntent,
+    maxSessionDepositSats,
+    maxSessionDurationMs,
     announce,
     announceRelays,
     announceKey,
