@@ -199,6 +199,7 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
       freeTier: config.freeTier,
       x402: config.x402,
       cashu: config.cashu ? { mints: config.cashu.mints, unit: config.cashu.unit } : undefined,
+      ...(config.realm && { ietfPayment: { realm: config.realm } }),
     }))
   })
 
@@ -208,6 +209,7 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
       models,
       ...(config.x402 && { x402: { network: config.x402.network } }),
       ...(config.cashu && { cashu: true }),
+      ...(config.realm && { ietfPayment: true }),
     }))
   })
 

@@ -16,6 +16,9 @@ export interface WellKnownInput {
     mints: string[]
     unit: string
   }
+  ietfPayment?: {
+    realm: string
+  }
 }
 
 export function generateWellKnown(input: WellKnownInput): Record<string, any> {
@@ -57,6 +60,17 @@ export function generateWellKnown(input: WellKnownInput): Record<string, any> {
     result.payment.cashu = {
       mints: input.cashu.mints,
       unit: input.cashu.unit,
+    }
+  }
+
+  if (input.ietfPayment) {
+    result.payment.ietf_payment = {
+      scheme: 'Payment',
+      draft: 'draft-ryan-httpauth-payment-01',
+      realm: input.ietfPayment.realm,
+      method: 'lightning',
+      intent: 'charge',
+      spec: 'https://github.com/forgesworn/payment-methods',
     }
   }
 
