@@ -1,3 +1,10 @@
+## [1.13.1](https://github.com/TheCryptoDonkey/satgate/compare/v1.13.0...v1.13.1) (2026-03-24)
+
+
+### Bug Fixes
+
+* branding — OG meta tags, ForgeSworn links, IETF Payment mention ([2fa82fb](https://github.com/TheCryptoDonkey/satgate/commit/2fa82fb07a2a19e61a2bf86b4fb261f1da9d0dcf))
+
 # [1.13.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.12.1...v1.13.0) (2026-03-24)
 
 
