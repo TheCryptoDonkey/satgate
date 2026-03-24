@@ -1,3 +1,10 @@
+## [1.15.1](https://github.com/TheCryptoDonkey/satgate/compare/v1.15.0...v1.15.1) (2026-03-24)
+
+
+### Bug Fixes
+
+* announce IETF Payment pmi tag when realm is configured ([f1abb5e](https://github.com/TheCryptoDonkey/satgate/commit/f1abb5e0f3a82337a0624faf44e6742522b2f44d))
+
 # [1.15.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.14.1...v1.15.0) (2026-03-24)
 
 
