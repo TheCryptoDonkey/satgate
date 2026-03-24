@@ -320,10 +320,10 @@ export async function main(argv: string[] = process.argv): Promise<void> {
           }
         }
 
-        const paymentMethods: string[] = []
-        if (config.lightning) paymentMethods.push('bitcoin-lightning-bolt11')
-        if (config.cashu) paymentMethods.push('bitcoin-cashu')
-        if (config.realm) paymentMethods.push('payment')
+        const paymentMethods: string[][] = []
+        if (config.lightning) paymentMethods.push(['l402', 'lightning'])
+        if (config.cashu) paymentMethods.push(['cashu'])
+        if (config.realm) paymentMethods.push(['payment', 'lightning'])
 
         try {
           announcement = await announceService({
