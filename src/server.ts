@@ -6,6 +6,7 @@ import type { Context } from 'hono'
 import { createHash } from 'node:crypto'
 import {
   createTollBooth,
+  createL402Rail,
   createIETFPaymentRail,
   createX402Rail,
   createXCashuRail,
@@ -118,9 +119,18 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
     }, storage))
   }
 
-  // IETF Payment auth rail (draft-ryan-httpauth-payment-01)
-  // Enables dual-scheme challenges: L402 + Payment in every 402 response
+  // Dual-scheme: L402 + IETF Payment auth (draft-ryan-httpauth-payment-01)
+  // When both are present, every 402 response contains both challenge schemes
   if (config.backend && config.rootKey) {
+    const defaultAmount = config.tiers[0]?.amountSats ?? 1000
+    rails.push(createL402Rail({
+      rootKey: config.rootKey,
+      storage,
+      defaultAmount,
+      backend: config.backend,
+      serviceName: config.serviceName,
+    }))
+
     const hmacSecret = createHash('sha256')
       .update(`toll-booth-ietf-hmac-v1${config.rootKey}`)
       .digest('hex')
