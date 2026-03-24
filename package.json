@@ -28,7 +28,7 @@
     "node": ">=22.0.0"
   },
   "dependencies": {
-    "@forgesworn/toll-booth": "^4.2.0",
+    "@forgesworn/toll-booth": "^4.2.1",
     "@hono/node-server": "^1.0.0",
     "@noble/curves": "^2.0.1",
     "@scure/base": "^2.0.0",
