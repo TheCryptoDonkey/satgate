@@ -1,7 +1,7 @@
 // test/e2e/helpers/mock-lightning.ts
 import { createHash, randomBytes } from 'node:crypto'
 import { createRequire } from 'node:module'
-import type { LightningBackend, Invoice, InvoiceStatus } from '@thecryptodonkey/toll-booth'
+import type { LightningBackend, Invoice, InvoiceStatus } from '@forgesworn/toll-booth'
 
 const require = createRequire(import.meta.url)
 const bolt11Lib = require('bolt11') as typeof import('bolt11')

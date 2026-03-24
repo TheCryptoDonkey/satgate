@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { createLogger, createNoopLogger } from './logger.js'
-import type { PaymentEvent, RequestEvent, ChallengeEvent } from '@thecryptodonkey/toll-booth'
+import type { PaymentEvent, RequestEvent, ChallengeEvent } from '@forgesworn/toll-booth'
 
 const samplePayment: PaymentEvent = {
   timestamp: '2026-03-13T12:00:00.000Z',

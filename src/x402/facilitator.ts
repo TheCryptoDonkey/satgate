@@ -1,4 +1,4 @@
-import type { X402Facilitator, X402Payment, X402VerifyResult } from '@thecryptodonkey/toll-booth'
+import type { X402Facilitator, X402Payment, X402VerifyResult } from '@forgesworn/toll-booth'
 
 export interface HttpFacilitatorConfig {
   facilitatorUrl: string

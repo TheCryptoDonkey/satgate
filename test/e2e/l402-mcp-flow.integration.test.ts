@@ -16,7 +16,7 @@ import { detectServer } from '402-mcp/l402/detect'
 import { isX402Challenge, parseX402Challenge } from '402-mcp/x402/parse'
 import { formatX402PaymentRequest } from '402-mcp/x402/payment'
 
-import { memoryStorage } from '@thecryptodonkey/toll-booth/storage/memory'
+import { memoryStorage } from '@forgesworn/toll-booth'
 
 // Mock upstream (Ollama stand-in)
 function mockUpstream() {

@@ -3,17 +3,19 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { Hono } from 'hono'
 import type { Context } from 'hono'
+import { createHash } from 'node:crypto'
 import {
   createTollBooth,
+  createIETFPaymentRail,
   createX402Rail,
   createXCashuRail,
   meltToLightning,
   memoryStorage,
   sqliteStorage,
-} from '@thecryptodonkey/toll-booth'
-import type { PaymentRail } from '@thecryptodonkey/toll-booth'
-import { createHonoTollBooth } from '@thecryptodonkey/toll-booth/hono'
-import type { TollBoothEnv } from '@thecryptodonkey/toll-booth/hono'
+} from '@forgesworn/toll-booth'
+import type { PaymentRail } from '@forgesworn/toll-booth'
+import { createHonoTollBooth } from '@forgesworn/toll-booth/hono'
+import type { TollBoothEnv } from '@forgesworn/toll-booth/hono'
 import type { TokenTollConfig } from './config.js'
 import { createNoopLogger } from './logger.js'
 import { createAuthMiddleware } from './auth/middleware.js'
@@ -114,6 +116,21 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
           }
         : undefined,
     }, storage))
+  }
+
+  // IETF Payment auth rail (draft-ryan-httpauth-payment-01)
+  // Enables dual-scheme challenges: L402 + Payment in every 402 response
+  if (config.backend && config.rootKey) {
+    const hmacSecret = createHash('sha256')
+      .update(`toll-booth-ietf-hmac-v1${config.rootKey}`)
+      .digest('hex')
+    rails.push(createIETFPaymentRail({
+      hmacSecret,
+      realm: config.realm ?? 'satgate',
+      backend: config.backend,
+      storage,
+      serviceName: config.serviceName,
+    }))
   }
 
   // Dual-currency pricing entry

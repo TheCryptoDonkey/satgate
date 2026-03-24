@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import { realpathSync } from 'node:fs'
 import { resolve, relative, dirname, basename, join } from 'node:path'
-import type { LightningBackend, Currency } from '@thecryptodonkey/toll-booth'
+import type { LightningBackend, Currency } from '@forgesworn/toll-booth'
 import type { Logger } from './logger.js'
 
 export interface ModelPricing {
@@ -59,6 +59,8 @@ export interface TokenTollConfig {
   logger?: Logger
   /** Human-readable service name for Lightning invoice descriptions. Defaults to 'toll-booth'. */
   serviceName?: string
+  /** IETF Payment auth realm (e.g. 'satgate.trotters.dev'). Enables dual-scheme challenges. */
+  realm?: string
   /** Announce service on Nostr relays for discovery. */
   announce: boolean
   /** Nostr relay URLs for service announcement. */
@@ -445,6 +447,7 @@ export function loadConfig(
   const logFormat = logFormatRaw as 'pretty' | 'json'
 
   const serviceName = env.SATGATE_SERVICE_NAME ?? 'satgate'
+  const realm = env.SATGATE_REALM ?? undefined
 
   // Announce
   const announce = args.announce ?? (env.ANNOUNCE === 'true' || false)
@@ -480,6 +483,7 @@ export function loadConfig(
     verbose,
     logFormat,
     serviceName,
+    realm,
     announce,
     announceRelays,
     announceKey,

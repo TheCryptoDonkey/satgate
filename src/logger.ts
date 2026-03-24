@@ -1,4 +1,4 @@
-import type { PaymentEvent, RequestEvent, ChallengeEvent } from '@thecryptodonkey/toll-booth'
+import type { PaymentEvent, RequestEvent, ChallengeEvent } from '@forgesworn/toll-booth'
 
 export interface Logger {
   challenge(event: ChallengeEvent): void

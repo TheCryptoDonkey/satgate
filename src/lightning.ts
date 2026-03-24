@@ -1,10 +1,10 @@
-import type { LightningBackend } from '@thecryptodonkey/toll-booth'
+import type { LightningBackend } from '@forgesworn/toll-booth'
 import {
   phoenixdBackend,
   lnbitsBackend,
   lndBackend,
   clnBackend,
-} from '@thecryptodonkey/toll-booth'
+} from '@forgesworn/toll-booth'
 
 export interface LightningConfig {
   lightning?: string
