@@ -1,3 +1,10 @@
+# [1.15.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.14.1...v1.15.0) (2026-03-24)
+
+
+### Features
+
+* add IETF Payment session intent support ([51f3516](https://github.com/TheCryptoDonkey/satgate/commit/51f35161578262f1a7c61be3c735beb8be184074))
+
 ## [1.14.1](https://github.com/TheCryptoDonkey/satgate/compare/v1.14.0...v1.14.1) (2026-03-24)
 
 
