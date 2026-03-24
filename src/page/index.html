@@ -12,289 +12,534 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="satgate — Lightning-paid AI inference">
 <meta name="twitter:description" content="Pay-per-token AI inference over Lightning. Dual-scheme: L402 + IETF Payment standard. No accounts. Just sats.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+:root {
+  --amber: #E0AC2B;
+  --amber-bright: #F5D470;
+  --amber-glow: #E8A317;
+  --amber-dim: rgba(224, 172, 43, 0.12);
+  --amber-border: rgba(224, 172, 43, 0.3);
+  --bg: #08080A;
+  --bg-raised: #0E0E12;
+  --bg-surface: #151519;
+  --text: #EAE6DC;
+  --text-muted: #918A7E;
+  --text-dim: #5E584E;
+  --border: #1E1E24;
+  --border-light: #2A2A32;
+  --red: #E05252;
+  --green: #6ECB80;
+}
+
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: linear-gradient(135deg, #0a0a1a, #0d1525);
-  color: #e2e8f0;
+  font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  background: var(--bg);
+  color: var(--text);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 2.5rem 1rem;
+  padding: 0 1rem 2.5rem;
   line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
 }
 
-.container { max-width: 720px; width: 100%; }
+/* Subtle diagonal security-paper lines */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 14px,
+    rgba(212, 160, 32, 0.015) 14px,
+    rgba(212, 160, 32, 0.015) 15px
+  );
+  pointer-events: none;
+  z-index: 0;
+}
 
-/* Hero */
-.hero { text-align: center; margin-bottom: 2rem; }
-.hero .icon { font-size: 5rem; display: block; margin-bottom: 0.5rem; }
+/* Top accent line */
+.accent-line {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--amber), transparent);
+  z-index: 100;
+}
+
+.container {
+  max-width: 860px;
+  width: 100%;
+  position: relative;
+  z-index: 1;
+}
+
+/* === HERO === */
+.hero {
+  text-align: center;
+  padding: 4rem 0 2.5rem;
+}
+
+.hero-icon {
+  display: block;
+  margin: 0 auto 1.5rem;
+  width: 64px;
+  height: 64px;
+}
+
 .hero h1 {
-  font-size: 3rem; font-weight: 800;
-  background: linear-gradient(135deg, #06b6d4, #22d3ee);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-  background-clip: text; margin-bottom: 0.5rem;
+  font-family: 'Cormorant Garamond', 'Georgia', serif;
+  font-size: 5rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--amber);
+  text-shadow: 0 0 80px rgba(224, 172, 43, 0.3), 0 0 160px rgba(224, 172, 43, 0.1);
+  margin-bottom: 0.7rem;
+  text-transform: uppercase;
 }
-.hero .tagline { color: #94a3b8; font-size: 1.3rem; }
 
-/* Free tier chip */
+.hero .tagline {
+  color: var(--text);
+  font-size: 1.15rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+
+.hero .scheme-badge {
+  display: inline-block;
+  margin-top: 1.25rem;
+  padding: 0.4rem 1rem;
+  border: 1px solid var(--amber-border);
+  color: var(--amber-bright);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* === FREE TIER CHIP === */
 .free-chip {
-  text-align: center; margin-bottom: 1.5rem;
+  text-align: center;
+  margin-bottom: 1.25rem;
 }
 .free-chip .chip {
   display: inline-block;
-  background: rgba(6, 182, 212, 0.1);
-  border: 1px solid rgba(6, 182, 212, 0.3);
-  color: #22d3ee; padding: 0.4rem 0.9rem;
-  border-radius: 999px; font-size: 0.95rem;
-  font-family: 'SF Mono', 'Fira Code', monospace;
+  background: var(--amber-dim);
+  border: 1px solid var(--amber-border);
+  color: var(--amber-bright);
+  padding: 0.45rem 1rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
 }
 
-/* Chat area */
+/* === MODEL SELECTOR === */
+.model-selector {
+  display: flex;
+  gap: 1px;
+  margin-bottom: 1.5rem;
+  background: var(--border);
+  border: 1px solid var(--border);
+}
+.model-selector:empty {
+  display: none;
+}
+
+.model-card {
+  flex: 1;
+  padding: 1.1rem 1.4rem;
+  background: var(--bg-raised);
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+  font-family: inherit;
+  font-size: inherit;
+}
+.model-card:hover:not(:disabled) {
+  background: var(--bg-surface);
+  color: var(--text);
+}
+.model-card:disabled { opacity: 0.35; cursor: not-allowed; }
+.model-card.active {
+  background: var(--bg-surface);
+  border-bottom: 2px solid var(--amber);
+}
+.model-card .model-name {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 0.25rem;
+}
+.model-card.active .model-name { color: var(--amber-bright); }
+.model-card .model-desc {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 0.3rem;
+}
+.model-card .model-price {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* === NEW CHAT BUTTON === */
+.new-chat-btn {
+  display: none;
+  margin: 0 auto 1rem;
+  padding: 0.5rem 1.1rem;
+  font-size: 0.9rem;
+  background: transparent;
+  border: 1px solid var(--border-light);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: inherit;
+  letter-spacing: 0.04em;
+  transition: all 0.15s;
+}
+.new-chat-btn:hover {
+  border-color: var(--amber-border);
+  color: var(--amber);
+}
+
+/* === CHAT BOX === */
 .chat-box {
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 1rem;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
   overflow: hidden;
   margin-bottom: 1.25rem;
+  position: relative;
 }
+
+/* Terminal-style header */
+.chat-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.chat-header .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
 .messages {
-  padding: 1.5rem;
-  min-height: 320px;
+  padding: 1.75rem;
+  min-height: 360px;
   max-height: 60vh;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.25rem;
 }
+
+/* Custom scrollbar */
+.messages::-webkit-scrollbar { width: 4px; }
+.messages::-webkit-scrollbar-track { background: transparent; }
+.messages::-webkit-scrollbar-thumb { background: var(--border-light); }
+.messages::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
 .msg {
   max-width: 85%;
-  padding: 0.75rem 1.1rem;
-  border-radius: 0.75rem;
-  font-size: 1.1rem;
-  line-height: 1.6;
+  padding: 0.9rem 1.2rem;
+  font-size: 1.05rem;
+  line-height: 1.7;
   word-wrap: break-word;
   overflow-wrap: break-word;
   min-width: 0;
 }
 .msg.user {
   align-self: flex-end;
-  background: rgba(6, 182, 212, 0.15);
-  border: 1px solid rgba(6, 182, 212, 0.25);
-  color: #e2e8f0;
+  background: var(--amber-dim);
+  border-left: 2px solid var(--amber);
+  color: var(--text);
 }
 .msg.assistant {
   align-self: flex-start;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.1);
-  color: #cbd5e1;
+  background: rgba(255, 255, 255, 0.025);
+  border-left: 2px solid var(--border-light);
+  color: var(--text);
 }
 .msg .model-tag {
   font-size: 0.8rem;
-  color: #64748b;
+  color: var(--text-muted);
   margin-bottom: 0.3rem;
-  font-family: monospace;
+  letter-spacing: 0.04em;
 }
 .msg .thinking {
-  font-size: 0.85rem; color: #64748b; font-style: italic;
-  margin-bottom: 0.3rem; padding-bottom: 0.3rem;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  font-style: italic;
+  margin-bottom: 0.35rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--border);
 }
-.msg .thinking::before { content: 'thinking... '; color: #475569; }
+.msg .thinking::before { content: 'thinking... '; color: var(--text-dim); }
 .msg .thinking:empty { display: none; }
 
-/* Input bar */
+/* === INPUT BAR === */
 .input-bar {
-  display: flex; gap: 0.6rem;
-  padding: 0.85rem 1.1rem;
-  border-top: 1px solid rgba(255,255,255,0.06);
-  background: rgba(0,0,0,0.15);
+  display: flex;
+  gap: 0.6rem;
+  padding: 0.75rem;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
 }
 .input-bar input {
-  flex: 1; background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.1);
-  color: #e2e8f0; padding: 0.7rem 1rem;
-  border-radius: 0.5rem; font-size: 1.1rem;
-  font-family: inherit; outline: none;
+  flex: 1;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  color: var(--text);
+  padding: 0.9rem 1.15rem;
+  font-size: 1.05rem;
+  font-family: inherit;
+  outline: none;
+  letter-spacing: 0.01em;
+  transition: border-color 0.15s;
 }
-.input-bar input::placeholder { color: #475569; }
-.input-bar input:focus { border-color: rgba(6,182,212,0.4); }
+.input-bar input::placeholder { color: var(--text-dim); }
+.input-bar input:focus {
+  border-color: var(--amber-border);
+  box-shadow: 0 0 0 1px rgba(224, 172, 43, 0.15);
+}
 .input-bar button {
-  background: linear-gradient(135deg, #06b6d4, #22d3ee);
-  border: none; color: #0a0a1a; font-weight: 700;
-  padding: 0.7rem 1.5rem; border-radius: 0.5rem;
-  font-size: 1.1rem; cursor: pointer; font-family: inherit;
-}
-.input-bar button:hover { filter: brightness(1.1); }
-.input-bar button:disabled {
-  opacity: 0.5; cursor: not-allowed; filter: none;
-}
-
-/* New chat button */
-.new-chat-btn {
-  display: none;
-  margin: 0 auto 1rem;
-  padding: 0.45rem 1rem;
-  border-radius: 0.5rem;
-  font-size: 0.9rem;
-  background: transparent;
-  border: 1px solid rgba(255,255,255,0.15);
-  color: #94a3b8;
+  background: var(--amber);
+  border: none;
+  color: var(--bg);
+  font-weight: 700;
+  padding: 0.9rem 1.8rem;
+  font-size: 1rem;
   cursor: pointer;
   font-family: inherit;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition: background 0.15s;
 }
-.new-chat-btn:hover { border-color: rgba(6,182,212,0.4); color: #22d3ee; }
+.input-bar button:hover { background: var(--amber-bright); }
+.input-bar button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: var(--amber);
+}
 
-/* Status bar — inside chat-box, above input */
+/* === STATUS BAR === */
 .status-bar {
-  text-align: center; font-size: 0.85rem; color: #64748b;
-  padding: 0.4rem 1rem;
-  border-top: 1px solid rgba(255,255,255,0.04);
-  background: rgba(0,0,0,0.1);
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  padding: 0.5rem 1rem;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  letter-spacing: 0.04em;
 }
 .status-bar:empty { display: none; }
-.status-bar .free { color: #4ade80; }
-.status-bar .credit { color: #22d3ee; }
+.status-bar .free { color: var(--green); }
+.status-bar .credit { color: var(--amber-bright); }
 
-/* Payment overlay — inside chat-box, hidden by default */
+/* === PAYMENT OVERLAY === */
 .payment-overlay {
   display: none;
-  background: rgba(0,0,0,0.85);
-  border-top: 1px solid rgba(6,182,212,0.2);
-  padding: 1.75rem;
+  background: rgba(8, 8, 10, 0.95);
+  border-top: 1px solid var(--amber-border);
+  padding: 2rem 1.75rem;
   text-align: center;
 }
-.payment-overlay h3 { color: #22d3ee; margin-bottom: 0.35rem; font-size: 1.3rem; }
-.payment-overlay .sub { color: #94a3b8; font-size: 1rem; margin-bottom: 1.25rem; }
+.payment-overlay h3 {
+  color: var(--amber-bright);
+  margin-bottom: 0.4rem;
+  font-size: 1.2rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.payment-overlay .sub {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  margin-bottom: 1.25rem;
+}
+
 .qr-container {
-  width: 260px; margin: 0 auto 1.25rem;
-  background: #fff; border-radius: 0.75rem; padding: 1rem;
+  width: 240px;
+  margin: 0 auto 1.25rem;
+  background: #FAFAF8;
+  padding: 1rem;
   min-height: 80px;
 }
 .qr-container svg { width: 100%; height: auto; display: block; }
-.payment-actions { display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; margin-bottom: 0.5rem; }
+
+.payment-actions {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
 .btn-outline {
-  padding: 0.55rem 1.15rem; border-radius: 0.5rem; font-size: 1rem;
-  background: transparent; border: 1px solid rgba(6,182,212,0.4);
-  color: #22d3ee; cursor: pointer; font-family: inherit;
-}
-.btn-outline:hover { background: rgba(6,182,212,0.1); }
-.btn-solid {
-  padding: 0.55rem 1.15rem; border-radius: 0.5rem; font-size: 1rem;
-  background: linear-gradient(135deg, #06b6d4, #22d3ee);
-  border: none; color: #0a0a1a; font-weight: 600;
-  cursor: pointer; font-family: inherit;
-}
-.btn-solid:hover { filter: brightness(1.1); }
-.poll-status { color: #64748b; font-size: 0.9rem; margin-top: 0.75rem; }
-
-/* Tier selection */
-.tier-grid {
-  display: flex; flex-wrap: wrap; gap: 0.75rem;
-  margin-bottom: 1.25rem; justify-content: center; margin-top: 1rem;
-}
-.tier-btn {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 0.75rem 1.1rem; border-radius: 0.6rem;
-  background: rgba(6, 182, 212, 0.08);
-  border: 1px solid rgba(6, 182, 212, 0.25);
-  color: #e2e8f0; cursor: pointer; font-family: inherit; font-size: 1rem;
-  transition: border-color 0.15s, background 0.15s;
-}
-.tier-btn:hover { background: rgba(6, 182, 212, 0.15); border-color: rgba(6, 182, 212, 0.5); }
-.tier-btn .amount { font-weight: 700; color: #22d3ee; }
-.tier-btn .tokens { font-size: 0.85rem; color: #94a3b8; }
-.tier-btn.selected {
-  background: rgba(6, 182, 212, 0.2);
-  border-color: rgba(6, 182, 212, 0.6);
-  color: #22d3ee;
-}
-
-/* Model selector cards */
-.model-selector {
-  display: flex; gap: 0.75rem; justify-content: center; margin-bottom: 1.5rem;
-}
-.model-card {
-  flex: 1; max-width: 320px; padding: 0.9rem 1.1rem;
-  border-radius: 0.75rem;
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.1);
-  color: #94a3b8; cursor: pointer;
-  transition: all 0.15s;
-  text-align: left;
+  padding: 0.55rem 1.1rem;
+  font-size: 0.95rem;
+  background: transparent;
+  border: 1px solid var(--amber-border);
+  color: var(--amber);
+  cursor: pointer;
   font-family: inherit;
+  letter-spacing: 0.04em;
+  transition: all 0.15s;
 }
-.model-card:hover:not(:disabled) {
-  border-color: rgba(6,182,212,0.4);
-  background: rgba(255,255,255,0.05);
+.btn-outline:hover { background: var(--amber-dim); }
+.btn-solid {
+  padding: 0.55rem 1.1rem;
+  font-size: 0.95rem;
+  background: var(--amber);
+  border: none;
+  color: var(--bg);
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  letter-spacing: 0.04em;
+  transition: background 0.15s;
 }
-.model-card:disabled { opacity: 0.4; cursor: not-allowed; }
-.model-card.active {
-  background: rgba(6, 182, 212, 0.08);
-  border-color: rgba(6, 182, 212, 0.5);
-}
-.model-card .model-name {
-  font-family: 'SF Mono', 'Fira Code', monospace;
-  font-size: 1rem; font-weight: 600; color: #e2e8f0;
-  margin-bottom: 0.25rem;
-}
-.model-card.active .model-name { color: #22d3ee; }
-.model-card .model-desc {
-  font-size: 0.85rem; color: #64748b; margin-bottom: 0.35rem;
-}
-.model-card .model-price {
-  font-family: 'SF Mono', 'Fira Code', monospace;
-  font-size: 0.8rem; color: #475569;
-}
-
-/* Footer */
-.footer {
-  text-align: center; font-size: 0.9rem; color: #475569;
+.btn-solid:hover { background: var(--amber-bright); }
+.poll-status {
+  color: var(--text-muted);
+  font-size: 0.85rem;
   margin-top: 0.75rem;
 }
-.footer a { color: #64748b; text-decoration: none; }
-.footer a:hover { color: #22d3ee; }
-.footer .links {
-  display: flex; gap: 1.25rem; justify-content: center;
-  margin-top: 0.5rem; font-size: 0.85rem;
-  font-family: 'SF Mono', 'Fira Code', monospace;
+
+/* === TIER BUTTONS === */
+.tier-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  margin-bottom: 1.25rem;
+  margin-top: 1rem;
+  justify-content: center;
+  background: var(--border);
+  border: 1px solid var(--border);
+}
+.tier-btn {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.8rem 1.15rem;
+  background: var(--bg-raised);
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 1rem;
+  transition: all 0.15s;
+  gap: 0.75rem;
+}
+.tier-btn:hover {
+  background: var(--bg-surface);
+}
+.tier-btn .amount {
+  font-weight: 700;
+  color: var(--amber-bright);
+}
+.tier-btn .tokens {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+.tier-btn.selected {
+  background: var(--amber-dim);
+  color: var(--amber-bright);
 }
 
-/* Mobile */
-@media (max-width: 480px) {
-  body { padding: 1.5rem 0.75rem; }
-  .hero .icon { font-size: 3.5rem; }
-  .hero h1 { font-size: 2rem; }
-  .hero .tagline { font-size: 1.05rem; }
-  .model-selector { flex-direction: column; gap: 0.5rem; }
-  .model-card { max-width: 100%; }
-  .model-card .model-name { font-size: 0.9rem; }
+/* === FOOTER === */
+.footer {
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin-top: 0.75rem;
+  letter-spacing: 0.02em;
+}
+.footer a {
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.footer a:hover { color: var(--amber); }
+.footer .links {
+  display: flex;
+  gap: 1.5rem;
+  justify-content: center;
+  margin-top: 0.6rem;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+}
+.footer .separator {
+  color: var(--border-light);
+  margin: 0.75rem auto;
+  width: 60px;
+  height: 1px;
+  background: var(--border);
+}
+
+/* === MOBILE === */
+@media (max-width: 520px) {
+  body { padding: 0 0.75rem 2rem; }
+  .hero { padding: 2.5rem 0 1.75rem; }
+  .hero h1 { font-size: 3.2rem; }
+  .hero .tagline { font-size: 1rem; }
+  .hero .scheme-badge { font-size: 0.75rem; }
+  .model-selector { flex-direction: column; }
+  .model-card { padding: 0.9rem 1.1rem; }
+  .model-card .model-name { font-size: 1rem; }
   .model-card .model-desc { font-size: 0.8rem; }
-  .msg { font-size: 0.95rem; }
-  .input-bar { gap: 0.4rem; padding: 0.65rem 0.7rem; }
-  .input-bar input { font-size: 0.95rem; padding: 0.6rem 0.75rem; }
-  .input-bar button { font-size: 0.95rem; padding: 0.6rem 1rem; }
-  .messages { min-height: 240px; padding: 1rem; }
-  .status-bar { font-size: 0.85rem; }
+  .msg { font-size: 1rem; }
+  .input-bar { padding: 0.6rem; gap: 0.5rem; }
+  .input-bar input { font-size: 1rem; padding: 0.8rem 0.9rem; }
+  .input-bar button { font-size: 0.95rem; padding: 0.8rem 1.1rem; }
+  .messages { min-height: 260px; padding: 1.25rem; }
   .payment-overlay h3 { font-size: 1.1rem; }
-  .qr-container { width: 180px; }
-  .tier-grid { max-width: 100%; }
-  .tier-btn { font-size: 0.9rem; padding: 0.6rem 0.9rem; }
+  .qr-container { width: 200px; }
+  .tier-grid { flex-direction: column; }
+  .tier-btn { font-size: 0.95rem; }
   .footer .links { flex-wrap: wrap; gap: 0.75rem; }
+  .chat-header { font-size: 0.75rem; }
+  .free-chip .chip { font-size: 0.9rem; }
+  .status-bar { font-size: 0.85rem; }
 }
 </style>
 </head>
 <body>
+
+<div class="accent-line"></div>
+
 <div class="container">
 
   <!-- HERO -->
   <div class="hero">
-    <span class="icon">&#x1F6F8;</span>
-    <h1>satgate</h1>
+    <svg class="hero-icon" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M32 4L12 30h14L22 52l24-30H30L38 4H32z" fill="none" stroke="#D4A020" stroke-width="2.5" stroke-linejoin="round"/>
+      <path d="M32 4L12 30h14L22 52l24-30H30L38 4H32z" fill="rgba(212,160,32,0.08)"/>
+    </svg>
+    <h1>Satgate</h1>
     <p class="tagline">Pay-per-token AI inference. No accounts. Just sats.</p>
+    <div class="scheme-badge">Dual-scheme: L402 + IETF Payment</div>
   </div>
 
   <!-- MODEL SELECTOR (populated by JS) -->
@@ -308,6 +553,10 @@ body {
 
   <!-- CHAT BOX -->
   <div class="chat-box">
+    <div class="chat-header">
+      <span class="dot"></span>
+      <span>session active</span>
+    </div>
     <div id="messages" class="messages"></div>
     <div id="payment-overlay" class="payment-overlay"></div>
     <div id="status-bar" class="status-bar"></div>
@@ -319,7 +568,8 @@ body {
 
   <!-- FOOTER -->
   <div class="footer">
-    <p>Powered by <a href="https://github.com/forgesworn/toll-booth" target="_blank">toll-booth</a> &#x2014; L402 + <a href="https://github.com/forgesworn/payment-methods" target="_blank">IETF Payment</a> dual-scheme</p>
+    <p>Powered by <a href="https://github.com/forgesworn/toll-booth" target="_blank">toll-booth</a> &#x2014; L402 + <a href="https://github.com/forgesworn/payment-methods" target="_blank">IETF Payment</a></p>
+    <div class="separator"></div>
     <div class="links">
       <a href="https://github.com/TheCryptoDonkey/satgate" target="_blank">GitHub</a>
       <a href="/.well-known/l402">/.well-known/l402</a>
@@ -421,7 +671,7 @@ body {
   }
 
   function makeErrorSpan(text) {
-    return el('span', { style: 'color:#f87171', textContent: text });
+    return el('span', { style: 'color:#E05252', textContent: text });
   }
 
   function makeStatusSpan(cls, text) {
@@ -816,12 +1066,12 @@ body {
     var customInput = el('input', {
       type: 'number',
       placeholder: 'Custom sats',
-      style: 'width:90px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:#e2e8f0;padding:0.3rem 0.5rem;border-radius:0.4rem;font-size:0.9rem;font-family:inherit;outline:none;-moz-appearance:textfield;',
+      style: 'width:90px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#D4CFC4;padding:0.3rem 0.5rem;font-size:0.8rem;font-family:inherit;outline:none;-moz-appearance:textfield;',
     });
     var customGo = el('button', {
       className: 'btn-outline',
       textContent: 'Go',
-      style: 'padding:0.3rem 0.7rem;font-size:0.85rem;',
+      style: 'padding:0.3rem 0.7rem;font-size:0.75rem;',
     });
     var doCustom = function() {
       var amt = parseInt(customInput.value, 10);
