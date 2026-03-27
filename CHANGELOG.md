@@ -1,3 +1,12 @@
+## [1.15.2](https://github.com/TheCryptoDonkey/satgate/compare/v1.15.1...v1.15.2) (2026-03-27)
+
+
+### Bug Fixes
+
+* correct type mismatches in 402-announce service call ([4d76482](https://github.com/TheCryptoDonkey/satgate/commit/4d764827509927d534852da39c6fda3c232f470c))
+* update 402-announce call to v2 API (url → urls array) ([529683c](https://github.com/TheCryptoDonkey/satgate/commit/529683cb888eef167d19fb9c4699d171e78739db))
+* update paymentMethods to 402-announce v2 array format ([7df22a6](https://github.com/TheCryptoDonkey/satgate/commit/7df22a63c36204f27ed3f620596fa16689d730a4))
+
 ## [1.15.1](https://github.com/TheCryptoDonkey/satgate/compare/v1.15.0...v1.15.1) (2026-03-24)
 
 
