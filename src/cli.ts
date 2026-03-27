@@ -320,10 +320,10 @@ export async function main(argv: string[] = process.argv): Promise<void> {
           }
         }
 
-        const paymentMethods: string[][] = []
-        if (config.lightning) paymentMethods.push(['l402', 'lightning'])
-        if (config.cashu) paymentMethods.push(['cashu'])
-        if (config.realm) paymentMethods.push(['payment', 'lightning'])
+        const paymentMethods: string[] = []
+        if (config.lightning) paymentMethods.push('l402', 'lightning')
+        if (config.cashu) paymentMethods.push('cashu')
+        if (config.realm) paymentMethods.push('payment', 'lightning')
 
         try {
           announcement = await announceService({
@@ -331,7 +331,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
             relays: config.announceRelays,
             identifier: `satgate-${new URL(publicUrl).hostname}`,
             name: `satgate @ ${publicUrl}`,
-            urls: [publicUrl],
+            url: publicUrl,
             about: `Pay-per-token AI inference — ${models.join(', ')}${config.cashu ? ` | Cashu mints: ${config.cashu.mints.join(', ')}` : ''}`,
             pricing: models.map(m => ({
               capability: m,
