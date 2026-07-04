@@ -210,7 +210,7 @@ npx satgate --upstream http://your-vllm-server:8000
 
 Built by [@TheCryptoDonkey](https://github.com/TheCryptoDonkey).
 
-- Lightning tips: `thedonkey@strike.me`
+- Lightning tips: `profusemeat89@walletofsatoshi.com`
 - Nostr: `npub1mgvlrnf5hm9yf0n5mf9nqmvarhvxkc6remu5ec3vf8r0txqkuk7su0e7q2`
 
 ---
