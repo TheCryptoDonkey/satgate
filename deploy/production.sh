@@ -98,7 +98,17 @@ fi
 ANNOUNCE_KEY_FILE="$RUNTIME_DIR/.announce-key"
 if [[ ! -f "$ANNOUNCE_KEY_FILE" ]]; then
   if [[ -f "$RUNTIME_DIR/data/announce.key" ]]; then
-    CURRENT_ANNOUNCE_KEY="$(tr -d '[:space:]' <"$RUNTIME_DIR/data/announce.key")"
+    if [[ -r "$RUNTIME_DIR/data/announce.key" ]]; then
+      CURRENT_ANNOUNCE_KEY="$(tr -d '[:space:]' <"$RUNTIME_DIR/data/announce.key")"
+    elif docker container inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
+      CURRENT_ANNOUNCE_KEY="$(
+        docker exec "$CONTAINER_NAME" sh -c \
+          "cat /home/satgate/.satgate/announce.key" | tr -d '[:space:]'
+      )"
+    else
+      echo "Persisted announcement key is not readable and no running deployment can recover it" >&2
+      exit 1
+    fi
     if [[ ! "$CURRENT_ANNOUNCE_KEY" =~ ^[0-9a-f]{64}$ ]]; then
       echo "Existing persisted announcement key is invalid; refusing identity replacement" >&2
       exit 1

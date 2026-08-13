@@ -27,6 +27,7 @@ describe('production Satgate deployment', () => {
     expect(source).toContain('--env-file')
     expect(source).toContain('.announce-key')
     expect(source).toContain('data/announce.key')
+    expect(source).toContain('/home/satgate/.satgate/announce.key')
     expect(source).toContain('deployed-commit')
     expect(source).toContain('rollback')
     expect(source).toContain('http-password-limited-access')
