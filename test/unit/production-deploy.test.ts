@@ -24,6 +24,7 @@ describe('production Satgate deployment', () => {
   it('pins deployment, persists identity, and records proof', () => {
     expect(source).toContain('refs/tags/$DEPLOY_REF^{commit}')
     expect(source).toContain('worktree add --detach')
+    expect(source).toContain('if [[ ! -d "$RUNTIME_DIR/data" ]]')
     expect(source).toContain('--env-file')
     expect(source).toContain('.announce-key')
     expect(source).toContain('data/announce.key')
