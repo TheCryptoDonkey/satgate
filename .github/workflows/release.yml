@@ -1,0 +1,44 @@
+name: release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish
+        type: string
+        required: true
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  release:
+    uses: forgesworn/anvil/.github/workflows/release.yml@d4294e622932d93957d73e5b1af0267382b6af04 # v0.10.1
+    with:
+      tag: ${{ inputs.tag || '' }}
+      test-command: npm run test:release
+      strict-action-pins: true
+      lifecycle-scripts-policy: strict
+      reproducibility-mode: strict
+
+  deploy:
+    needs: release
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    env:
+      DEPLOY_REF: ${{ inputs.tag || github.event.release.tag_name }}
+    steps:
+      - name: Deploy satgate production service
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        with:
+          host: 95.217.39.110
+          username: deploy
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          # drone-ssh's Go client negotiates this host's ECDSA key first.
+          fingerprint: SHA256:2LOW4yEepg8esCvpx3ddiN4c73V++MujSyPT+cDrNow
+          envs: DEPLOY_REF
+          script: /opt/satgate/deploy.sh

@@ -17,9 +17,11 @@
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
+    "test:release": "npm run check:publish-dependencies && npm test",
+    "check:publish-dependencies": "node scripts/check-publish-dependencies.mjs",
     "typecheck": "tsc --noEmit",
     "dev": "tsx src/cli.ts",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run check:publish-dependencies && npm run typecheck && npm test && npm run build"
   },
   "files": [
     "dist"
@@ -27,27 +29,26 @@
   "engines": {
     "node": ">=22.0.0"
   },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "dependencies": {
-    "@forgesworn/toll-booth": "^4.4.0",
-    "@hono/node-server": "^1.0.0",
+    "@forgesworn/toll-booth": "6.0.1",
+    "@hono/node-server": "^2.0.12",
     "@noble/curves": "^2.0.1",
     "@scure/base": "^2.0.0",
-    "402-announce": "^1.1.2",
-    "hono": "^4.0.0",
-    "js-yaml": "^4.1.1"
+    "402-announce": "^2.1.1",
+    "hono": "^4.13.1",
+    "js-yaml": "^4.3.1"
   },
   "devDependencies": {
-    "@semantic-release/changelog": "^6.0.3",
-    "@semantic-release/git": "^10.0.1",
-    "@semantic-release/github": "^12.0.6",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^25.5.0",
-    "402-mcp": "file:../402-mcp",
-    "bolt11": "^1.4.1",
-    "semantic-release": "^25.0.3",
-    "tsx": "^4.0.0",
-    "typescript": "^5.8.0",
-    "vitest": "^3.1.0"
+    "402-mcp": "4.0.0",
+    "tsx": "^4.23.10",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.0"
   },
   "keywords": [
     "lightning",

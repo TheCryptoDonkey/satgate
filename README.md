@@ -131,7 +131,9 @@ graph TB
 - **Streaming reconciliation** — estimated charge upfront, reconciled to actual usage after. Overpayments credited back.
 - **Capacity management** — limit concurrent inference requests to protect your GPU.
 - **Auto-detect models** — queries your upstream on startup. No manual model list.
-- **Four payment rails** — Lightning, Cashu ecash, NWC, and x402 stablecoins. Operator picks what to accept.
+- **Three server-side payment rails** — Lightning, Cashu ecash, and x402
+  stablecoins. NWC stays on the client side, where an agent can connect its own
+  wallet through 402-mcp without disclosing wallet credentials to satgate.
 - **Privacy by design** — no personal data collected or stored. No accounts, no cookies, no IP logging. GDPR-safe out of the box.
 - **Instant public URL** — auto-spawns a Cloudflare tunnel. Your GPU is reachable from the internet in seconds.
 
@@ -190,6 +192,26 @@ The [`examples/`](examples/) directory contains runnable scripts and config temp
 - **[client.sh](examples/client.sh)** — discovery and inference requests against a running instance
 - **[production.yaml](examples/production.yaml)** — production config template with SQLite, per-model pricing, volume tiers
 - **[caddy-reverse-proxy.Caddyfile](examples/caddy-reverse-proxy.Caddyfile)** — Caddyfile for TLS termination
+
+### Release deployment
+
+[`deploy/production.sh`](deploy/production.sh) is the canonical server-side
+deploy script. It accepts only an exact release tag through `DEPLOY_REF`, builds
+that tag in an isolated Git worktree, refuses missing Lightning credentials,
+persists the Nostr announcement identity, rolls back failed containers, and
+records the deployed tag and commit.
+
+The server-local `/opt/satgate/deploy.conf` contains non-secret runtime identity
+and the models provisioned by the operator:
+
+```dotenv
+PUBLIC_URL=https://service.example.com
+ANNOUNCE_RELAYS=wss://relay.example.com,wss://relay2.example.com
+OLLAMA_MODELS=qwen3:0.6b,gemma3:4b
+```
+
+The script deliberately refuses to install mutable model images or use a
+hard-coded credential fallback during an application deployment.
 
 ---
 
