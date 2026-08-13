@@ -1,0 +1,13 @@
+name: auto-release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  auto-release:
+    uses: forgesworn/anvil/.github/workflows/auto-release.yml@d4294e622932d93957d73e5b1af0267382b6af04 # v0.10.1

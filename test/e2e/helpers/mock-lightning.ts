@@ -1,13 +1,21 @@
 // test/e2e/helpers/mock-lightning.ts
 import { createHash, randomBytes } from 'node:crypto'
-import { createRequire } from 'node:module'
+import { bech32 } from '@scure/base'
 import type { LightningBackend, Invoice, InvoiceStatus } from '@forgesworn/toll-booth'
 
-const require = createRequire(import.meta.url)
-const bolt11Lib = require('bolt11') as typeof import('bolt11')
+function numberWords(value: number): number[] {
+  const words: number[] = []
+  let remaining = BigInt(value)
+  do {
+    words.unshift(Number(remaining % 32n))
+    remaining /= 32n
+  } while (remaining > 0n)
+  return words
+}
 
-// Fixed test-only private key (not a real node, just needs valid BOLT11 signatures)
-const TEST_PRIVATE_KEY = randomBytes(32)
+function taggedField(type: number, words: number[]): number[] {
+  return [type, Math.floor(words.length / 32), words.length % 32, ...words]
+}
 
 function encodeBolt11(opts: {
   paymentHash: string
@@ -15,18 +23,24 @@ function encodeBolt11(opts: {
   expiry: number
   description?: string
 }): string {
-  const encoded = bolt11Lib.encode({
-    satoshis: opts.amountSats,
-    timestamp: Math.floor(Date.now() / 1000),
-    tags: [
-      { tagName: 'payment_hash', data: opts.paymentHash },
-      { tagName: 'description', data: opts.description ?? 'satgate test invoice' },
-      { tagName: 'expire_time', data: opts.expiry },
-    ],
-  })
-  const signed = bolt11Lib.sign(encoded, TEST_PRIVATE_KEY)
-  if (!signed.paymentRequest) throw new Error('bolt11 sign failed to produce paymentRequest')
-  return signed.paymentRequest
+  const timestamp = Math.floor(Date.now() / 1000)
+  const timestampWords = Array.from({ length: 7 }, (_, index) =>
+    Number((BigInt(timestamp) >> BigInt((6 - index) * 5)) & 31n),
+  )
+  const paymentHashWords = bech32.toWords(Uint8Array.from(Buffer.from(opts.paymentHash, 'hex')))
+  const descriptionWords = bech32.toWords(new TextEncoder().encode(opts.description ?? 'satgate test invoice'))
+  const data = [
+    ...timestampWords,
+    ...taggedField(1, paymentHashWords),
+    ...taggedField(13, descriptionWords),
+    ...taggedField(6, numberWords(opts.expiry)),
+    ...Array<number>(104).fill(0),
+  ]
+
+  // The settlement path decodes and validates invoice commitments but does not
+  // verify the payee signature. A zeroed signature keeps this fixture small and
+  // deterministic without pulling a vulnerable signing package into the suite.
+  return bech32.encode(`lnbc${opts.amountSats * 10}n`, data, 5_000)
 }
 
 export interface MockLightningResult {

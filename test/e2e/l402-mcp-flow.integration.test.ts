@@ -15,6 +15,9 @@ import { parseL402Challenge } from '402-mcp/l402/parse'
 import { detectServer } from '402-mcp/l402/detect'
 import { isX402Challenge, parseX402Challenge } from '402-mcp/x402/parse'
 import { formatX402PaymentRequest } from '402-mcp/x402/payment'
+import { isXCashuChallenge, parseXCashuChallenge } from '402-mcp/xcashu/parse'
+import { isIETFPaymentChallenge, parseIETFPaymentChallenge } from '402-mcp/ietf-payment/parse'
+import { buildIETFPaymentCredential } from '402-mcp/ietf-payment/credential'
 
 import { memoryStorage } from '@forgesworn/toll-booth'
 
@@ -46,6 +49,17 @@ function mockUpstream() {
 }
 
 const rootKey = 'a'.repeat(64)
+
+function additionalPaymentDeps(preferIETFPayment = true) {
+  return {
+    isXCashu: isXCashuChallenge,
+    parseXCashu: parseXCashuChallenge,
+    payXCashu: async () => null,
+    isIETFPayment: preferIETFPayment ? isIETFPaymentChallenge : () => false,
+    parseIETFPayment: parseIETFPaymentChallenge,
+    buildIETFCredential: buildIETFPaymentCredential,
+  }
+}
 
 describe('E2E: l402-mcp → satgate', () => {
   let upstreamServer: ReturnType<typeof serve>
@@ -168,6 +182,7 @@ describe('E2E: l402-mcp → satgate', () => {
         isX402: isX402Challenge,
         parseX402: parseX402Challenge,
         formatX402: formatX402PaymentRequest,
+        ...additionalPaymentDeps(),
       },
     )
 
@@ -177,18 +192,18 @@ describe('E2E: l402-mcp → satgate', () => {
     expect(getCallCount()).toBe(1)
     expect(data.status).toBe(200)
     expect(data.satsPaid).toBeGreaterThan(0)
+    expect(data.paymentMethod).toBe('ietf-payment')
 
     // Got a real completion
     const body = JSON.parse(data.body)
     expect(body.choices[0].message.content).toBe('Hello from satgate!')
     expect(body.usage.total_tokens).toBe(15)
 
-    // Credential stored (server is null because detectServer sees 'generic' —
-    // toll-booth doesn't set x-powered-by header)
+    // IETF Payment charge credentials are bound to one request rather than
+    // stored as reusable L402 credit credentials.
     const origin = new URL(baseUrl).origin
     const cred = credStore.get(origin)
-    expect(cred).toBeDefined()
-    expect(cred!.server).toBeNull()
+    expect(cred).toBeUndefined()
   })
 
   // Scenario 3: Credential reuse
@@ -216,6 +231,9 @@ describe('E2E: l402-mcp → satgate', () => {
       isX402: isX402Challenge,
       parseX402: parseX402Challenge,
       formatX402: formatX402PaymentRequest,
+      // This scenario deliberately selects L402 to verify reusable credits on
+      // a dual-scheme Satgate challenge.
+      ...additionalPaymentDeps(false),
     }
 
     const body = JSON.stringify({
@@ -270,6 +288,8 @@ describe('E2E: l402-mcp → satgate', () => {
       isX402: isX402Challenge,
       parseX402: parseX402Challenge,
       formatX402: formatX402PaymentRequest,
+      // Credit exhaustion is an L402 stored-credit behaviour.
+      ...additionalPaymentDeps(false),
     }
 
     const body = JSON.stringify({
@@ -346,12 +366,14 @@ describe('E2E: l402-mcp → satgate', () => {
         isX402: isX402Challenge,
         parseX402: parseX402Challenge,
         formatX402: formatX402PaymentRequest,
+        ...additionalPaymentDeps(),
       },
     )
 
     const data = JSON.parse(result.content[0].text)
     expect(data.status).toBe(200)
     expect(getCallCount()).toBe(1)
+    expect(data.paymentMethod).toBe('ietf-payment')
 
     // handleFetch buffers the response via response.text()
     expect(data.body).toContain('data:')
