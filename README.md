@@ -193,6 +193,26 @@ The [`examples/`](examples/) directory contains runnable scripts and config temp
 - **[production.yaml](examples/production.yaml)** — production config template with SQLite, per-model pricing, volume tiers
 - **[caddy-reverse-proxy.Caddyfile](examples/caddy-reverse-proxy.Caddyfile)** — Caddyfile for TLS termination
 
+### Release deployment
+
+[`deploy/production.sh`](deploy/production.sh) is the canonical server-side
+deploy script. It accepts only an exact release tag through `DEPLOY_REF`, builds
+that tag in an isolated Git worktree, refuses missing Lightning credentials,
+persists the Nostr announcement identity, rolls back failed containers, and
+records the deployed tag and commit.
+
+The server-local `/opt/satgate/deploy.conf` contains non-secret runtime identity
+and the models provisioned by the operator:
+
+```dotenv
+PUBLIC_URL=https://service.example.com
+ANNOUNCE_RELAYS=wss://relay.example.com,wss://relay2.example.com
+OLLAMA_MODELS=qwen3:0.6b,gemma3:4b
+```
+
+The script deliberately refuses to install mutable model images or use a
+hard-coded credential fallback during an application deployment.
+
 ---
 
 ## Get started
