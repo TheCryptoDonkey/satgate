@@ -34,7 +34,7 @@
     "provenance": true
   },
   "dependencies": {
-    "@forgesworn/toll-booth": "file:../toll-booth",
+    "@forgesworn/toll-booth": "6.0.1",
     "@hono/node-server": "^2.0.12",
     "@noble/curves": "^2.0.1",
     "@scure/base": "^2.0.0",
@@ -45,7 +45,7 @@
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^25.5.0",
-    "402-mcp": "file:../402-mcp",
+    "402-mcp": "4.0.0",
     "tsx": "^4.23.10",
     "typescript": "^6.0.2",
     "vitest": "^4.1.0"
