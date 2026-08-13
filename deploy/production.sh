@@ -62,19 +62,31 @@ else
   git -C "$SOURCE_REPO" worktree add --detach "$RELEASE_DIR" "$DEPLOY_COMMIT"
 fi
 
-PHOENIXD_PASSWORD="$(
+PHOENIXD_LIMITED_PASSWORD="$(
   docker exec "$PHOENIXD_CONTAINER" sh -c \
-    "sed -n 's/^http-password=//p' /phoenix/.phoenix/phoenix.conf" |
+    "sed -n 's/^http-password-limited-access=//p' /phoenix/.phoenix/phoenix.conf" |
     head -n 1 | tr -d '[:space:]'
 )"
-if [[ ! "$PHOENIXD_PASSWORD" =~ ^[A-Za-z0-9_-]{32,256}$ ]]; then
-  echo "Could not read a valid Phoenixd password; refusing fallback" >&2
+if [[ ! "$PHOENIXD_LIMITED_PASSWORD" =~ ^[A-Za-z0-9_-]{32,256}$ ]]; then
+  echo "Could not read a valid limited-access Phoenixd password; refusing fallback" >&2
   exit 1
 fi
 
 ROOT_KEY_FILE="$RUNTIME_DIR/.root-key"
 if [[ ! -f "$ROOT_KEY_FILE" ]]; then
-  openssl rand -hex 32 >"$ROOT_KEY_FILE"
+  if docker container inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
+    CURRENT_ROOT_KEY="$(
+      docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$CONTAINER_NAME" |
+        sed -n 's/^ROOT_KEY=//p' | head -n 1 | tr -d '[:space:]'
+    )"
+    if [[ ! "$CURRENT_ROOT_KEY" =~ ^[0-9a-f]{64}$ ]]; then
+      echo "Existing deployment has no recoverable macaroon root key; refusing identity replacement" >&2
+      exit 1
+    fi
+    printf '%s\n' "$CURRENT_ROOT_KEY" >"$ROOT_KEY_FILE"
+  else
+    openssl rand -hex 32 >"$ROOT_KEY_FILE"
+  fi
   chmod 600 "$ROOT_KEY_FILE"
 fi
 ROOT_KEY="$(tr -d '[:space:]' <"$ROOT_KEY_FILE")"
@@ -85,7 +97,26 @@ fi
 
 ANNOUNCE_KEY_FILE="$RUNTIME_DIR/.announce-key"
 if [[ ! -f "$ANNOUNCE_KEY_FILE" ]]; then
-  openssl rand -hex 32 >"$ANNOUNCE_KEY_FILE"
+  if [[ -f "$RUNTIME_DIR/data/announce.key" ]]; then
+    CURRENT_ANNOUNCE_KEY="$(tr -d '[:space:]' <"$RUNTIME_DIR/data/announce.key")"
+    if [[ ! "$CURRENT_ANNOUNCE_KEY" =~ ^[0-9a-f]{64}$ ]]; then
+      echo "Existing persisted announcement key is invalid; refusing identity replacement" >&2
+      exit 1
+    fi
+    printf '%s\n' "$CURRENT_ANNOUNCE_KEY" >"$ANNOUNCE_KEY_FILE"
+  elif docker container inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
+    CURRENT_ANNOUNCE_KEY="$(
+      docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$CONTAINER_NAME" |
+        sed -n 's/^ANNOUNCE_KEY=//p' | head -n 1 | tr -d '[:space:]'
+    )"
+    if [[ ! "$CURRENT_ANNOUNCE_KEY" =~ ^[0-9a-f]{64}$ ]]; then
+      echo "Existing deployment has no recoverable announcement key; refusing identity replacement" >&2
+      exit 1
+    fi
+    printf '%s\n' "$CURRENT_ANNOUNCE_KEY" >"$ANNOUNCE_KEY_FILE"
+  else
+    openssl rand -hex 32 >"$ANNOUNCE_KEY_FILE"
+  fi
   chmod 600 "$ANNOUNCE_KEY_FILE"
 fi
 ANNOUNCE_KEY="$(tr -d '[:space:]' <"$ANNOUNCE_KEY_FILE")"
@@ -128,7 +159,7 @@ trap 'rm -f "$ENV_FILE"' EXIT
   printf 'UPSTREAM_URL=http://127.0.0.1:11434\n'
   printf 'LIGHTNING_BACKEND=phoenixd\n'
   printf 'LIGHTNING_URL=http://127.0.0.1:9740\n'
-  printf 'LIGHTNING_KEY=%s\n' "$PHOENIXD_PASSWORD"
+  printf 'LIGHTNING_KEY=%s\n' "$PHOENIXD_LIMITED_PASSWORD"
   printf 'PORT=3002\n'
   printf 'ROOT_KEY=%s\n' "$ROOT_KEY"
   printf 'SATGATE_TOKEN_PRICE=5\n'
