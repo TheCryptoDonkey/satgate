@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 const scriptPath = fileURLToPath(new URL('../../deploy/production.sh', import.meta.url))
 const source = readFileSync(scriptPath, 'utf8')
+const dockerfile = readFileSync(fileURLToPath(new URL('../../Dockerfile', import.meta.url)), 'utf8')
 
 describe('production Satgate deployment', () => {
   it('has valid Bash syntax', () => {
@@ -36,5 +37,13 @@ describe('production Satgate deployment', () => {
     expect(source).not.toMatch(/s\/\^http-password=\/\/p/)
     expect(source).not.toContain('origin/main')
     expect(source).not.toMatch(/\|\|\s*echo\s+[0-9a-f]{32,}/)
+  })
+
+  it('uses lockfile-strict Docker installs', () => {
+    expect(dockerfile).toContain('RUN npm ci')
+    expect(dockerfile).toContain('RUN npm prune --omit=dev')
+    expect(dockerfile).toContain('COPY --from=build /build/node_modules/ ./node_modules/')
+    expect(dockerfile).not.toContain('RUN npm install')
+    expect(dockerfile).not.toContain('file: dev dependency')
   })
 })
