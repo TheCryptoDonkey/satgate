@@ -1,6 +1,6 @@
 {
   "name": "satgate",
-  "version": "1.15.4",
+  "version": "1.15.5",
   "description": "Lightning-paid AI inference - monetise any OpenAI-compatible endpoint in 30 seconds",
   "type": "module",
   "main": "./dist/src/index.js",
@@ -67,6 +67,20 @@
     "vllm"
   ],
   "license": "MIT",
+  "funding": [
+    {
+      "type": "individual",
+      "url": "https://github.com/sponsors/TheCryptoDonkey"
+    },
+    {
+      "type": "individual",
+      "url": "https://ko-fi.com/brays"
+    },
+    {
+      "type": "individual",
+      "url": "https://geyser.fund/project/forgesworn"
+    }
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/TheCryptoDonkey/satgate"
