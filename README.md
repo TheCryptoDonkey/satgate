@@ -213,6 +213,16 @@ OLLAMA_MODELS=qwen3:0.6b,gemma3:4b
 The script deliberately refuses to install mutable model images or use a
 hard-coded credential fallback during an application deployment.
 
+### Production acceptance
+
+The public deployment completed a controlled mainnet L402 acceptance on
+14 August 2026: one 10-sat invoice, a 1-sat payer routing fee, cryptographically
+verified settlement, and an HTTP 200 paid inference response. The receiver
+recorded the same 10 sats and the Lightning channel remained `Normal`.
+
+See the [full acceptance record](https://github.com/TheCryptoDonkey/satgate/blob/main/docs/acceptance/2026-08-14-mainnet-l402.md),
+including the safety envelope and the limits of what this single run proves.
+
 ---
 
 ## Get started
