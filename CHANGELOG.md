@@ -1,3 +1,10 @@
+## [1.15.5](https://github.com/TheCryptoDonkey/satgate/compare/v1.15.4...v1.15.5) (2026-08-14)
+
+### Documentation and metadata
+
+* correct canonical ForgeSworn links for toll-booth and 402-mcp
+* add npm funding metadata for the project support channels
+
 ## [1.15.2](https://github.com/TheCryptoDonkey/satgate/compare/v1.15.1...v1.15.2) (2026-03-27)
 
 

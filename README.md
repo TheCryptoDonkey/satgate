@@ -63,7 +63,7 @@ Every satgate instance exposes three discovery endpoints — no auth required:
 | `/llms.txt` | AI agents — plain-text description of what you're selling |
 | `/openapi.json` | Code generators — full OpenAPI spec |
 
-Pair with [402-mcp](https://github.com/TheCryptoDonkey/402-mcp) and an AI agent can autonomously discover your endpoint, check your prices, pay from its own wallet, and start prompting — no human involved.
+Pair with [402-mcp](https://github.com/forgesworn/402-mcp) and an AI agent can autonomously discover your endpoint, check your prices, pay from its own wallet, and start prompting — no human involved.
 
 ```mermaid
 sequenceDiagram
@@ -89,7 +89,7 @@ sequenceDiagram
 
 ## The secret
 
-Everything you just saw — the payment gating, the multi-rail support, the credit system, the free tier, the macaroon credentials — that's not satgate. That's [toll-booth](https://github.com/TheCryptoDonkey/toll-booth).
+Everything you just saw — the payment gating, the multi-rail support, the credit system, the free tier, the macaroon credentials — that's not satgate. That's [toll-booth](https://github.com/forgesworn/toll-booth).
 
 satgate is ~400 lines of glue on top of toll-booth. It adds the AI-specific bits: token counting, model pricing, streaming reconciliation, capacity management. Everything else comes from the middleware.
 
@@ -97,7 +97,7 @@ satgate is ~400 lines of glue on top of toll-booth. It adds the AI-specific bits
 
 Monetise a routing API. Gate a translation service. Sell weather data per request. toll-booth handles the payments — you just write the product logic.
 
-→ [**See toll-booth**](https://github.com/TheCryptoDonkey/toll-booth)
+→ [**See toll-booth**](https://github.com/forgesworn/toll-booth)
 
 ```mermaid
 graph TB
@@ -235,8 +235,8 @@ npx satgate --upstream http://localhost:11434
 npx satgate --upstream http://your-vllm-server:8000
 ```
 
-→ [**toll-booth**](https://github.com/TheCryptoDonkey/toll-booth) — the middleware that powers all of this. Build your own.
-→ [**402-mcp**](https://github.com/TheCryptoDonkey/402-mcp) — give AI agents a wallet. Let them pay for your GPU.
+→ [**toll-booth**](https://github.com/forgesworn/toll-booth) — the middleware that powers all of this. Build your own.
+→ [**402-mcp**](https://github.com/forgesworn/402-mcp) — give AI agents a wallet. Let them pay for your GPU.
 
 ---
 
