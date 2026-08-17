@@ -23,6 +23,14 @@
 
 # [1.15.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.14.1...v1.15.0) (2026-03-24)
 
+## 1.16.0 (2026-08-17)
+
+### Features
+
+- add an nwc lightning backend
+
+
+
 ## 1.15.4 (2026-08-13)
 
 ### Bug Fixes
