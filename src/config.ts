@@ -30,7 +30,7 @@ export interface TokenTollConfig {
   /** Auto-detected model IDs from upstream. */
   models?: string[]
   // New fields:
-  lightning?: 'phoenixd' | 'lnbits' | 'lnd' | 'cln'
+  lightning?: 'phoenixd' | 'lnbits' | 'lnd' | 'cln' | 'nwc'
   lightningUrl?: string
   lightningKey?: string
   authMode: 'open' | 'lightning' | 'cashu' | 'allowlist'
@@ -329,7 +329,8 @@ export function loadConfig(
   const maxBodySize = maxBodySizeRaw
 
   // Lightning backend config
-  const VALID_BACKENDS = ['phoenixd', 'lnbits', 'lnd', 'cln'] as const
+  // nwc carries its relay inside the connection URI, so it needs no lightning URL.
+  const VALID_BACKENDS = ['phoenixd', 'lnbits', 'lnd', 'cln', 'nwc'] as const
   const lightningRaw = args.lightning ?? env.LIGHTNING_BACKEND ?? file.lightning
   if (lightningRaw && !VALID_BACKENDS.includes(lightningRaw as any)) {
     throw new Error(`Invalid lightning backend: ${lightningRaw} (must be one of: ${VALID_BACKENDS.join(', ')})`)
