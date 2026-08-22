@@ -192,6 +192,10 @@ URL on that host all name the same mint. They are published on
 `/.well-known/l402` under `payment.lnurlcash`, so a caller can find out
 what is accepted without provoking a 402 first.
 
+On the production deploy the setting is `LNURLCASH_MINTS` in
+`/opt/satgate/deploy.conf`, read and validated by
+[`deploy/production.sh`](deploy/production.sh).
+
 ---
 
 ## Configuration

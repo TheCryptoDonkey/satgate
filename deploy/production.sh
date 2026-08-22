@@ -7,7 +7,6 @@ SOURCE_REPO="${SOURCE_REPO:-/opt/satgate/src}"
 RUNTIME_DIR="${RUNTIME_DIR:-/opt/satgate}"
 CONFIG_FILE="${CONFIG_FILE:-$RUNTIME_DIR/deploy.conf}"
 CONTAINER_NAME="${CONTAINER_NAME:-satgate}"
-PHOENIXD_CONTAINER="${PHOENIXD_CONTAINER:-routing-phoenixd-1}"
 OLLAMA_CONTAINER="${OLLAMA_CONTAINER:-ollama}"
 DEPLOY_REF="${DEPLOY_REF:?DEPLOY_REF must be an exact vMAJOR.MINOR.PATCH release tag}"
 
@@ -29,9 +28,14 @@ read_config() {
 PUBLIC_URL="$(read_config PUBLIC_URL)"
 ANNOUNCE_RELAYS="$(read_config ANNOUNCE_RELAYS)"
 OLLAMA_MODELS="$(read_config OLLAMA_MODELS)"
+LNURLCASH_MINTS="$(read_config LNURLCASH_MINTS)"
 
 if [[ ! "$PUBLIC_URL" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?(/.*)?$ ]]; then
   echo "PUBLIC_URL must be an HTTPS URL" >&2
+  exit 1
+fi
+if [[ -n "$LNURLCASH_MINTS" && ! "$LNURLCASH_MINTS" =~ ^[A-Za-z0-9.:,-]+$ ]]; then
+  echo "LNURLCASH_MINTS must be comma-separated mint hosts" >&2
   exit 1
 fi
 if [[ ! "$ANNOUNCE_RELAYS" =~ ^wss://[A-Za-z0-9./,:_-]+$ ]]; then
@@ -65,13 +69,14 @@ else
   git -C "$SOURCE_REPO" worktree add --detach "$RELEASE_DIR" "$DEPLOY_COMMIT"
 fi
 
-PHOENIXD_LIMITED_PASSWORD="$(
-  docker exec "$PHOENIXD_CONTAINER" sh -c \
-    "sed -n 's/^http-password-limited-access=//p' /phoenix/.phoenix/phoenix.conf" |
-    head -n 1 | tr -d '[:space:]'
-)"
-if [[ ! "$PHOENIXD_LIMITED_PASSWORD" =~ ^[A-Za-z0-9_-]{32,256}$ ]]; then
-  echo "Could not read a valid limited-access Phoenixd password; refusing fallback" >&2
+# The wallet moved to the funds box on 2026-08-17, so there is no local phoenixd
+# to read a limited-access password from. This box now holds only an NWC URI
+# restricted to make_invoice and lookup_invoice: it can take payments and cannot
+# spend them. Passed as a file path rather than the URI itself, because env vars
+# are readable from the process table and the URI is a bearer credential.
+NWC_URI_HOST_FILE="$RUNTIME_DIR/data/nwc-uri.txt"
+if [[ ! -s "$NWC_URI_HOST_FILE" ]]; then
+  echo "Missing NWC URI file: $NWC_URI_HOST_FILE" >&2
   exit 1
 fi
 
@@ -170,9 +175,8 @@ ENV_FILE="$(mktemp "$RUNTIME_DIR/runtime.env.XXXXXX")"
 trap 'rm -f "$ENV_FILE"' EXIT
 {
   printf 'UPSTREAM_URL=http://127.0.0.1:11434\n'
-  printf 'LIGHTNING_BACKEND=phoenixd\n'
-  printf 'LIGHTNING_URL=http://127.0.0.1:9740\n'
-  printf 'LIGHTNING_KEY=%s\n' "$PHOENIXD_LIMITED_PASSWORD"
+  printf 'LIGHTNING_BACKEND=nwc\n'
+  printf 'LIGHTNING_KEY=/app/data/nwc-uri.txt\n'
   printf 'PORT=3002\n'
   printf 'ROOT_KEY=%s\n' "$ROOT_KEY"
   printf 'SATGATE_TOKEN_PRICE=5\n'
@@ -187,6 +191,11 @@ trap 'rm -f "$ENV_FILE"' EXIT
   printf 'ANNOUNCE_KEY=%s\n' "$ANNOUNCE_KEY"
   printf 'ANNOUNCE_RELAYS=%s\n' "$ANNOUNCE_RELAYS"
   printf 'PUBLIC_URL=%s\n' "$PUBLIC_URL"
+  # LUD-25 bearer notes. Only mints named here are accepted, and what the
+  # rail takes is melted to this box's own node through the NWC URI above.
+  if [[ -n "${LNURLCASH_MINTS:-}" ]]; then
+    printf 'LNURLCASH_MINTS=%s\n' "$LNURLCASH_MINTS"
+  fi
 } >"$ENV_FILE"
 chmod 600 "$ENV_FILE"
 
