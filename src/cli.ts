@@ -1,7 +1,7 @@
 import { readFileSync, existsSync } from 'node:fs'
 import yaml from 'js-yaml'
 import { serve } from '@hono/node-server'
-import { loadConfig, type CliArgs } from './config.js'
+import { loadConfig, type CliArgs, type TokenTollConfig } from './config.js'
 import { createTokenTollServer } from './server.js'
 import { createLightningBackend } from './lightning.js'
 import { startTunnel, stopTunnel, type TunnelResult } from './tunnel.js'
@@ -134,6 +134,24 @@ function printVersion(): void {
   } catch {
     console.log('satgate (unknown version)')
   }
+}
+
+/**
+ * The rails this instance announces on Nostr, in 402-announce's tag shape.
+ *
+ * The identifiers are a closed set that 402-announce validates, and a name
+ * it does not know makes the WHOLE announcement fail rather than dropping
+ * one rail - so satgate goes silent on Nostr over a single unknown string.
+ * That is what happened when the lnurlcash rail landed against
+ * 402-announce 2.1.1, which predated the identifier.
+ */
+export function announcedPaymentMethods(config: TokenTollConfig): string[][] {
+  const methods: string[][] = []
+  if (config.lightning) methods.push(['l402', 'lightning'])
+  if (config.cashu) methods.push(['cashu'])
+  if (config.lnurlcash) methods.push(['lnurlcash', ...config.lnurlcash.mints])
+  if (config.realm) methods.push(['payment', 'lightning'])
+  return methods
 }
 
 export async function main(argv: string[] = process.argv): Promise<void> {
@@ -332,11 +350,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
           }
         }
 
-        const paymentMethods: string[][] = []
-        if (config.lightning) paymentMethods.push(['l402', 'lightning'])
-        if (config.cashu) paymentMethods.push(['cashu'])
-        if (config.lnurlcash) paymentMethods.push(['lnurlcash', ...config.lnurlcash.mints])
-        if (config.realm) paymentMethods.push(['payment', 'lightning'])
+        const paymentMethods = announcedPaymentMethods(config)
 
         try {
           announcement = await announceService({
