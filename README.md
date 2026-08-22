@@ -131,9 +131,10 @@ graph TB
 - **Streaming reconciliation** — estimated charge upfront, reconciled to actual usage after. Overpayments credited back.
 - **Capacity management** — limit concurrent inference requests to protect your GPU.
 - **Auto-detect models** — queries your upstream on startup. No manual model list.
-- **Three server-side payment rails** — Lightning, Cashu ecash, and x402
-  stablecoins. NWC stays on the client side, where an agent can connect its own
-  wallet through 402-mcp without disclosing wallet credentials to satgate.
+- **Four server-side payment rails** — Lightning, Cashu ecash, LNURLcash
+  bearer notes, and x402 stablecoins. NWC stays on the client side, where an
+  agent can connect its own wallet through 402-mcp without disclosing wallet
+  credentials to satgate.
 - **Privacy by design** — no personal data collected or stored. No accounts, no cookies, no IP logging. GDPR-safe out of the box.
 - **Instant public URL** — auto-spawns a Cloudflare tunnel. Your GPU is reachable from the internet in seconds.
 
@@ -162,6 +163,37 @@ Charges are estimated upfront based on model pricing, then reconciled to actual 
 
 ---
 
+## Paying with a bearer note
+
+`--lnurlcash-mints mint.example.com` turns on the LUD-25 rail. A 402 then
+carries an `X-LNURLcash` challenge naming the price and the mints this
+booth will take a note from, and a caller pays by putting the note's URL in
+an `X-LNURLcash` header on the retry.
+
+Settlement is one rotate at the mint. That single call proves the note is
+live, moves it to this server, and burns the secret the caller sent - so a
+replayed note fails at the mint rather than at a replay table here, and
+nothing has to be remembered to make that true.
+
+With `--lightning` configured, the note is then melted to your own node for
+the whole of what it was worth: the mint pays the invoice out of the note
+and covers routing from its own fee. Without a Lightning backend the rail
+still works and satgate says so loudly at startup - notes are accepted and
+then discarded, which is a choice, not a default.
+
+```bash
+satgate --upstream http://localhost:11434 \
+        --lightning phoenixd \
+        --lnurlcash-mints mint.example.com
+```
+
+Accepted mints are matched by HOST, so a bare host, a `host:port` and any
+URL on that host all name the same mint. They are published on
+`/.well-known/l402` under `payment.lnurlcash`, so a caller can find out
+what is accepted without provoking a 402 first.
+
+---
+
 ## Configuration
 
 Zero config works (just `--upstream`). For production, create `satgate.yaml`:
@@ -178,6 +210,9 @@ freeTier:
   creditsPerDay: 250
 capacity:
   maxConcurrent: 4
+lnurlcash:
+  mints:
+    - mint.example.com
 ```
 
 CLI flags > environment variables > config file > defaults.

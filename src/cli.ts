@@ -41,6 +41,7 @@ function parseArgs(argv: string[]): CliArgs {
       case '--public-url': args.publicUrl = argv[++i]; break
       case '--cashu-mints': args.cashuMints = argv[++i]; break
       case '--cashu-unit': args.cashuUnit = argv[++i]; break
+      case '--lnurlcash-mints': args.lnurlcashMints = argv[++i]; break
       case '-h': case '--help': printHelp(); process.exit(0);
       case '-v': case '--version': printVersion(); process.exit(0);
       default:
@@ -85,6 +86,9 @@ function printHelp(): void {
   Cashu:
     --cashu-mints <urls>       Comma-separated accepted mint URLs
     --cashu-unit <unit>        sat | usd (default: sat)
+
+  LNURLcash (LUD-25 bearer notes):
+    --lnurlcash-mints <hosts>  Comma-separated accepted mint hosts
 
   Auth:
     --auth <mode>              open | lightning | allowlist (inferred from context)
@@ -260,6 +264,9 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     logger.info(`Lightning:  ${lightningLabel}`)
     logger.info(`Auth:       ${authLabel}`)
     logger.info(`Price:      ${priceLabel}`)
+    if (config.lnurlcash) {
+      logger.info(`LNURLcash:  ${config.lnurlcash.mints.join(', ')}`)
+    }
     logger.info(`Storage:    ${config.storage}${config.storage === 'memory' ? ' (ephemeral)' : ''}`)
     logger.info(`Local:      http://localhost:${config.port}`)
     if (config.rootKeyGenerated) {
@@ -271,6 +278,11 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     if (config.cashu && !config.lightning) {
       logger.warn('Cashu payments accepted but cannot be melted — no Lightning backend.')
       logger.warn('Received ecash will be discarded. Configure --lightning to auto-melt.')
+    }
+
+    if (config.lnurlcash && !config.lightning) {
+      logger.warn('LNURLcash notes accepted but cannot be melted — no Lightning backend.')
+      logger.warn('Received notes will be discarded. Configure --lightning to auto-melt.')
     }
 
     if (config.authMode === 'open' && config.tunnel) {
@@ -323,6 +335,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
         const paymentMethods: string[][] = []
         if (config.lightning) paymentMethods.push(['l402', 'lightning'])
         if (config.cashu) paymentMethods.push(['cashu'])
+        if (config.lnurlcash) paymentMethods.push(['lnurlcash', ...config.lnurlcash.mints])
         if (config.realm) paymentMethods.push(['payment', 'lightning'])
 
         try {

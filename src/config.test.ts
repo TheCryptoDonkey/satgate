@@ -607,3 +607,48 @@ describe('security validations', () => {
     expect(config.x402?.facilitatorUrl).toBe('https://facilitator.example.com')
   })
 })
+
+// A note is accepted on the strength of which mint issued it, and that
+// claim is a HOST. Config that names the same mint three different ways
+// has to arrive at the same host, or the rail refuses money it was told
+// to take.
+describe('lnurlcash mints', () => {
+  it('is absent unless configured', () => {
+    expect(loadConfig({ upstream: 'http://localhost:11434' }).lnurlcash).toBeUndefined()
+  })
+
+  it('takes hosts, URLs and host:port, and stores the host', () => {
+    const config = loadConfig({
+      upstream: 'http://localhost:11434',
+      lnurlcashMints: 'mint.example.com,https://other.example.com/lnurlp/mint,127.0.0.1:8899',
+    })
+    expect(config.lnurlcash?.mints).toEqual([
+      'mint.example.com',
+      'other.example.com',
+      '127.0.0.1:8899',
+    ])
+  })
+
+  it('reads the env var and the config file', () => {
+    expect(
+      loadConfig({ upstream: 'http://localhost:11434' }, { LNURLCASH_MINTS: 'mint.example.com' })
+        .lnurlcash?.mints,
+    ).toEqual(['mint.example.com'])
+    expect(
+      loadConfig({ upstream: 'http://localhost:11434' }, {}, { lnurlcash: { mints: ['from.file'] } })
+        .lnurlcash?.mints,
+    ).toEqual(['from.file'])
+  })
+
+  it('refuses an entry with no host in it', () => {
+    expect(() =>
+      loadConfig({ upstream: 'http://localhost:11434', lnurlcashMints: 'not a host' }),
+    ).toThrow(/not a host or URL/)
+  })
+
+  it('refuses an empty list rather than quietly accepting nothing', () => {
+    expect(() =>
+      loadConfig({ upstream: 'http://localhost:11434' }, {}, { lnurlcash: { mints: [] } }),
+    ).toThrow(/at least one mint host/)
+  })
+})

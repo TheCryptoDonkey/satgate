@@ -5,6 +5,8 @@ export interface WellKnownInput {
   models: string[]
   tiers: Array<{ amountSats: number; creditSats: number; label: string }>
   paymentMethods: string[]
+  /** LUD-25 bearer notes: which mints this booth will take one from. */
+  lnurlcash?: { mints: string[] }
   freeTier?: { creditsPerDay: number }
   x402?: {
     receiverAddress: string
@@ -62,6 +64,12 @@ export function generateWellKnown(input: WellKnownInput): Record<string, any> {
       mints: input.cashu.mints,
       unit: input.cashu.unit,
     }
+  }
+
+  // A caller can learn which mints are accepted here rather than having to
+  // provoke a 402 to find out.
+  if (input.lnurlcash) {
+    result.payment.lnurlcash = { mints: input.lnurlcash.mints, unit: 'sat' }
   }
 
   if (input.ietfPayment) {
