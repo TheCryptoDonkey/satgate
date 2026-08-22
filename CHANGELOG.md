@@ -23,6 +23,14 @@
 
 # [1.15.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.14.1...v1.15.0) (2026-03-24)
 
+## 1.17.0 (2026-08-22)
+
+### Features
+
+- accept LUD-25 bearer notes and sweep them to Lightning (#7)
+
+
+
 ## 1.16.0 (2026-08-17)
 
 ### Features
