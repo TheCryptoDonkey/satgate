@@ -11,11 +11,13 @@ import {
   createIETFSessionRail,
   createX402Rail,
   createXCashuRail,
+  createLnurlcashRail,
   meltToLightning,
   memoryStorage,
   sqliteStorage,
 } from '@forgesworn/toll-booth'
 import type { PaymentRail } from '@forgesworn/toll-booth'
+import { meltNoteToLightning } from './lnurlcash-melt.js'
 import { createHonoTollBooth } from '@forgesworn/toll-booth/hono'
 import type { TollBoothEnv } from '@forgesworn/toll-booth/hono'
 import type { TokenTollConfig } from './config.js'
@@ -120,6 +122,28 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
     }, storage))
   }
 
+  if (config.lnurlcash) {
+    rails.push(createLnurlcashRail({
+      mints: config.lnurlcash.mints,
+      onNoteReceived: config.backend
+        ? async (note) => {
+            const result = await meltNoteToLightning({
+              note,
+              createInvoice: async (amountSats) => {
+                const inv = await config.backend!.createInvoice(amountSats, 'satgate lnurlcash melt')
+                return inv.bolt11
+              },
+            })
+            if (result.paid) {
+              logger.info(`lnurlcash melt: ${result.amountSats} sats from ${note.host}`)
+            } else {
+              logger.warn(`lnurlcash melt failed (${result.amountSats} sats from ${note.host}): ${result.error}`)
+            }
+          }
+        : undefined,
+    }, storage))
+  }
+
   // Dual-scheme: L402 + IETF Payment auth (draft-ryan-httpauth-payment-01)
   // When both are present, every 402 response contains both challenge schemes
   if (config.backend && config.rootKey) {
@@ -209,6 +233,7 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
   if (config.lightning) paymentMethods.push('lightning')
   if (config.cashu) paymentMethods.push('cashu')
   if (config.x402) paymentMethods.push('x402')
+  if (config.lnurlcash) paymentMethods.push('lnurlcash')
 
   app.get('/.well-known/l402', (c) => {
     return c.json(generateWellKnown({
@@ -219,6 +244,7 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
       freeTier: config.freeTier,
       x402: config.x402,
       cashu: config.cashu ? { mints: config.cashu.mints, unit: config.cashu.unit } : undefined,
+      ...(config.lnurlcash && { lnurlcash: { mints: config.lnurlcash.mints } }),
       ...(config.realm && { ietfPayment: { realm: config.realm } }),
       sessionIntent: config.sessionIntent,
     }))

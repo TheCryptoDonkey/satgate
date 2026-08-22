@@ -53,6 +53,14 @@ export interface TokenTollConfig {
     mints: string[]
     unit: Currency
   }
+  /**
+   * LUD-25 bearer notes. Each entry is a mint HOST, not a URL: a note is
+   * accepted only when the mint that issued it is one of these, and the
+   * host is the whole of that claim.
+   */
+  lnurlcash?: {
+    mints: string[]
+  }
   defaultPriceUsd?: number
   verbose: boolean
   logFormat: 'pretty' | 'json'
@@ -106,6 +114,7 @@ export interface CliArgs {
   publicUrl?: string
   cashuMints?: string
   cashuUnit?: string
+  lnurlcashMints?: string
 }
 
 export interface FileConfig {
@@ -141,9 +150,29 @@ export interface FileConfig {
     mints?: string[]
     unit?: string
   }
+  lnurlcash?: {
+    mints?: string[]
+  }
   defaultPriceUsd?: number
   verbose?: boolean
   logFormat?: string
+}
+
+/**
+ * The host a mint is known by, from either a bare host or any URL on it.
+ * `mint.example.com`, `https://mint.example.com/some/path` and
+ * `127.0.0.1:8899` all name the same mint; the rail matches on the host,
+ * so that is what gets stored. Returns undefined when there is no host to
+ * be had, which is a configuration error rather than a note to refuse.
+ */
+export function normaliseMintHost(entry: string): string | undefined {
+  const trimmed = entry.trim()
+  if (!trimmed) return undefined
+  try {
+    return new URL(/^https?:\/\//.test(trimmed) ? trimmed : `https://${trimmed}`).host || undefined
+  } catch {
+    return undefined
+  }
 }
 
 const LIGHTNING_URL_DEFAULTS: Record<string, string> = {
@@ -379,6 +408,23 @@ export function loadConfig(
     ? { mints: cashuMints, unit: (cashuUnitRaw ?? 'sat') as Currency }
     : undefined
 
+  // LUD-25 bearer notes. Accepted mints are HOSTS - a note is only taken
+  // when the mint that issued it is one of these - so a full URL is
+  // narrowed to its host rather than refused, and anything with no host in
+  // it at all is a configuration error worth stopping for.
+  const lnurlcashMintsRaw = args.lnurlcashMints ?? env.LNURLCASH_MINTS
+  const lnurlcashFromCli = lnurlcashMintsRaw?.split(',').map(m => m.trim()).filter(Boolean)
+  const lnurlcashConfigured = lnurlcashFromCli ?? file.lnurlcash?.mints
+  if (lnurlcashConfigured && lnurlcashConfigured.length === 0) {
+    throw new Error('lnurlcash config requires at least one mint host')
+  }
+  const lnurlcashMints = lnurlcashConfigured?.map(entry => {
+    const host = normaliseMintHost(entry)
+    if (!host) throw new Error(`lnurlcash mint is not a host or URL: ${entry}`)
+    return host
+  })
+  const lnurlcash = lnurlcashMints ? { mints: lnurlcashMints } : undefined
+
   // Auth mode inference
   const VALID_AUTH_MODES = ['open', 'lightning', 'cashu', 'allowlist'] as const
   const explicitAuth = args.authMode ?? env.AUTH_MODE ?? file.auth
@@ -489,6 +535,7 @@ export function loadConfig(
     tunnel,
     x402,
     cashu,
+    lnurlcash,
     defaultPriceUsd,
     verbose,
     logFormat,
