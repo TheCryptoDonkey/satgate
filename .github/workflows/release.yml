@@ -35,10 +35,15 @@ jobs:
       - name: Deploy satgate production service
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         with:
-          host: 95.217.39.110
+          # `stall`. The old dedicated box at 95.217.39.110 failed SMART on
+          # its NVMe and was replaced on 2026-08-20; same deploy user, same
+          # key, same paths. Every release since has published to npm and
+          # then failed here, because the host it was still pointed at is
+          # a different machine now.
+          host: 62.238.98.53
           username: deploy
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           # drone-ssh's Go client negotiates this host's ECDSA key first.
-          fingerprint: SHA256:2LOW4yEepg8esCvpx3ddiN4c73V++MujSyPT+cDrNow
+          fingerprint: SHA256:CrlC1NmWHcFQLuhM49DYW/pDg38csYXJRhGtKyA+9yE
           envs: DEPLOY_REF
           script: /opt/satgate/deploy.sh
