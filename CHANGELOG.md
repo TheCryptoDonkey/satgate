@@ -23,6 +23,14 @@
 
 # [1.15.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.14.1...v1.15.0) (2026-03-24)
 
+## 1.17.1 (2026-08-22)
+
+### Bug Fixes
+
+- keep announcing after adding the lnurlcash rail (#9)
+
+
+
 ## 1.17.0 (2026-08-22)
 
 ### Features
