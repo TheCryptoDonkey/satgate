@@ -38,7 +38,7 @@
     "@hono/node-server": "^2.0.12",
     "@noble/curves": "^2.0.1",
     "@scure/base": "^2.0.0",
-    "402-announce": "^2.1.1",
+    "402-announce": "^2.2.0",
     "hono": "^4.13.1",
     "js-yaml": "^4.3.1",
     "lnurlcash-kit": "^0.2.1"
