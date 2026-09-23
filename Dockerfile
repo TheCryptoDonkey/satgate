@@ -23,5 +23,5 @@ COPY --from=build /build/dist/ ./dist/
 RUN groupadd -r satgate && useradd -r -g satgate satgate && chown -R satgate:satgate /app
 USER satgate
 
-EXPOSE 3002
+EXPOSE 3000
 CMD ["node", "dist/bin/satgate.js"]

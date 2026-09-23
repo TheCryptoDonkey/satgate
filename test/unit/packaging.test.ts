@@ -22,3 +22,12 @@ describe('npm package contents', () => {
     expect(manifest.files).toContain('dist')
   })
 })
+
+describe('Docker image', () => {
+  it('exposes the port satgate listens on by default', async () => {
+    const { loadConfig } = await import('../../src/config.js')
+    const dockerfile = readFileSync(join(root, 'Dockerfile'), 'utf8')
+    const exposed = /^EXPOSE (\d+)$/m.exec(dockerfile)?.[1]
+    expect(Number(exposed)).toBe(loadConfig({ upstream: 'http://x' }).port)
+  })
+})
