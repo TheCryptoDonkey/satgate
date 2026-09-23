@@ -440,7 +440,12 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
   // methods and paths fall through to a 404 instead of minting invoices.
   const authMiddleware = paidAuth
     ? tollBooth.authMiddleware
-    : createAuthMiddleware({ authMode: config.authMode, allowlist: config.allowlist })
+    : createAuthMiddleware({
+        authMode: config.authMode,
+        allowlist: config.allowlist,
+        publicUrl: config.publicUrl,
+        trustProxy: config.trustProxy,
+      })
 
   // Forward toll-booth credit/free-tier context as response headers.
   // Must run AFTER next() so c.header() applies to the actual response.
