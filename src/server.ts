@@ -305,9 +305,11 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
     return c.text(generateLlmsTxt({
       pricing: config.pricing,
       models,
+      ...(config.flatPricing && { flatPriceSats: config.price }),
+      ...(config.lightning && { lightning: config.lightning, ietfPayment: true }),
       ...(config.x402 && { x402: { network: config.x402.network } }),
       ...(config.cashu && { cashu: true }),
-      ...(config.realm && { ietfPayment: true }),
+      ...(config.lnurlcash && { lnurlcash: true }),
     }))
   })
 
