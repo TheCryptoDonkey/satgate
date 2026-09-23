@@ -100,6 +100,25 @@ describe('TokenCounter', () => {
       expect(counter.finalCount()).toBe(18)
     })
 
+    it('parses a usage event split across network chunks', () => {
+      const counter = new TokenCounter()
+      counter.ingestSSEChunk('data: {"choices":[{"delta":{"content":"Hi"}}]}\n\ndata: {"choices":[],"usage":{"prompt_tok')
+      counter.ingestSSEChunk('ens":100,"completion_tokens":400}}\n\ndata: [DONE]\n\n')
+      expect(counter.finalCount()).toBe(500)
+    })
+
+    it('parses a final event with no trailing newline', () => {
+      const counter = new TokenCounter()
+      counter.ingestSSEChunk('data: {"choices":[],"usage":{"prompt_tokens":3,"completion_tokens":4}}')
+      expect(counter.finalCount()).toBe(7)
+    })
+
+    it('accepts data fields without a space and CRLF line endings', () => {
+      const counter = new TokenCounter()
+      counter.ingestSSEChunk('data:{"choices":[],"usage":{"prompt_tokens":2,"completion_tokens":2}}\r\n\r\n')
+      expect(counter.finalCount()).toBe(4)
+    })
+
     it('handles multi-event chunks', () => {
       const counter = new TokenCounter()
       const multiChunk =

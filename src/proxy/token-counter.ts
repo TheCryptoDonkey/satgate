@@ -4,6 +4,9 @@ interface UsageData {
   total_tokens?: number
 }
 
+/** Longest partial SSE line kept between chunks (bounds memory on hostile streams). */
+const MAX_PARTIAL_LINE = 1024 * 1024
+
 /** A usage figure, if it is a non-negative finite number; otherwise undefined. */
 function tokenCount(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? Math.ceil(value) : undefined
@@ -22,6 +25,7 @@ export class TokenCounter {
   private sseUsage: UsageData | null = null
   private contentChunkCount = 0
   private totalContentBytes = 0
+  private partialLine = ''
 
   /** Set usage from a buffered (non-streaming) JSON response. */
   setBufferedUsage(usage: Record<string, unknown>): void {
@@ -32,12 +36,23 @@ export class TokenCounter {
     }
   }
 
-  /** Ingest an SSE chunk (may contain multiple events). */
+  /** Ingest an SSE chunk (may contain multiple events, or part of one). */
   ingestSSEChunk(chunk: string): void {
-    const lines = chunk.split('\n')
-    for (const line of lines) {
-      if (!line.startsWith('data: ')) continue
-      const data = line.slice(6).trim()
+    // Network chunks do not respect line boundaries: keep the trailing
+    // partial line until the rest of it arrives, so an event split across
+    // reads (often the final usage event) is still parsed.
+    const lines = (this.partialLine + chunk).split('\n')
+    this.partialLine = lines.pop() ?? ''
+    if (this.partialLine.length > MAX_PARTIAL_LINE) this.partialLine = ''
+    this.ingestLines(lines)
+  }
+
+  private ingestLines(lines: string[]): void {
+    for (const rawLine of lines) {
+      const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine
+      // The space after the colon is optional in SSE
+      if (!line.startsWith('data:')) continue
+      const data = line.slice(5).trim()
       if (data === '[DONE]') continue
 
       try {
@@ -81,6 +96,13 @@ export class TokenCounter {
    *  Without reported usage (upstream ignored include_usage), the completion
    *  is estimated from generated chunks with a byte-based floor. */
   finalCount(): number {
+    // A stream that ends without a trailing newline still has a last event
+    if (this.partialLine) {
+      const last = this.partialLine
+      this.partialLine = ''
+      this.ingestLines([last])
+    }
+
     // Buffered response: use reported usage directly (no chunks to count)
     if (this.bufferedUsage) {
       const prompt = this.bufferedUsage.prompt_tokens ?? 0
