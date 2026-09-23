@@ -18,11 +18,10 @@ Set TypingSpeed 40ms
 Set Padding 24
 Set PlaybackSpeed 1
 
-# Hidden: set up PATH and cd
+# Hidden: move to the repository root (run vhs from inside the checkout,
+# with Node >= 22 on PATH)
 Hide
-Type `export PATH="/Users/darren/.nvm/versions/node/v22.17.0/bin:$PATH"`
-Enter
-Type "cd /Users/darren/WebstormProjects/satgate && clear"
+Type `cd "$(git rev-parse --show-toplevel)" && clear`
 Enter
 Sleep 1s
 Show
