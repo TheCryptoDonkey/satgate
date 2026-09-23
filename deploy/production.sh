@@ -187,6 +187,10 @@ trap 'rm -f "$ENV_FILE"' EXIT
   printf 'SATGATE_DB_PATH=./data/satgate.db\n'
   printf 'SATGATE_REALM=%s\n' "$REALM"
   printf 'TUNNEL=false\n'
+  # Caddy on loopback is the only proxy satgate talks to. It sets the real
+  # client address from Cf-Connecting-Ip, so trust forwarded headers from it
+  # alone; without this every visitor shares one free-tier bucket.
+  printf 'TRUSTED_PROXIES=127.0.0.1,::1\n'
   printf 'ANNOUNCE=true\n'
   printf 'ANNOUNCE_KEY=%s\n' "$ANNOUNCE_KEY"
   printf 'ANNOUNCE_RELAYS=%s\n' "$ANNOUNCE_RELAYS"
