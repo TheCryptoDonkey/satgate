@@ -316,7 +316,9 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     const authLabel = config.authMode === 'lightning'
       ? 'lightning (pay-per-request)'
       : config.authMode === 'cashu'
-        ? `cashu (${config.cashu!.mints.length} mint${config.cashu!.mints.length > 1 ? 's' : ''})`
+        ? (config.cashu
+            ? `cashu (${config.cashu.mints.length} mint${config.cashu.mints.length > 1 ? 's' : ''})`
+            : 'lnurlcash notes')
         : config.authMode === 'allowlist'
           ? `allowlist (${config.allowlist.length} identities)`
           : 'open'

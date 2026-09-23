@@ -385,3 +385,16 @@ describe('invoice minting limits', () => {
     expect(direct.status).toBe(429)
   })
 })
+
+describe('LNURLcash-only configuration', () => {
+  it('challenges unpaid requests instead of serving them openly', async () => {
+    upstream = await startUpstream()
+    const { loadConfig } = await import('../../src/config.js')
+    const config = loadConfig({ upstream: upstream.url, lnurlcashMints: 'mint.example.com' })
+    const { app } = createTokenTollServer({ ...config, storage: 'memory' })
+    const res = await app.request('/v1/chat/completions', chat('', 'hi'))
+    expect(res.status).toBe(402)
+    expect(res.headers.get('X-LNURLcash')).toBeTruthy()
+    expect(upstream.bodies).toHaveLength(0)
+  })
+})

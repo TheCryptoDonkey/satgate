@@ -522,11 +522,13 @@ export function loadConfig(
     if (authMode === 'lightning' && !lightning) {
       throw new Error("auth mode 'lightning' requires --lightning <backend>")
     }
-    if (authMode === 'cashu' && !cashu) {
-      throw new Error("auth mode 'cashu' requires --cashu-mints <urls>")
+    if (authMode === 'cashu' && !cashu && !lnurlcash) {
+      throw new Error("auth mode 'cashu' requires --cashu-mints <urls> or --lnurlcash-mints <hosts>")
     }
   } else {
-    authMode = lightning ? 'lightning' : cashu ? 'cashu' : 'open'
+    // 'cashu' is the bearer-ecash mode: payment without a Lightning backend,
+    // by Cashu tokens or LNURLcash notes
+    authMode = lightning ? 'lightning' : (cashu || lnurlcash) ? 'cashu' : 'open'
   }
 
   // Allowlist

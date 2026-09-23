@@ -726,3 +726,11 @@ describe('concurrency limit', () => {
     expect(loadConfig({ upstream: 'http://x' }, { MAX_CONCURRENT: '0' }).capacity.maxConcurrent).toBe(0)
   })
 })
+
+describe('LNURLcash without Lightning', () => {
+  it('requires payment rather than falling back to open mode', () => {
+    const config = loadConfig({ upstream: 'http://x', lnurlcashMints: 'mint.example.com' })
+    expect(config.authMode).toBe('cashu')
+    expect(config.tunnel).toBe(true)
+  })
+})
