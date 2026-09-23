@@ -160,9 +160,13 @@ export function createProxyHandler(deps: ProxyDeps) {
       const pricePerThousand = resolveModelPrice(deps.pricing, model)
       const isStreaming = body.stream === true
 
-      // Inject stream_options for usage reporting if streaming
-      if (isStreaming && !body.stream_options) {
-        body.stream_options = { include_usage: true }
+      // Always ask for usage on streams: billing depends on it, so a client
+      // must not be able to switch it off with its own stream_options.
+      if (isStreaming) {
+        const clientOptions = typeof body.stream_options === 'object' && body.stream_options !== null && !Array.isArray(body.stream_options)
+          ? body.stream_options as Record<string, unknown>
+          : {}
+        body.stream_options = { ...clientOptions, include_usage: true }
       }
 
       // Build upstream URL using the already-validated requestPath
