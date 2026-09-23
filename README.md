@@ -25,19 +25,19 @@ Without `--lightning` (or Cashu mints, or an allowlist) satgate runs in open mod
 
 ## Try it live
 
-A public instance is running at [satgate.trotters.dev](https://satgate.trotters.dev). Open it in a browser for the chat playground, or use curl:
+A public instance is running at [satgate.forgesworn.dev](https://satgate.forgesworn.dev). Open it in a browser for the chat playground, or use curl:
 
 ```bash
 # 250 sats of free usage per day per IP — after that you'll get a 402 + invoice
-curl -s -w '\n%{http_code}\n' https://satgate.trotters.dev/v1/chat/completions \
+curl -s -w '\n%{http_code}\n' https://satgate.forgesworn.dev/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{"model":"qwen3:0.6b","messages":[{"role":"user","content":"What is Bitcoin?"}]}'
 
 # Check pricing
-curl -s https://satgate.trotters.dev/.well-known/l402 | jq .
+curl -s https://satgate.forgesworn.dev/.well-known/l402 | jq .
 
 # Machine-readable description
-curl -s https://satgate.trotters.dev/llms.txt
+curl -s https://satgate.forgesworn.dev/llms.txt
 ```
 
 ---
