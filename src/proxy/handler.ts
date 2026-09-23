@@ -2,6 +2,7 @@ import { TokenCounter } from './token-counter.js'
 import { createStreamingProxy } from './streaming.js'
 import { resolveModelPrice, tokenCostToSats } from './pricing.js'
 import type { CapacityTracker } from './capacity.js'
+import { reconcileHold, unmeteredHold, type Hold } from './hold.js'
 import type { ModelPricing } from '../config.js'
 import type { Logger } from '../logger.js'
 
@@ -12,7 +13,11 @@ export interface ProxyDeps {
   upstream: string
   pricing: ModelPricing
   capacity: CapacityTracker
-  reconcile: (paymentHash: string, actualCost: number) => { adjusted: boolean; newBalance: number; delta: number }
+  /**
+   * Settles a payment hash at its actual cost. Only used when the caller
+   * passes no hold; the server always passes one.
+   */
+  reconcile?: (paymentHash: string, actualCost: number) => { adjusted: boolean; newBalance: number; delta: number }
   maxBodySize: number
   /** When true, skip token-based reconciliation — a flat per-request fee was charged upfront. */
   flatPricing?: boolean
@@ -38,11 +43,18 @@ export function createProxyHandler(deps: ProxyDeps) {
   return async function handleProxy(
     req: Request,
     paymentHash: string | undefined,
+    suppliedHold?: Hold,
   ): Promise<Response> {
+    const hold = suppliedHold
+      ?? (paymentHash && deps.reconcile ? reconcileHold(deps.reconcile, paymentHash) : unmeteredHold())
+    // Refund helper for every path that serves no inference
+    const refund = () => hold.settle(0)
+
     // Validate request before acquiring capacity — cheap checks first to avoid
     // tying up capacity slots during body reads or for invalid requests
     const requestPath = new URL(req.url).pathname
     if (!ALLOWED_PATH_PREFIXES.some(p => requestPath === p)) {
+      refund()
       return new Response(
         JSON.stringify({ error: 'Not found' }),
         { status: 404, headers: { 'Content-Type': 'application/json' } },
@@ -52,6 +64,7 @@ export function createProxyHandler(deps: ProxyDeps) {
     const contentType = req.headers.get('content-type')
     const mediaType = contentType?.split(';')[0]?.trim().toLowerCase()
     if (mediaType !== 'application/json') {
+      refund()
       return new Response(
         JSON.stringify({ error: 'Content-Type must be application/json' }),
         { status: 415, headers: { 'Content-Type': 'application/json' } },
@@ -62,6 +75,7 @@ export function createProxyHandler(deps: ProxyDeps) {
     if (contentLength !== null) {
       const len = parseInt(contentLength, 10)
       if (!Number.isFinite(len) || len > deps.maxBodySize) {
+        refund()
         return new Response(
           JSON.stringify({ error: 'Request body too large' }),
           { status: 413, headers: { 'Content-Type': 'application/json' } },
@@ -82,7 +96,7 @@ export function createProxyHandler(deps: ProxyDeps) {
         while (true) {
           if (bodyAbort.aborted) {
             await reader.cancel('body read deadline exceeded').catch(() => {})
-            if (paymentHash) deps.reconcile(paymentHash, 0)
+            refund()
             return new Response(
               JSON.stringify({ error: 'Request body read timed out' }),
               { status: 408, headers: { 'Content-Type': 'application/json' } },
@@ -100,7 +114,7 @@ export function createProxyHandler(deps: ProxyDeps) {
           totalBytes += result.value.byteLength
           if (totalBytes > deps.maxBodySize) {
             await reader.cancel('body too large').catch(() => {})
-            if (paymentHash) deps.reconcile(paymentHash, 0)
+            refund()
             return new Response(
               JSON.stringify({ error: 'Request body too large' }),
               { status: 413, headers: { 'Content-Type': 'application/json' } },
@@ -112,7 +126,7 @@ export function createProxyHandler(deps: ProxyDeps) {
       } catch (err) {
         await reader.cancel('body read failed').catch(() => {})
         // Refund any pre-reserved Lightning payment on body read failure
-        if (paymentHash) deps.reconcile(paymentHash, 0)
+        refund()
         if (err instanceof DOMException && err.name === 'TimeoutError') {
           return new Response(
             JSON.stringify({ error: 'Request body read timed out' }),
@@ -132,6 +146,7 @@ export function createProxyHandler(deps: ProxyDeps) {
     try {
       const parsed = JSON.parse(bodyText)
       if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        refund()
         return new Response(
           JSON.stringify({ error: 'Request body must be a JSON object' }),
           { status: 400, headers: { 'Content-Type': 'application/json' } },
@@ -139,6 +154,7 @@ export function createProxyHandler(deps: ProxyDeps) {
       }
       body = parsed
     } catch {
+      refund()
       return new Response(
         JSON.stringify({ error: 'Invalid JSON body' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } },
@@ -147,6 +163,7 @@ export function createProxyHandler(deps: ProxyDeps) {
 
     // Now acquire capacity — body is validated and parsed, no slow client can hold a slot
     if (!deps.capacity.tryAcquire()) {
+      refund()
       return new Response(
         JSON.stringify({ error: 'Service at capacity, try again later' }),
         { status: 503, headers: { 'Content-Type': 'application/json', 'Retry-After': '5' } },
@@ -184,9 +201,7 @@ export function createProxyHandler(deps: ProxyDeps) {
         })
       } catch (err) {
         // Upstream unreachable - refund estimated cost
-        if (paymentHash) {
-          deps.reconcile(paymentHash, 0)
-        }
+        refund()
         deps.logger?.error('upstream error', {
           endpoint: new URL(req.url).pathname,
           method: req.method,
@@ -202,9 +217,7 @@ export function createProxyHandler(deps: ProxyDeps) {
       // If upstream returned an error, refund and return a generic error
       // (don't forward raw upstream body — may leak internal details)
       if (!upstreamRes.ok) {
-        if (paymentHash) {
-          deps.reconcile(paymentHash, 0)
-        }
+        refund()
         // Consume and discard the upstream error body to prevent connection leaks
         await upstreamRes.body?.cancel().catch(() => {})
         const status = upstreamRes.status >= 400 && upstreamRes.status < 600
@@ -223,14 +236,13 @@ export function createProxyHandler(deps: ProxyDeps) {
           proxy = createStreamingProxy(upstreamRes.body, (tokenCount) => {
             // Release capacity slot when stream ends (not in finally)
             deps.capacity.release()
-            if (!deps.flatPricing && paymentHash) {
-              const satCost = tokenCostToSats(tokenCount, pricePerThousand)
-              deps.reconcile(paymentHash, satCost)
+            if (!deps.flatPricing && hold.metered) {
+              hold.settle(tokenCostToSats(tokenCount, pricePerThousand))
             }
           }, undefined, deps.maxBodySize)
         } catch {
           // createStreamingProxy failed — capacity will be released by finally
-          if (paymentHash) deps.reconcile(paymentHash, 0)
+          refund()
           return new Response(
             JSON.stringify({ error: 'Internal streaming error' }),
             { status: 500, headers: { 'Content-Type': 'application/json' } },
@@ -254,7 +266,7 @@ export function createProxyHandler(deps: ProxyDeps) {
       if (upstreamContentLength !== null) {
         const len = parseInt(upstreamContentLength, 10)
         if (Number.isFinite(len) && len > deps.maxBodySize) {
-          if (paymentHash) deps.reconcile(paymentHash, 0)
+          refund()
           await upstreamRes.body?.cancel().catch(() => {})
           return new Response(
             JSON.stringify({ error: 'Upstream response too large' }),
@@ -278,7 +290,7 @@ export function createProxyHandler(deps: ProxyDeps) {
             totalBytes += value.byteLength
             if (totalBytes > deps.maxBodySize) {
               await reader.cancel('response too large').catch(() => {})
-              if (paymentHash) deps.reconcile(paymentHash, 0)
+              refund()
               return new Response(
                 JSON.stringify({ error: 'Upstream response too large' }),
                 { status: 502, headers: { 'Content-Type': 'application/json' } },
@@ -286,7 +298,7 @@ export function createProxyHandler(deps: ProxyDeps) {
             }
             if (Date.now() > deadline) {
               await reader.cancel('deadline exceeded').catch(() => {})
-              if (paymentHash) deps.reconcile(paymentHash, 0)
+              refund()
               return new Response(
                 JSON.stringify({ error: 'Upstream response timed out' }),
                 { status: 504, headers: { 'Content-Type': 'application/json' } },
@@ -296,7 +308,7 @@ export function createProxyHandler(deps: ProxyDeps) {
           }
           chunks.push(decoder.decode()) // flush remaining
         } catch {
-          if (paymentHash) deps.reconcile(paymentHash, 0)
+          refund()
           return new Response(
             JSON.stringify({ error: 'Upstream response read failed' }),
             { status: 502, headers: { 'Content-Type': 'application/json' } },
@@ -311,6 +323,7 @@ export function createProxyHandler(deps: ProxyDeps) {
       try {
         responseBody = JSON.parse(responseText)
       } catch {
+        refund()
         return new Response(
           JSON.stringify({ error: 'Upstream returned invalid JSON' }),
           { status: 502, headers: { 'Content-Type': 'application/json' } },
@@ -323,8 +336,8 @@ export function createProxyHandler(deps: ProxyDeps) {
       const tokenCount = counter.finalCount()
       const satCost = tokenCostToSats(tokenCount, pricePerThousand)
 
-      if (!deps.flatPricing && paymentHash) {
-        deps.reconcile(paymentHash, satCost)
+      if (!deps.flatPricing && hold.metered) {
+        hold.settle(satCost)
       }
 
       return new Response(JSON.stringify(responseBody), {

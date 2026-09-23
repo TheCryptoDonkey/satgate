@@ -25,6 +25,7 @@ import { createNoopLogger } from './logger.js'
 import { createAuthMiddleware } from './auth/middleware.js'
 import { createProxyHandler } from './proxy/handler.js'
 import { CapacityTracker } from './proxy/capacity.js'
+import { creditHold, fixedHold, unmeteredHold, usdHold, type Hold } from './proxy/hold.js'
 import { generateWellKnown } from './discovery/well-known.js'
 import { generateLlmsTxt } from './discovery/llms-txt.js'
 import { generateOpenApiSpec } from './discovery/openapi.js'
@@ -352,13 +353,41 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
     upstream: config.upstream,
     pricing: config.pricing,
     capacity,
-    reconcile: (paymentHash, actualCost) => engine.reconcile(paymentHash, actualCost),
     maxBodySize: config.maxBodySize,
     flatPricing: config.flatPricing,
     logger,
   })
 
-  if (config.authMode === 'lightning' || config.authMode === 'cashu') {
+  const paidAuth = config.authMode === 'lightning' || config.authMode === 'cashu'
+
+  /**
+   * The hold for one request: what toll-booth has already taken for it and
+   * how that charge may move. Settled per request by the proxy, so
+   * concurrent requests on one credential cannot clobber each other.
+   */
+  function holdFor(c: Context<TollBoothEnv>): Hold {
+    if (!paidAuth) return unmeteredHold()
+    const paymentHash = c.get('tollBoothPaymentHash')
+    if (!paymentHash) {
+      // Free tier: the route price came out of today's allowance
+      return c.get('tollBoothFreeRemaining') !== undefined ? fixedHold(routePriceSats) : unmeteredHold()
+    }
+    const held = c.get('tollBoothEstimatedCost') ?? 0
+    const creditBalance = c.get('tollBoothCreditBalance')
+    const isUsd = c.req.header('payment-signature') !== undefined
+      || c.req.header('x-payment') !== undefined
+      || (config.cashu?.unit === 'usd' && c.req.header('x-cashu') !== undefined)
+    if (isUsd) return usdHold(storage, paymentHash, held, creditBalance !== undefined)
+    // A per-request payment (IETF Payment charge) reports no balance
+    if (creditBalance === undefined) return fixedHold(held)
+    // IETF Payment session: the payment id is the session id
+    if (storage.getSession(paymentHash)) return fixedHold(held)
+    return creditHold(storage, paymentHash, held)
+  }
+
+  const proxy = (c: Context<TollBoothEnv>) => proxyHandler(c.req.raw, undefined, holdFor(c))
+
+  if (paidAuth) {
     app.use('/v1/*', tollBooth.authMiddleware)
   } else {
     const authMiddleware = createAuthMiddleware({
@@ -386,20 +415,9 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
     }
   })
 
-  app.post('/v1/chat/completions', async (c: Context<TollBoothEnv>) => {
-    const paymentHash = (config.authMode === 'lightning' || config.authMode === 'cashu') ? c.get('tollBoothPaymentHash') : undefined
-    return proxyHandler(c.req.raw, paymentHash)
-  })
-
-  app.post('/v1/completions', async (c: Context<TollBoothEnv>) => {
-    const paymentHash = (config.authMode === 'lightning' || config.authMode === 'cashu') ? c.get('tollBoothPaymentHash') : undefined
-    return proxyHandler(c.req.raw, paymentHash)
-  })
-
-  app.post('/v1/embeddings', async (c: Context<TollBoothEnv>) => {
-    const paymentHash = (config.authMode === 'lightning' || config.authMode === 'cashu') ? c.get('tollBoothPaymentHash') : undefined
-    return proxyHandler(c.req.raw, paymentHash)
-  })
+  app.post('/v1/chat/completions', proxy)
+  app.post('/v1/completions', proxy)
+  app.post('/v1/embeddings', proxy)
 
   return {
     app,
