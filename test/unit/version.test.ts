@@ -19,7 +19,7 @@ describe('readPackageVersion', () => {
   it('reads the package root from the compiled dist/src layout', () => {
     const pkg = mkdtempSync(join(tmpdir(), 'satgate-pkg-'))
     mkdirSync(join(pkg, 'dist', 'src'), { recursive: true })
-    writeFileSync(join(pkg, 'package.json'), JSON.stringify({ name: 'satgate', version: '9.8.7' }))
+    writeFileSync(join(pkg, 'package.json'), JSON.stringify({ name: 'satgate', version: '9.8.7', type: 'module' }))
     // A dist/package.json that is not satgate's must be ignored
     writeFileSync(join(pkg, 'dist', 'package.json'), JSON.stringify({ name: 'other', version: '0.0.0' }))
     copyFileSync(join(root, 'src', 'version.ts'), join(pkg, 'dist', 'src', 'version.ts'))
