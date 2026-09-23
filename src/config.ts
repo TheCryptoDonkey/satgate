@@ -86,7 +86,7 @@ export interface TokenTollConfig {
   logger?: Logger
   /** Human-readable service name for Lightning invoice descriptions. Defaults to 'toll-booth'. */
   serviceName?: string
-  /** IETF Payment auth realm (e.g. 'satgate.trotters.dev'). Enables dual-scheme challenges. */
+  /** IETF Payment auth realm (e.g. 'satgate.forgesworn.dev'). Enables dual-scheme challenges. */
   realm?: string
   /** Enable IETF Payment session intent (deposit/bearer/top-up/close for streaming). */
   sessionIntent: boolean

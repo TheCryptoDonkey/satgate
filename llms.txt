@@ -6,11 +6,11 @@ One command turns a local inference server into a billable API endpoint. satgate
 
 ## Live Demo
 
-A public instance is running at https://satgate.trotters.dev — open it in a browser for the chat playground, or point any OpenAI-compatible client at it. Discovery endpoints:
+A public instance is running at https://satgate.forgesworn.dev — open it in a browser for the chat playground, or point any OpenAI-compatible client at it. Discovery endpoints:
 
-- https://satgate.trotters.dev/.well-known/l402
-- https://satgate.trotters.dev/llms.txt
-- https://satgate.trotters.dev/openapi.json
+- https://satgate.forgesworn.dev/.well-known/l402
+- https://satgate.forgesworn.dev/llms.txt
+- https://satgate.forgesworn.dev/openapi.json
 
 ## Getting Started
 
