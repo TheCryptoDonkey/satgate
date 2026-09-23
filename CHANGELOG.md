@@ -1,9 +1,47 @@
+# Changelog
+
+## 1.17.2 (2026-08-22)
+
+### Bug Fixes
+
+- point the deploy guard at the credential that exists (#11)
+
+## 1.17.1 (2026-08-22)
+
+### Bug Fixes
+
+- keep announcing after adding the lnurlcash rail (#9)
+
+## 1.17.0 (2026-08-22)
+
+### Features
+
+- accept LUD-25 bearer notes and sweep them to Lightning (#7)
+
+## 1.16.0 (2026-08-17)
+
+### Features
+
+- add an nwc lightning backend
+
 ## [1.15.5](https://github.com/TheCryptoDonkey/satgate/compare/v1.15.4...v1.15.5) (2026-08-14)
 
 ### Documentation and metadata
 
 * correct canonical ForgeSworn links for toll-booth and 402-mcp
 * add npm funding metadata for the project support channels
+
+## 1.15.4 (2026-08-13)
+
+### Bug Fixes
+
+- publish the built package exports
+
+## 1.15.3 (2026-08-13)
+
+### Bug Fixes
+
+- migrate to toll-booth 6 and restore releases
 
 ## [1.15.2](https://github.com/TheCryptoDonkey/satgate/compare/v1.15.1...v1.15.2) (2026-03-27)
 
@@ -21,55 +59,7 @@
 
 * announce IETF Payment pmi tag when realm is configured ([f1abb5e](https://github.com/TheCryptoDonkey/satgate/commit/f1abb5e0f3a82337a0624faf44e6742522b2f44d))
 
-# [1.15.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.14.1...v1.15.0) (2026-03-24)
-
-## 1.17.2 (2026-08-22)
-
-### Bug Fixes
-
-- point the deploy guard at the credential that exists (#11)
-
-
-
-## 1.17.1 (2026-08-22)
-
-### Bug Fixes
-
-- keep announcing after adding the lnurlcash rail (#9)
-
-
-
-## 1.17.0 (2026-08-22)
-
-### Features
-
-- accept LUD-25 bearer notes and sweep them to Lightning (#7)
-
-
-
-## 1.16.0 (2026-08-17)
-
-### Features
-
-- add an nwc lightning backend
-
-
-
-## 1.15.4 (2026-08-13)
-
-### Bug Fixes
-
-- publish the built package exports
-
-
-
-## 1.15.3 (2026-08-13)
-
-### Bug Fixes
-
-- migrate to toll-booth 6 and restore releases
-
-
+## [1.15.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.14.1...v1.15.0) (2026-03-24)
 
 
 ### Features
@@ -83,7 +73,7 @@
 
 * allow Google Fonts in CSP for landing page typography ([3dc4a50](https://github.com/TheCryptoDonkey/satgate/commit/3dc4a50286c03219bf49d39f35fc508a098cd16f))
 
-# [1.14.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.13.1...v1.14.0) (2026-03-24)
+## [1.14.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.13.1...v1.14.0) (2026-03-24)
 
 
 ### Features
@@ -97,7 +87,7 @@
 
 * branding — OG meta tags, ForgeSworn links, IETF Payment mention ([2fa82fb](https://github.com/TheCryptoDonkey/satgate/commit/2fa82fb07a2a19e61a2bf86b4fb261f1da9d0dcf))
 
-# [1.13.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.12.1...v1.13.0) (2026-03-24)
+## [1.13.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.12.1...v1.13.0) (2026-03-24)
 
 
 ### Features
@@ -111,21 +101,21 @@
 
 * add explicit L402 rail for dual-scheme challenges ([4756ae4](https://github.com/TheCryptoDonkey/satgate/commit/4756ae43e572bd1e14790d4e6e8591c522274915))
 
-# [1.12.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.11.0...v1.12.0) (2026-03-24)
+## [1.12.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.11.0...v1.12.0) (2026-03-24)
 
 
 ### Features
 
 * upgrade to @forgesworn/toll-booth + IETF Payment auth ([150a470](https://github.com/TheCryptoDonkey/satgate/commit/150a4706f483fcaa026028ad8c85a02ecb899466))
 
-# [1.11.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.10.0...v1.11.0) (2026-03-17)
+## [1.11.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.10.0...v1.11.0) (2026-03-17)
 
 
 ### Features
 
 * auto-melt Cashu ecash to operator Lightning node ([9baa006](https://github.com/TheCryptoDonkey/satgate/commit/9baa0065cd54687db4f0455aed294ed273740f2e))
 
-# [1.10.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.9.0...v1.10.0) (2026-03-17)
+## [1.10.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.9.0...v1.10.0) (2026-03-17)
 
 
 ### Bug Fixes
@@ -141,14 +131,14 @@
 * add Cashu metadata to well-known and llms.txt discovery ([91a9341](https://github.com/TheCryptoDonkey/satgate/commit/91a9341a4c45b92bfbfedc295b02aef33b229ae0))
 * wire xcashu rail, fix paymentMethods, broaden auth for Cashu ([3ca5436](https://github.com/TheCryptoDonkey/satgate/commit/3ca54366dc7b7cacdbeafc4dbbf59f08981aebc0))
 
-# [1.9.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.8.0...v1.9.0) (2026-03-15)
+## [1.9.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.8.0...v1.9.0) (2026-03-15)
 
 
 ### Features
 
 * add --public-url flag for explicit announce URL ([bb9b186](https://github.com/TheCryptoDonkey/satgate/commit/bb9b186b295d9c6dba955209875f31bc2ac4eb2e))
 
-# [1.8.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.7.8...v1.8.0) (2026-03-15)
+## [1.8.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.7.8...v1.8.0) (2026-03-15)
 
 
 ### Features
@@ -237,7 +227,7 @@
 * pass maxBodySize to streaming proxy instead of using hardcoded 100 MiB ([18ae958](https://github.com/TheCryptoDonkey/satgate/commit/18ae95827341c71f4864c4577678f9e9a7e0c03d))
 * require rootKey to be exactly 64 hex chars, matching toll-booth ([79ceb2a](https://github.com/TheCryptoDonkey/satgate/commit/79ceb2a7974bcc2970f57de566b9219d98581802))
 
-# [1.7.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.6.0...v1.7.0) (2026-03-14)
+## [1.7.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.6.0...v1.7.0) (2026-03-14)
 
 
 ### Bug Fixes
@@ -255,7 +245,7 @@
 * add --announce for Nostr discovery via l402-announce ([0d23a48](https://github.com/TheCryptoDonkey/satgate/commit/0d23a48abe603cdf6ca917dc79d021a1a6ae0f00))
 * add status tag and JSON schemas to Nostr service announcement ([1495451](https://github.com/TheCryptoDonkey/satgate/commit/14954513838173b233f3585d1e6e24580b14aca3))
 
-# [1.6.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.5.1...v1.6.0) (2026-03-14)
+## [1.6.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.5.1...v1.6.0) (2026-03-14)
 
 
 ### Features
@@ -270,14 +260,14 @@
 
 * add spacing between payment tier buttons and actions ([9100278](https://github.com/TheCryptoDonkey/satgate/commit/91002785092d29c71818d170c2c1f0eb0c9e4cd4))
 
-# [1.5.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.4.0...v1.5.0) (2026-03-14)
+## [1.5.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.4.0...v1.5.0) (2026-03-14)
 
 
 ### Features
 
 * add custom sats amount option to payment flow ([f3b9e68](https://github.com/TheCryptoDonkey/satgate/commit/f3b9e68439c859ab83340782fcea31f29d3ce0e5))
 
-# [1.4.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.3.1...v1.4.0) (2026-03-14)
+## [1.4.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.3.1...v1.4.0) (2026-03-14)
 
 
 ### Features
@@ -291,7 +281,7 @@
 
 * show tokens/sat instead of sats/1k tokens on model cards ([2ba5714](https://github.com/TheCryptoDonkey/satgate/commit/2ba5714dafe1e7ca4f4bdbd7c8a84c79ae68437f))
 
-# [1.3.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.2.1...v1.3.0) (2026-03-14)
+## [1.3.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.2.1...v1.3.0) (2026-03-14)
 
 
 ### Features
@@ -305,7 +295,7 @@
 
 * model selector UX improvements ([9a22de3](https://github.com/TheCryptoDonkey/satgate/commit/9a22de36521b17561a98c61879ac77388ab36aa6))
 
-# [1.2.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.1.0...v1.2.0) (2026-03-14)
+## [1.2.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.1.0...v1.2.0) (2026-03-14)
 
 
 ### Bug Fixes
@@ -318,14 +308,14 @@
 * add gemma3:4b as second model with per-model pricing ([0c5eab6](https://github.com/TheCryptoDonkey/satgate/commit/0c5eab630fa031b93f7fdc78c428574d79b30938))
 * add model selector pills to UI ([7bb3c49](https://github.com/TheCryptoDonkey/satgate/commit/7bb3c49e200566f735c75806b7aceb9fbc29e84c))
 
-# [1.1.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.0.0...v1.1.0) (2026-03-14)
+## [1.1.0](https://github.com/TheCryptoDonkey/satgate/compare/v1.0.0...v1.1.0) (2026-03-14)
 
 
 ### Features
 
 * switch free tier from per-request to per-usage (creditsPerDay) ([3aec2b3](https://github.com/TheCryptoDonkey/satgate/commit/3aec2b340d08b94b383dfe6e3998c1b7ce27ef17))
 
-# 1.0.0 (2026-03-14)
+## 1.0.0 (2026-03-14)
 
 
 ### Bug Fixes
