@@ -1,8 +1,8 @@
 # satgate
 
-> satgate is a pay-per-token inference proxy for any OpenAI-compatible endpoint — Ollama, vLLM, llama.cpp, or any API that speaks the OpenAI format. Clients pay per token using Lightning, Cashu, or NWC (Nostr Wallet Connect); no accounts, no API keys, instant settlement. Stablecoin payments via x402 are coming. Powered by toll-booth under the hood.
+> satgate is a pay-per-token (or pay-per-request) inference proxy for OpenAI-compatible endpoints: Ollama, vLLM, llama.cpp, or a hosted API (set UPSTREAM_API_KEY for one that needs a key). Clients pay over Lightning, Cashu ecash, LNURLcash (LUD-25) bearer notes or x402 stablecoins; no accounts, no API keys. Payment handling comes from toll-booth.
 
-One command turns a local inference server into a billable API endpoint. satgate auto-detects your models, issues L402 payment challenges, proxies requests once paid, counts actual tokens from the response, and reconciles any overpayment back to the client's credit balance.
+One command turns a local inference server into a billable API endpoint. satgate auto-detects your models, issues HTTP 402 payment challenges, proxies requests once paid, and bills from the token counts the upstream reports, returning any unused hold to the client's credit balance.
 
 ## Live Demo
 
@@ -18,26 +18,35 @@ A public instance is running at https://satgate.trotters.dev — open it in a br
 LIGHTNING_KEY=<phoenixd password> npx satgate --upstream http://localhost:11434 --lightning phoenixd
 ```
 
-satgate queries `/v1/models` on startup, charges per token over Lightning, and proxies paid inference traffic to your backend. Without `--lightning` (or Cashu mints, or an allowlist) it runs in open mode, with no payment or authentication, and stays local unless `--tunnel` is passed. For production, create `satgate.yaml`:
+satgate queries `/v1/models` on startup, charges over Lightning, and proxies paid inference traffic to your backend. Without `--lightning` (or Cashu mints, or an allowlist) it runs in open mode, with no payment or authentication, and stays local unless `--tunnel` is passed.
+
+With no pricing configured, each request costs a flat 1 sat. Set `--token-price`, `--model-price` or a `pricing:` block for per-token billing, or `--price` for a different flat price. For production, create `satgate.yaml`:
 
 ```yaml
 upstream: http://localhost:11434
 port: 3000
-storage: sqlite
+lightning: phoenixd          # or lnbits, lnd, cln, nwc; key in LIGHTNING_KEY
+storage: sqlite              # the default when a payment rail is configured
 dbPath: ./satgate.db
 
 pricing:
-  default: 1          # sats per 1k tokens for unlisted models
+  default: 1                 # sats per 1k tokens for unlisted models
   models:
     llama3: 1
     deepseek-r1: 5
     mixtral-8x22b: 3
 
+maxTokens: 2048              # cap on completion tokens per request
+
 freeTier:
-  creditsPerDay: 250
+  creditsPerDay: 250         # free sats of credit per client IP per day
 
 capacity:
-  maxConcurrent: 4
+  maxConcurrent: 4           # default 8; 0 = unlimited
+
+trustProxy: true             # only behind a reverse proxy
+trustedProxies:
+  - 127.0.0.1
 
 tiers:
   - amountSats: 1000
@@ -46,36 +55,46 @@ tiers:
   - amountSats: 5000
     creditSats: 5500
     label: "5,000 sats (10% bonus)"
-  - amountSats: 10000
-    creditSats: 11100
-    label: "10,000 sats (11% bonus)"
 ```
 
 ## Key Concepts
 
-- **Model pricing** — per-model rates in sats per 1,000 tokens. Unlisted models fall back to the `default` rate. Resolution order: exact match → case-insensitive match → Ollama tag stripping (`llama3:latest` → `llama3`) → default. Token costs always round up so the operator is never short-changed.
-- **Token counting** — three priority sources. Priority 1: usage field from a buffered (non-streaming) JSON response. Priority 2: usage field from the final SSE chunk when `stream_options: { include_usage: true }` is set. Priority 3: content chunk count (1 chunk ≈ 1 token) as a fallback for streams that omit usage data.
-- **Capacity management** — `maxConcurrent` limits how many inference requests run simultaneously. Requests that arrive when all slots are occupied receive a 503. Set to `0` to disable the limit.
-- **Free tier** — optional per-IP daily allowance. Requests within the daily limit pass through without any payment challenge. Resets at midnight UTC.
-- **Payment tiers with volume discounts** — clients choose a tier amount when funding their balance. Each tier can grant bonus credit (e.g. pay 5,000 sats, receive 5,500 in credit), incentivising larger upfront payments.
-- **Cost reconciliation** — when a request arrives, an estimated sat amount is deducted from the client's balance upfront (based on model price and a configurable estimate). After the response completes and tokens are counted, the actual cost is reconciled. Any overpayment is credited back immediately.
+- **Model pricing**: per-model rates in sats per 1,000 tokens. Unlisted models fall back to the `default` rate. Resolution order: exact match, case-insensitive match (a missing tag counts as `:latest`), Ollama tag stripping (`llama3:8b` to `llama3`), then default. Requests naming a model that is neither auto-detected nor priced are refused with a 400, so an alias cannot fall through to the default price.
+- **Flat pricing**: `--price <sats>` (or `price:` in the config file) charges a fixed amount per request instead. A price of 0 serves inference free.
+- **Token counting**: billing uses the prompt and completion token counts the upstream reports, from the JSON body or, for streams, the final usage event (satgate always sets `stream_options.include_usage`). Completion tokens include any reasoning tokens. Only if the upstream reports no usage does satgate estimate from generated chunks, with a floor of one token per four bytes.
+- **Holds and reconciliation**: before calling the upstream, satgate holds the most the request could cost: every byte of the body as a prompt token plus `max_tokens` for each choice (`n`/`best_of`, at most 8). `max_tokens` is clamped to `maxTokens` (default 2048) and set when absent. A credit balance that cannot cover the hold gets a 402. Afterwards the charge is settled to the reported usage, rounded up to the next sat, and the rest returns to the balance. Each request settles its own hold, so concurrent requests on one credential are billed correctly.
+- **Per-request payments**: an IETF Payment charge pays exactly `estimatedCostSats` for one request and cannot be topped up or refunded, so `max_tokens` is shrunk to fit it and a larger prompt is refused. The same applies to the free tier and IETF Payment sessions.
+- **Capacity management**: `maxConcurrent` limits simultaneous inference requests (default 8). Requests beyond it get a 503. Set to `0` to disable the limit.
+- **Free tier**: an optional daily allowance of credit, in sats, per client IP. Each free request uses `estimatedCostSats` of it (or the flat price). Resets at midnight UTC.
+- **Client IPs**: without `trustProxy`, the TCP peer address identifies a client. Behind a reverse proxy set `trustProxy` (and `trustedProxies`) so `X-Forwarded-For` is read instead; otherwise every client looks like the proxy.
+- **Invoice limits**: each client IP may hold 20 unpaid invoices (`maxPendingInvoicesPerIp`) before further challenges get a 429.
+- **Payment tiers with volume discounts**: clients choose a tier amount when buying credit. Each tier can grant bonus credit (e.g. pay 5,000 sats, receive 5,500 in credit).
+
+## Payment Rails
+
+- **Lightning**: `--lightning phoenixd | lnbits | lnd | cln | nwc`. For nwc, `LIGHTNING_KEY` names a file holding the `nostr+walletconnect://` URI. Lightning enables L402 (credit: pay once, spend the balance over many requests) and IETF Payment (per-request charge, draft-ryan-httpauth-payment-01) credentials.
+- **Cashu ecash**: `--cashu-mints <urls>`; clients send an `X-Cashu` token. With Lightning configured, received ecash is melted to your node.
+- **LNURLcash (LUD-25) bearer notes**: `--lnurlcash-mints <hosts>`; clients send the note URL in `X-LNURLcash`. With Lightning configured, notes are melted to your node.
+- **x402 stablecoins**: set `X402_RECEIVER`, `X402_NETWORK` and `X402_FACILITATOR_URL` (and `DEFAULT_PRICE_USD`); clients send a `PAYMENT-SIGNATURE` header.
 
 ## Supported Inference Endpoints
 
-These endpoints require a valid L402 credential (pay once, use until credit runs out):
+These endpoints require payment (or an allowlisted identity in allowlist mode):
 
-- `POST /v1/chat/completions` — chat completions, streaming and buffered
-- `POST /v1/completions` — legacy text completions
-- `POST /v1/embeddings` — embedding generation
+- `POST /v1/chat/completions`: chat completions, streaming and buffered
+- `POST /v1/completions`: legacy text completions
+- `POST /v1/embeddings`: embedding generation
+
+`HEAD` on any of them is a free price probe (`X-L402-Price-Sats`).
 
 ## Discovery Endpoints
 
 These endpoints require no authentication and are designed for machine consumption:
 
-- `GET /.well-known/l402` — machine-readable service descriptor: pricing per model, available tiers, payment methods, and model list
-- `GET /llms.txt` — this file, served dynamically with live pricing and model data
-- `GET /openapi.json` — OpenAPI 3.1 specification for client code generation
-- `GET /v1/models` — standard OpenAI model listing, proxied transparently from upstream
+- `GET /.well-known/l402`: pricing per model, tiers, payment methods and model list
+- `GET /llms.txt`: a description of this instance, generated from its live configuration
+- `GET /openapi.json`: OpenAPI 3.1 specification for client code generation
+- `GET /v1/models`: standard OpenAI model listing, proxied from upstream
 
 ## Configuration
 
@@ -85,46 +104,66 @@ Configuration precedence: **CLI flags > environment variables > config file > de
 
 | Flag | Description |
 |------|-------------|
-| `--upstream <url>` | Upstream inference URL (required) |
+| `--upstream <url>` | Upstream inference URL (default: auto-detect Ollama on :11434) |
+| `--upstream-key-file <path>` | File holding a bearer key for the upstream |
+| `--lightning <backend>` | `phoenixd`, `lnbits`, `lnd`, `cln` or `nwc` |
+| `--cashu-mints <urls>` | Accepted Cashu mints |
+| `--lnurlcash-mints <hosts>` | Accepted LNURLcash mint hosts |
+| `--auth <mode>` | `open`, `lightning`, `cashu` or `allowlist` (inferred when omitted) |
 | `--port <n>` | Port to listen on (default: 3000) |
-| `--config <path>` | Path to YAML config file |
-| `--price <n>` | Default sats per 1k tokens (default: 1) |
-| `--max-concurrent <n>` | Max concurrent requests (default: 0 = unlimited) |
-| `--storage <type>` | `memory` or `sqlite` (default: memory) |
-| `--free-tier <n>` | Free requests per IP per day (default: 0) |
-| `--root-key <hex>` | Root key for macaroon signing (auto-generated if omitted) |
+| `--config <path>` | Path to a JSON or YAML config file |
+| `--price <sats>` | Flat sats per request (flat pricing) |
+| `--token-price <sats>` | Sats per 1k tokens (per-token pricing) |
+| `--model-price <model:sats>` | Per-model token price (repeatable) |
+| `--max-tokens <n>` | Cap on completion tokens per request (default: 2048) |
+| `--max-concurrent <n>` | Max concurrent requests (default: 8; 0 = unlimited) |
+| `--max-pending-invoices <n>` | Unpaid invoices per client IP (default: 20; 0 = unlimited) |
+| `--storage <type>` | `memory` or `sqlite` (default: sqlite with a payment rail, else memory) |
+| `--free-tier <n>` | Free credit, in sats, per client IP per day (default: 0) |
+| `--trust-proxy` | Read client IPs from `X-Forwarded-For` / `X-Real-IP` |
+| `--trusted-proxies <ips>` | Proxy IPs/IPv4 CIDRs to skip in `X-Forwarded-For` |
+| `--tunnel` / `--no-tunnel` | Force the Cloudflare quick tunnel on or off |
+| `--root-key <hex>` | Root key for macaroon signing (prefer `ROOT_KEY`) |
 
 ### Environment variables
 
 | Variable | Description |
 |----------|-------------|
 | `UPSTREAM_URL` | Upstream inference URL |
-| `ROOT_KEY` | Root key for macaroon signing |
+| `UPSTREAM_API_KEY` | Bearer key for the upstream |
+| `LIGHTNING_BACKEND`, `LIGHTNING_URL`, `LIGHTNING_KEY` | Lightning backend settings |
+| `ROOT_KEY` | Root key for macaroon signing; otherwise generated and kept in `satgate.root-key` beside the database |
 | `PORT` | Port to listen on |
 | `STORAGE` | `memory` or `sqlite` |
 | `DEFAULT_PRICE` | Default sats per 1k tokens |
-| `FREE_TIER_CREDITS` | Free credits (sats) per IP per day |
+| `SATGATE_TOKEN_PRICE` | Sats per 1k tokens (per-token pricing) |
+| `SATGATE_MAX_TOKENS` | Cap on completion tokens per request |
+| `SATGATE_ESTIMATED_COST` | Per-request hold, in sats |
+| `FREE_TIER_CREDITS` | Free credit, in sats, per client IP per day |
 | `MAX_CONCURRENT` | Max concurrent inference requests |
+| `TRUST_PROXY`, `TRUSTED_PROXIES` | Reverse proxy settings |
+| `SATGATE_MAX_PENDING_INVOICES` | Unpaid invoices per client IP |
+| `CASHU_MINTS`, `LNURLCASH_MINTS` | Accepted mints |
 
-### YAML config file
+### Config file
 
-The config file (default: `satgate.yaml` in the working directory) accepts all of the above plus:
+The config file (default: `satgate.yaml` or `satgate.json` in the working directory) accepts the settings above plus:
 
-- `dbPath` — path to the SQLite database file
-- `tiers` — array of `{ amountSats, creditSats, label }` objects for volume discount tiers
-- `trustProxy` — set `true` when running behind a reverse proxy (uses `X-Forwarded-For` for free tier tracking)
-- `estimatedCostSats` — sat amount to hold per request before token count is known (default: `max(defaultPrice * 10, 10)`)
-- `maxBodySize` — maximum request body size in bytes (default: 10 MiB)
+- `dbPath`: path to the SQLite database file (default: `./satgate.db`)
+- `tiers`: array of `{ amountSats, creditSats, label }` objects for volume discount tiers
+- `estimatedCostSats`: sats held per request before the token count is known. Default: `ceil((4096 + maxTokens) * dearestPrice / 1000)`, enough for a 4 KiB request plus a full `max_tokens` completion at the dearest configured per-1k price
+- `maxBodySize`: maximum request body size in bytes (default: 10 MiB)
+- `upstreamKeyFile`: file holding a bearer key for the upstream
 
 ## Ecosystem
 
-satgate is built on top of **toll-booth** — L402 payment middleware that handles the full invoice → credential → credit flow. toll-booth is payment-rail agnostic and supports Lightning (Phoenixd, LND, Core Lightning, LNbits, Alby), Cashu ecash, and NWC. satgate adds the inference-specific layer: model detection, token counting, cost reconciliation, and capacity management.
+satgate is built on **toll-booth**, HTTP 402 payment middleware that handles the invoice, credential and credit flow. It supports Lightning (phoenixd, LND, Core Lightning, LNbits and NWC wallets), Cashu ecash, LNURLcash notes and x402. satgate adds the inference-specific layer: model detection, token counting, holds and reconciliation, and capacity management.
 
-The natural client counterpart is **402-mcp** — an MCP server that lets AI agents discover L402 APIs (via `/.well-known/l402`), pay invoices from a connected wallet, and consume the API — all autonomously, with no human in the loop.
+The natural client counterpart is **402-mcp**, an MCP server that lets AI agents discover 402 APIs (via `/.well-known/l402`), pay from a connected wallet and consume the API with no human in the loop.
 
 ```
 AI Agent -> 402-mcp -> satgate -> Your inference backend
 ```
 
-- toll-booth: https://github.com/TheCryptoDonkey/toll-booth
-- 402-mcp: https://github.com/TheCryptoDonkey/402-mcp
+- toll-booth: https://github.com/forgesworn/toll-booth
+- 402-mcp: https://github.com/forgesworn/402-mcp
