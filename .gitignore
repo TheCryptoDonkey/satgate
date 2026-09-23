@@ -11,3 +11,4 @@ docs/superpowers/
 .playwright-mcp/
 satgate.root-key
 pnpm-lock.yaml
+.idea/
