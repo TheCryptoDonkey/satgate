@@ -15,6 +15,7 @@ function parseArgs(argv: string[]): CliArgs {
   for (let i = 2; i < argv.length; i++) {
     switch (argv[i]) {
       case '--upstream': args.upstream = argv[++i]; break
+      case '--upstream-key-file': args.upstreamKeyFile = argv[++i]; break
       case '--port': args.port = parseInt(argv[++i], 10); break
       case '--config': args.config = argv[++i]; break
       case '--price': args.price = parseInt(argv[++i], 10); break
@@ -83,6 +84,8 @@ function printHelp(): void {
 
   Upstream:
     --upstream <url>           Upstream API URL (default: auto-detect Ollama on :11434)
+    --upstream-key-file <path> File holding a bearer key for the upstream API
+                               (or set UPSTREAM_API_KEY)
 
   Lightning:
     --lightning <backend>      phoenixd | lnbits | lnd | cln | nwc
@@ -231,6 +234,18 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     args.allowlist = [...(args.allowlist ?? []), ...entries]
   }
 
+  // Upstream API key from a file, so it never appears in argv
+  const upstreamKeyFile = args.upstreamKeyFile
+    ?? (typeof fileConfig.upstreamKeyFile === 'string' ? fileConfig.upstreamKeyFile : undefined)
+  if (upstreamKeyFile) {
+    try {
+      args.upstreamKey = readFileSync(upstreamKeyFile, 'utf-8').trim()
+    } catch {
+      console.error(`[satgate] Could not read upstream key file: ${upstreamKeyFile}`)
+      process.exit(1)
+    }
+  }
+
   // Warn when secrets are passed on the command line (visible in `ps aux`)
   const cliSecrets: string[] = []
   if (args.lightningKey) cliSecrets.push('--lightning-key')
@@ -272,6 +287,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     try {
       const res = await fetch(`${config.upstream}/v1/models`, {
         signal: AbortSignal.timeout(5000),
+        ...(config.upstreamKey && { headers: { Authorization: `Bearer ${config.upstreamKey}` } }),
       })
       const body = await res.json() as { data?: Array<{ id: string }> }
       models = body.data?.map(m => m.id) ?? []

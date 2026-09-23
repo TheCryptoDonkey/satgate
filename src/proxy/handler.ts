@@ -11,6 +11,8 @@ const ALLOWED_PATH_PREFIXES = ['/v1/chat/completions', '/v1/completions', '/v1/e
 
 export interface ProxyDeps {
   upstream: string
+  /** Bearer token for the upstream API, if it needs one. */
+  upstreamKey?: string
   pricing: ModelPricing
   capacity: CapacityTracker
   /**
@@ -288,7 +290,10 @@ export function createProxyHandler(deps: ProxyDeps) {
       try {
         upstreamRes = await fetch(upstreamUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(deps.upstreamKey && { Authorization: `Bearer ${deps.upstreamKey}` }),
+          },
           body: JSON.stringify(body),
           signal: AbortSignal.timeout(timeout),
         })

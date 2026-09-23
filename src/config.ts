@@ -13,6 +13,8 @@ export interface ModelPricing {
 
 export interface TokenTollConfig {
   upstream: string
+  /** Bearer token sent to the upstream, for hosted OpenAI-compatible APIs. */
+  upstreamKey?: string
   port: number
   rootKey: string
   rootKeyGenerated: boolean
@@ -104,6 +106,9 @@ export interface TokenTollConfig {
 
 export interface CliArgs {
   upstream?: string
+  /** Upstream API key, read by the CLI from --upstream-key-file (never a flag value). */
+  upstreamKey?: string
+  upstreamKeyFile?: string
   port?: number
   config?: string
   price?: number
@@ -140,6 +145,8 @@ export interface CliArgs {
 
 export interface FileConfig {
   upstream?: string
+  /** Path to a file holding the upstream API key. */
+  upstreamKeyFile?: string
   port?: number
   rootKey?: string
   storage?: string
@@ -243,6 +250,8 @@ export function loadConfig(
     if (e instanceof Error && e.message.includes('http or https')) throw e
     throw new Error(`upstream URL is not a valid URL: ${upstream}`)
   }
+
+  const upstreamKey = (args.upstreamKey ?? env.UPSTREAM_API_KEY)?.trim() || undefined
 
   const portRaw = args.port ?? (env.PORT ? parseInt(env.PORT, 10) : undefined) ?? file.port ?? 3000
   if (!Number.isFinite(portRaw) || portRaw < 0 || portRaw > 65535) {
@@ -592,6 +601,7 @@ export function loadConfig(
 
   return {
     upstream: upstream.replace(/\/+$/, ''),
+    upstreamKey,
     port,
     rootKey,
     rootKeyGenerated,

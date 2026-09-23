@@ -360,6 +360,7 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
       const maxModelsBytes = 1024 * 1024 // 1 MiB limit for /v1/models response
       const res = await fetch(`${config.upstream}/v1/models`, {
         signal: AbortSignal.timeout(10_000),
+        ...(config.upstreamKey && { headers: { Authorization: `Bearer ${config.upstreamKey}` } }),
       })
       // Read body incrementally to enforce size limit
       const reader = res.body?.getReader()
@@ -395,6 +396,7 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
   // AI proxy routes (behind auth middleware)
   const proxyHandler = createProxyHandler({
     upstream: config.upstream,
+    upstreamKey: config.upstreamKey,
     pricing: config.pricing,
     capacity,
     maxBodySize: config.maxBodySize,
