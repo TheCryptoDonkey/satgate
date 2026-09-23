@@ -1,6 +1,6 @@
 import { TokenCounter } from './token-counter.js'
 import { createStreamingProxy } from './streaming.js'
-import { resolveModelPrice, tokenCostToSats } from './pricing.js'
+import { isServedModel, resolveModelPrice, tokenCostToSats } from './pricing.js'
 import type { CapacityTracker } from './capacity.js'
 import { reconcileHold, unmeteredHold, type Hold } from './hold.js'
 import type { ModelPricing } from '../config.js'
@@ -23,6 +23,12 @@ export interface ProxyDeps {
   flatPricing?: boolean
   /** Timeout in ms for upstream requests (default: 120_000). */
   upstreamTimeout?: number
+  /**
+   * Model names this gateway serves (auto-detected upstream models plus
+   * configured prices). Requests for any other name are refused before
+   * reaching the upstream. Empty or omitted: no check.
+   */
+  models?: readonly string[]
   /** Logger instance — if omitted, errors are silent. */
   logger?: Logger
 }
@@ -157,6 +163,18 @@ export function createProxyHandler(deps: ProxyDeps) {
       refund()
       return new Response(
         JSON.stringify({ error: 'Invalid JSON body' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } },
+      )
+    }
+
+    // Refuse models this gateway does not serve. Pricing looks models up by
+    // name, so a name the upstream resolves to a priced model but pricing
+    // does not recognise would otherwise be billed at the default price.
+    const requestedModel = extractModel(body)
+    if (!isServedModel(requestedModel, deps.models ?? [])) {
+      refund()
+      return new Response(
+        JSON.stringify({ error: `Unknown model: ${requestedModel.slice(0, 200) || '(none)'}`, models: deps.models }),
         { status: 400, headers: { 'Content-Type': 'application/json' } },
       )
     }

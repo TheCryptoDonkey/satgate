@@ -129,3 +129,32 @@ describe('per-token billing on one credential', () => {
     expect(probe.headers.get('X-Credit-Balance')).toBe(String(1000 - 10))
   })
 })
+
+describe('model names', () => {
+  it('refuses a model alias outside the served list without charging', async () => {
+    upstream = await startUpstream()
+    const { backend, preimages } = createPreimageBackend()
+    const { app } = createTokenTollServer(paidConfig(upstream.url, {
+      backend,
+      models: ['gemma3:4b'],
+      pricing: { default: 1, models: { 'gemma3:4b': 50 } },
+    }))
+    const auth = await buyL402Credential(app, preimages)
+
+    const res = await app.request('/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: auth },
+      body: JSON.stringify({ model: 'registry.ollama.ai/library/gemma3:4b', messages: [{ role: 'user', content: 'hi' }] }),
+    })
+    expect(res.status).toBe(400)
+    expect(upstream.bodies).toHaveLength(0)
+
+    const probe = await app.request('/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: auth },
+      body: JSON.stringify({ model: 'gemma3:4b', messages: [{ role: 'user', content: 'tokens=1' }] }),
+    })
+    expect(probe.status).toBe(200)
+    expect(probe.headers.get('X-Credit-Balance')).toBe(String(1000 - 10))
+  })
+})
