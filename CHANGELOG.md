@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.17.5 (2026-09-23)
+
+### Bug Fixes
+
+- serve the public instance from satgate.forgesworn.dev
+
+
+
 ## 1.17.4 (2026-09-23)
 
 ### Bug Fixes
