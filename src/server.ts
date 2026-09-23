@@ -317,7 +317,10 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
     return c.json(generateOpenApiSpec({
       models,
       pricing: config.pricing,
+      lightning: !!config.lightning,
       x402: !!config.x402,
+      cashu: !!config.cashu,
+      lnurlcash: !!config.lnurlcash,
     }))
   })
 
