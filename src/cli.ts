@@ -7,6 +7,7 @@ import { createLightningBackend } from './lightning.js'
 import { startTunnel, stopTunnel, type TunnelResult } from './tunnel.js'
 import { createLogger } from './logger.js'
 import { resolveModelPrice } from './proxy/pricing.js'
+import { readPackageVersion } from './version.js'
 
 function parseArgs(argv: string[]): CliArgs {
   const args: CliArgs = {}
@@ -143,12 +144,14 @@ function printHelp(): void {
 }
 
 function printVersion(): void {
-  try {
-    const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf-8'))
-    console.log(`satgate v${pkg.version}`)
-  } catch {
-    console.log('satgate (unknown version)')
-  }
+  const version = readPackageVersion()
+  console.log(version ? `satgate v${version}` : 'satgate (unknown version)')
+}
+
+/** The Lightning line of the startup banner. nwc has no URL: its relay is in the URI. */
+export function lightningLabel(config: Pick<TokenTollConfig, 'lightning' | 'lightningUrl'>): string {
+  if (!config.lightning) return 'none (free mode)'
+  return config.lightningUrl ? `${config.lightning} (${config.lightningUrl})` : config.lightning
 }
 
 /**
@@ -267,19 +270,12 @@ export async function main(argv: string[] = process.argv): Promise<void> {
   const backend = createLightningBackend(config)
   const { app } = createTokenTollServer({ ...config, models, backend, logger })
 
-  let version = '0.1.0'
-  try {
-    const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf-8'))
-    version = pkg.version
-  } catch { /* ignore */ }
+  const version = readPackageVersion() ?? 'unknown'
 
   let tunnelResult: TunnelResult | undefined
   let announcement: { close(): void; pubkey: string } | undefined
 
   const server = serve({ fetch: app.fetch, port: config.port }, async () => {
-    const lightningLabel = config.lightning
-      ? `${config.lightning} (${config.lightningUrl})`
-      : 'none (free mode)'
     const authLabel = config.authMode === 'lightning'
       ? 'lightning (pay-per-request)'
       : config.authMode === 'cashu'
@@ -294,7 +290,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     logger.info(`satgate v${version}`)
     logger.info(`Upstream:   ${config.upstream}${ollamaAutoDetected ? ' (auto-detected)' : ''}`)
     logger.info(`Models:     ${models.length > 0 ? models.join(', ') : '(none detected)'}`)
-    logger.info(`Lightning:  ${lightningLabel}`)
+    logger.info(`Lightning:  ${lightningLabel(config)}`)
     logger.info(`Auth:       ${authLabel}`)
     logger.info(`Price:      ${priceLabel}`)
     if (config.lnurlcash) {
