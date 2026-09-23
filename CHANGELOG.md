@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.17.3 (2026-09-23)
+
+### Bug Fixes
+
+- close underpayment paths and harden the defaults (#13)
+
+
+
 ## 1.17.2 (2026-08-22)
 
 ### Bug Fixes
