@@ -132,9 +132,10 @@ graph TB
 - **Capacity management** — limit concurrent inference requests to protect your GPU.
 - **Auto-detect models** — queries your upstream on startup. No manual model list.
 - **Four server-side payment rails** — Lightning, Cashu ecash, LNURLcash
-  bearer notes, and x402 stablecoins. NWC stays on the client side, where an
-  agent can connect its own wallet through 402-mcp without disclosing wallet
-  credentials to satgate.
+  bearer notes, and x402 stablecoins. The Lightning rail can run on phoenixd,
+  LNbits, LND, CLN or any NWC wallet (`--lightning nwc`, URI read from a
+  file). Callers can pay from their own NWC wallet through 402-mcp without
+  disclosing it to satgate.
 - **Privacy by design** — no personal data collected or stored. No accounts, no cookies, no IP logging. GDPR-safe out of the box.
 - **Instant public URL** — auto-spawns a Cloudflare tunnel. Your GPU is reachable from the internet in seconds.
 

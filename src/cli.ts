@@ -79,9 +79,10 @@ function printHelp(): void {
     --upstream <url>           Upstream API URL (default: auto-detect Ollama on :11434)
 
   Lightning:
-    --lightning <backend>      phoenixd | lnbits | lnd | cln
-    --lightning-url <url>      Backend URL (defaults per backend)
-    --lightning-key <secret>   Password / API key / macaroon / rune
+    --lightning <backend>      phoenixd | lnbits | lnd | cln | nwc
+    --lightning-url <url>      Backend URL (defaults per backend; not used by nwc)
+    --lightning-key <secret>   Password / API key / macaroon / rune, or for nwc
+                               a file holding the nostr+walletconnect:// URI
 
   Cashu:
     --cashu-mints <urls>       Comma-separated accepted mint URLs
