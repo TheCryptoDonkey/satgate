@@ -348,3 +348,26 @@ describe('which routes are paid', () => {
     expect(res.headers.get('X-Credit-Balance')).toBe(String(1000 - 10))
   })
 })
+
+describe('client IPs without a proxy', () => {
+  it('keys the free tier on the socket address rather than one shared bucket', async () => {
+    upstream = await startUpstream()
+    const { backend } = createPreimageBackend()
+    const { app } = createTokenTollServer(paidConfig(upstream.url, { backend, freeTier: { creditsPerDay: 10 }, estimatedCostSats: 10 }))
+    let server: ReturnType<typeof serve> | undefined
+    const url = await new Promise<string>((resolve) => {
+      server = serve({ fetch: app.fetch, port: 0, hostname: '127.0.0.1' }, (info) => resolve(`http://127.0.0.1:${info.port}`))
+    })
+    try {
+      const body = JSON.stringify({ model: 'llama3', messages: [{ role: 'user', content: 'tokens=1' }], max_tokens: 1 })
+      const init = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }
+      // Over the socket: 127.0.0.1 uses its allowance
+      expect((await fetch(`${url}/v1/chat/completions`, init)).status).toBe(200)
+      expect((await fetch(`${url}/v1/chat/completions`, init)).status).toBe(402)
+      // A client with no socket address has its own allowance, not 127.0.0.1's
+      expect((await app.request('/v1/chat/completions', init)).status).toBe(200)
+    } finally {
+      server?.close()
+    }
+  })
+})

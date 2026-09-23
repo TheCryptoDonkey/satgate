@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { serve } from '@hono/node-server'
-import { createTokenTollServer } from './server.js'
+import { createTokenTollServer, socketClientIp } from './server.js'
 import { Hono } from 'hono'
 
 function mockUpstream() {
@@ -227,5 +227,28 @@ describe('free flat pricing', () => {
     } finally {
       server?.close()
     }
+  })
+})
+
+describe('socketClientIp', () => {
+  it('reads the TCP peer address under the Node server', async () => {
+    const probe = new Hono()
+    probe.get('/ip', (c) => c.text(socketClientIp(c)))
+    let server: ReturnType<typeof serve> | undefined
+    const url = await new Promise<string>((resolve) => {
+      server = serve({ fetch: probe.fetch, port: 0, hostname: '127.0.0.1' }, (info) => resolve(`http://127.0.0.1:${info.port}`))
+    })
+    try {
+      const ip = await (await fetch(`${url}/ip`, { headers: { 'X-Forwarded-For': '203.0.113.9' } })).text()
+      expect(ip).toMatch(/127\.0\.0\.1$/)
+    } finally {
+      server?.close()
+    }
+  })
+
+  it('falls back to 0.0.0.0 without a socket', async () => {
+    const probe = new Hono()
+    probe.get('/ip', (c) => c.text(socketClientIp(c)))
+    expect(await (await probe.request('/ip')).text()).toBe('0.0.0.0')
   })
 })

@@ -19,6 +19,7 @@ import {
 import type { PaymentRail } from '@forgesworn/toll-booth'
 import { meltNoteToLightning } from './lnurlcash-melt.js'
 import { createHonoTollBooth } from '@forgesworn/toll-booth/hono'
+import { getConnInfo } from '@hono/node-server/conninfo'
 import type { TollBoothEnv } from '@forgesworn/toll-booth/hono'
 import type { TokenTollConfig } from './config.js'
 import { createNoopLogger } from './logger.js'
@@ -30,6 +31,18 @@ import { generateWellKnown } from './discovery/well-known.js'
 import { generateLlmsTxt } from './discovery/llms-txt.js'
 import { generateOpenApiSpec } from './discovery/openapi.js'
 import { createHttpFacilitator } from './x402/facilitator.js'
+
+/**
+ * The address of the TCP peer. Used for per-client limits when forwarded
+ * headers are not trusted; toll-booth's own fallback is a shared 0.0.0.0.
+ */
+export function socketClientIp(c: Context): string {
+  try {
+    return getConnInfo(c).remote.address ?? '0.0.0.0'
+  } catch {
+    return '0.0.0.0' // no socket (e.g. app.request in tests)
+  }
+}
 
 /** The inference endpoints: the only routes that cost money. */
 const PAID_PATHS = ['/v1/chat/completions', '/v1/completions', '/v1/embeddings'] as const
@@ -225,10 +238,14 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
   })
 
   // Create Hono toll-booth adapter
+  // Behind a trusted proxy, toll-booth reads X-Forwarded-For. Otherwise the
+  // socket address identifies the client, rather than toll-booth's shared
+  // 0.0.0.0, so free-tier and invoice limits are per client.
   const tollBooth = createHonoTollBooth({
     engine,
     trustProxy: config.trustProxy,
     ...(config.trustedProxies?.length && { trustedProxies: config.trustedProxies }),
+    ...(!config.trustProxy && { getClientIp: socketClientIp }),
   })
 
   // Mount payment routes
