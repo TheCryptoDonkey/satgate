@@ -672,3 +672,20 @@ describe('max tokens', () => {
     expect(() => loadConfig({ upstream: 'http://x', maxTokens: 0 })).toThrow(/max tokens/)
   })
 })
+
+describe('trusted proxies', () => {
+  it('parses --trusted-proxies and TRUSTED_PROXIES, and implies trustProxy', () => {
+    const fromCli = loadConfig({ upstream: 'http://x', trustedProxies: '10.0.0.0/8, 127.0.0.1' })
+    expect(fromCli.trustedProxies).toEqual(['10.0.0.0/8', '127.0.0.1'])
+    expect(fromCli.trustProxy).toBe(true)
+    const fromEnv = loadConfig({ upstream: 'http://x' }, { TRUSTED_PROXIES: '::1' })
+    expect(fromEnv.trustedProxies).toEqual(['::1'])
+    const fromFile = loadConfig({ upstream: 'http://x' }, {}, { trustedProxies: ['172.16.0.0/12'] })
+    expect(fromFile.trustedProxies).toEqual(['172.16.0.0/12'])
+    expect(loadConfig({ upstream: 'http://x' }).trustProxy).toBe(false)
+  })
+
+  it('rejects entries that are not IPs or CIDRs', () => {
+    expect(() => loadConfig({ upstream: 'http://x', trustedProxies: 'proxy.example.com' })).toThrow(/trusted proxy/)
+  })
+})

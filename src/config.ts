@@ -23,6 +23,12 @@ export interface TokenTollConfig {
   capacity: { maxConcurrent: number }
   tiers: Array<{ amountSats: number; creditSats: number; label: string }>
   trustProxy: boolean
+  /**
+   * IPs or IPv4 CIDRs of the reverse proxies in front of satgate. With these
+   * set, X-Forwarded-For is read right to left skipping them, so a client
+   * cannot pick its own IP by prepending entries.
+   */
+  trustedProxies: string[]
   /** Estimated cost in sats to hold per request (deducted upfront, reconciled after). */
   estimatedCostSats: number
   /**
@@ -101,6 +107,7 @@ export interface CliArgs {
   dbPath?: string
   freeTier?: number
   trustProxy?: boolean
+  trustedProxies?: string
   rootKey?: string
   maxTokens?: number
   // New fields:
@@ -135,6 +142,7 @@ export interface FileConfig {
   capacity?: { maxConcurrent?: number }
   tiers?: Array<{ amountSats: number; creditSats: number; label: string }>
   trustProxy?: boolean
+  trustedProxies?: string[]
   estimatedCostSats?: number
   maxTokens?: number
   maxBodySize?: number
@@ -348,11 +356,23 @@ export function loadConfig(
     throw new Error(`Invalid max concurrent value: ${maxConcurrent} (must be a non-negative integer)`)
   }
 
+  const trustedProxiesRaw = args.trustedProxies ?? env.TRUSTED_PROXIES
+  const trustedProxies = (trustedProxiesRaw !== undefined
+    ? trustedProxiesRaw.split(',')
+    : file.trustedProxies ?? []
+  ).map(p => String(p).trim()).filter(Boolean)
+  for (const entry of trustedProxies) {
+    if (!/^[0-9a-fA-F.:]+(\/\d{1,2})?$/.test(entry)) {
+      throw new Error(`Invalid trusted proxy: ${entry} (expected an IP or IPv4 CIDR)`)
+    }
+  }
+
+  // Naming trusted proxies implies trusting forwarded headers from them
   const trustProxy = args.trustProxy !== undefined
     ? args.trustProxy
     : env.TRUST_PROXY !== undefined
       ? env.TRUST_PROXY === 'true'
-      : file.trustProxy ?? false
+      : file.trustProxy ?? trustedProxies.length > 0
 
   const tiers = file.tiers ?? []
 
@@ -551,6 +571,7 @@ export function loadConfig(
     capacity: { maxConcurrent },
     tiers,
     trustProxy,
+    trustedProxies,
     estimatedCostSats,
     maxTokens,
     maxBodySize,

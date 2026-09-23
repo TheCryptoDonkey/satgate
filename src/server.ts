@@ -224,7 +224,11 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
   })
 
   // Create Hono toll-booth adapter
-  const tollBooth = createHonoTollBooth({ engine })
+  const tollBooth = createHonoTollBooth({
+    engine,
+    trustProxy: config.trustProxy,
+    ...(config.trustedProxies?.length && { trustedProxies: config.trustedProxies }),
+  })
 
   // Mount payment routes
   const paymentApp = tollBooth.createPaymentApp({

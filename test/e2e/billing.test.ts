@@ -275,3 +275,38 @@ describe('IETF Payment sessions', () => {
     expect(res.status).toBe(200)
   })
 })
+
+describe('client IPs behind a proxy', () => {
+  async function freeTierApp(trustProxy: boolean, trustedProxies: string[] = []) {
+    upstream = await startUpstream()
+    const { backend } = createPreimageBackend()
+    // One request's worth of free credit per IP per day
+    return createTokenTollServer(paidConfig(upstream.url, {
+      backend, trustProxy, trustedProxies, freeTier: { creditsPerDay: 10 }, estimatedCostSats: 10,
+    })).app
+  }
+
+  function from(ip: string, extra: Record<string, string> = {}) {
+    return {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': ip, ...extra },
+      body: JSON.stringify({ model: 'llama3', messages: [{ role: 'user', content: 'tokens=1' }], max_tokens: 1 }),
+    }
+  }
+
+  it('gives each forwarded client its own free-tier allowance', async () => {
+    const app = await freeTierApp(true)
+    expect((await app.request('/v1/chat/completions', from('203.0.113.1'))).status).toBe(200)
+    expect((await app.request('/v1/chat/completions', from('203.0.113.1'))).status).toBe(402)
+    expect((await app.request('/v1/chat/completions', from('203.0.113.2'))).status).toBe(200)
+  })
+
+  it('skips trusted proxy hops when reading X-Forwarded-For', async () => {
+    const app = await freeTierApp(true, ['10.0.0.0/8'])
+    expect((await app.request('/v1/chat/completions', from('203.0.113.7, 10.1.2.3'))).status).toBe(200)
+    // A different spoofed first hop is still the same client behind the same proxy hop
+    expect((await app.request('/v1/chat/completions', from('198.51.100.9, 203.0.113.7, 10.1.2.3'))).status).toBe(402)
+    // Another client through the same proxy has its own allowance
+    expect((await app.request('/v1/chat/completions', from('203.0.113.8, 10.1.2.3'))).status).toBe(200)
+  })
+})

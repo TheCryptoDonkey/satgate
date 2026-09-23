@@ -21,6 +21,7 @@ function parseArgs(argv: string[]): CliArgs {
       case '--db-path': args.dbPath = argv[++i]; break
       case '--free-tier': args.freeTier = parseInt(argv[++i], 10); break
       case '--trust-proxy': args.trustProxy = true; break
+      case '--trusted-proxies': args.trustedProxies = argv[++i]; break
       case '--lightning': args.lightning = argv[++i]; break
       case '--lightning-url': args.lightningUrl = argv[++i]; break
       case '--lightning-key': args.lightningKey = argv[++i]; break
@@ -122,7 +123,10 @@ function printHelp(): void {
     --config <path>            Config file (JSON or YAML)
     --max-concurrent <n>       Max concurrent inference requests
     --free-tier <n>            Free credits (sats) per IP per day (default: 0)
-    --trust-proxy              Trust X-Forwarded-For headers
+    --trust-proxy              Trust X-Forwarded-For / X-Real-IP for client IPs
+                               (free tier and invoice limits); only behind a proxy
+    --trusted-proxies <ips>    Comma-separated proxy IPs/IPv4 CIDRs to skip when
+                               reading X-Forwarded-For (implies --trust-proxy)
     --root-key <key>           Root key for macaroon minting
     --verbose                  Show extra fields in log output
     --log-format <format>      pretty | json (default: pretty)
