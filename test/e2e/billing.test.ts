@@ -253,3 +253,25 @@ describe('IETF Payment per-request charges', () => {
     expect(upstream.bodies).toHaveLength(0)
   })
 })
+
+describe('IETF Payment sessions', () => {
+  it('opens a session with a session credential rather than checking it as a charge', async () => {
+    upstream = await startUpstream()
+    const { backend, preimages } = createPreimageBackend()
+    const refundingBackend = { ...backend, sendPayment: async () => ({ paid: true, preimage: '0'.repeat(64) }) }
+    const { app } = createTokenTollServer(paidConfig(upstream.url, { backend: refundingBackend as typeof backend, sessionIntent: true, realm: 'satgate-test' }))
+    const challengeRes = await app.request('/v1/chat/completions', chat('', 'hi'))
+    expect(challengeRes.status).toBe(402)
+    const header = challengeRes.headers.get('WWW-Authenticate') ?? ''
+    const match = /Payment (id="[^"]+", realm="[^"]+", method="[^"]+", intent="session", request="[^"]+", expires="[^"]+")/.exec(header)
+    expect(match).not.toBeNull()
+    const challenge: Record<string, string> = {}
+    for (const [, key, value] of match![1].matchAll(/(\w+)="([^"]*)"/g)) challenge[key] = value
+    const body = await challengeRes.json() as { ietf_session: { payment_hash: string } }
+    const preimage = preimages.get(body.ietf_session.payment_hash)!
+    const credential = Buffer.from(JSON.stringify({ challenge, payload: { action: 'open', preimage } })).toString('base64url')
+
+    const res = await app.request('/v1/chat/completions', chat(`Payment ${credential}`, 'tokens=1'))
+    expect(res.status).toBe(200)
+  })
+})

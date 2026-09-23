@@ -160,15 +160,11 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
     const hmacSecret = createHash('sha256')
       .update(`toll-booth-ietf-hmac-v1${config.rootKey}`)
       .digest('hex')
-    rails.push(createIETFPaymentRail({
-      hmacSecret,
-      realm: config.realm ?? 'satgate',
-      backend: config.backend,
-      storage,
-      serviceName: config.serviceName,
-    }))
 
-    // IETF Payment session intent (deposit/bearer/top-up/close for streaming)
+    // IETF Payment session intent (deposit/bearer/top-up/close for streaming).
+    // It must come before the charge rail: rails are tried in order and the
+    // charge rail claims every "Authorization: Payment" header, so a session
+    // credential behind it would only ever be checked as a charge and fail.
     if (config.sessionIntent) {
       const sessionRail = createIETFSessionRail({
         hmacSecret,
@@ -186,6 +182,14 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
       // Start auto-close sweep for expired sessions
       sessionRail.startSweep()
     }
+
+    rails.push(createIETFPaymentRail({
+      hmacSecret,
+      realm: config.realm ?? 'satgate',
+      backend: config.backend,
+      storage,
+      serviceName: config.serviceName,
+    }))
   }
 
   // Route price in sats. Flat mode charges the configured per-request price;
