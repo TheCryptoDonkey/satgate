@@ -15,7 +15,7 @@
     }
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/copy-page.mjs",
     "test": "vitest run",
     "test:release": "npm run check:publish-dependencies && npm test",
     "check:publish-dependencies": "node scripts/check-publish-dependencies.mjs",
