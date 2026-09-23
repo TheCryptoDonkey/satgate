@@ -25,6 +25,12 @@ export interface TokenTollConfig {
   trustProxy: boolean
   /** Estimated cost in sats to hold per request (deducted upfront, reconciled after). */
   estimatedCostSats: number
+  /**
+   * Most completion tokens one request may ask for. Requests asking for more
+   * (or naming no limit) are clamped to this, and per-token billing reserves
+   * the worst case up front.
+   */
+  maxTokens: number
   /** Maximum request body size in bytes. */
   maxBodySize: number
   /** Auto-detected model IDs from upstream. */
@@ -96,6 +102,7 @@ export interface CliArgs {
   freeTier?: number
   trustProxy?: boolean
   rootKey?: string
+  maxTokens?: number
   // New fields:
   lightning?: string
   lightningUrl?: string
@@ -129,6 +136,7 @@ export interface FileConfig {
   tiers?: Array<{ amountSats: number; creditSats: number; label: string }>
   trustProxy?: boolean
   estimatedCostSats?: number
+  maxTokens?: number
   maxBodySize?: number
   // New fields:
   lightning?: string
@@ -174,6 +182,12 @@ export function normaliseMintHost(entry: string): string | undefined {
     return undefined
   }
 }
+
+/** Default cap on completion tokens per request. */
+export const DEFAULT_MAX_TOKENS = 2048
+
+/** Request body size, in bytes, that the default per-request hold is sized to cover. */
+export const PROMPT_ALLOWANCE_BYTES = 4096
 
 const LIGHTNING_URL_DEFAULTS: Record<string, string> = {
   phoenixd: 'http://localhost:9740',
@@ -348,8 +362,22 @@ export function loadConfig(
   if (estimatedCostRaw !== undefined && !Number.isFinite(estimatedCostRaw)) {
     throw new Error(`Invalid SATGATE_ESTIMATED_COST: ${env.SATGATE_ESTIMATED_COST}`)
   }
+  const maxTokens = args.maxTokens
+    ?? (env.SATGATE_MAX_TOKENS ? parseInt(env.SATGATE_MAX_TOKENS, 10) : undefined)
+    ?? file.maxTokens
+    ?? DEFAULT_MAX_TOKENS
+  if (!Number.isSafeInteger(maxTokens) || maxTokens < 1) {
+    throw new Error(`Invalid max tokens: ${maxTokens} (must be a positive integer)`)
+  }
+
+  // Default hold: enough for a request body of PROMPT_ALLOWANCE_BYTES plus a
+  // full max_tokens completion at the dearest configured price. Per-request
+  // payments and the free tier are capped at this amount, so it sets how
+  // large a request they can make before max_tokens is clamped further.
+  const dearestPrice = Math.max(pricing.default, ...Object.values(pricing.models))
   const estimatedCostSats = estimatedCostRaw
-    ?? file.estimatedCostSats ?? Math.max(pricing.default * 2, 5)
+    ?? file.estimatedCostSats
+    ?? Math.max(1, Math.ceil((PROMPT_ALLOWANCE_BYTES + maxTokens) * dearestPrice / 1000))
   const maxBodySizeRaw = file.maxBodySize ?? 10 * 1024 * 1024 // 10 MiB
   const MAX_BODY_SIZE_LIMIT = 100 * 1024 * 1024 // 100 MiB hard cap
   if (typeof maxBodySizeRaw !== 'number' || !Number.isFinite(maxBodySizeRaw) || maxBodySizeRaw <= 0 || maxBodySizeRaw > MAX_BODY_SIZE_LIMIT) {
@@ -524,6 +552,7 @@ export function loadConfig(
     tiers,
     trustProxy,
     estimatedCostSats,
+    maxTokens,
     maxBodySize,
     lightning,
     lightningUrl,

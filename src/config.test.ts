@@ -540,7 +540,8 @@ describe('per-token CLI pricing', () => {
 
   it('estimatedCostSats reflects CLI tokenPrice when set', () => {
     const config = loadConfig({ upstream: 'http://localhost:11434', tokenPrice: 5 })
-    expect(config.estimatedCostSats).toBe(10)
+    // (4096-byte prompt allowance + 2048 max tokens) at 5 sats/1k, rounded up
+    expect(config.estimatedCostSats).toBe(31)
   })
 
   it('model ID with colon (e.g. qwen3:0.6b) parses correctly', () => {
@@ -650,5 +651,24 @@ describe('lnurlcash mints', () => {
     expect(() =>
       loadConfig({ upstream: 'http://localhost:11434' }, {}, { lnurlcash: { mints: [] } }),
     ).toThrow(/at least one mint host/)
+  })
+})
+
+describe('max tokens', () => {
+  it('defaults to 2048 and sizes the default hold from it and the dearest model', () => {
+    const config = loadConfig({ upstream: 'http://localhost:11434' }, {}, { pricing: { default: 1, models: { big: 10 } } })
+    expect(config.maxTokens).toBe(2048)
+    // (4096 + 2048) tokens at the dearest price, 10 sats/1k
+    expect(config.estimatedCostSats).toBe(62)
+  })
+
+  it('reads --max-tokens, SATGATE_MAX_TOKENS and maxTokens in precedence order', () => {
+    expect(loadConfig({ upstream: 'http://x', maxTokens: 10 }, { SATGATE_MAX_TOKENS: '20' }, { maxTokens: 30 }).maxTokens).toBe(10)
+    expect(loadConfig({ upstream: 'http://x' }, { SATGATE_MAX_TOKENS: '20' }, { maxTokens: 30 }).maxTokens).toBe(20)
+    expect(loadConfig({ upstream: 'http://x' }, {}, { maxTokens: 30 }).maxTokens).toBe(30)
+  })
+
+  it('rejects a non-positive max tokens', () => {
+    expect(() => loadConfig({ upstream: 'http://x', maxTokens: 0 })).toThrow(/max tokens/)
   })
 })

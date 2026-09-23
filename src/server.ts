@@ -355,6 +355,7 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
     capacity,
     maxBodySize: config.maxBodySize,
     flatPricing: config.flatPricing,
+    maxTokens: config.maxTokens,
     models: [...new Set([...(config.models ?? []), ...Object.keys(config.pricing.models)])],
     logger,
   })

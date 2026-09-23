@@ -3,7 +3,7 @@ import { Hono } from 'hono'
 import { serve } from '@hono/node-server'
 import { createTokenTollServer } from '../../src/server.js'
 import type { TokenTollConfig } from '../../src/config.js'
-import { createPreimageBackend, buyL402Credential } from './helpers/l402-wallet.js'
+import { createPreimageBackend, buyL402Credential, buyIetfCharge } from './helpers/l402-wallet.js'
 
 /**
  * Upstream that reports usage taken from the request: a user message of
@@ -156,5 +156,100 @@ describe('model names', () => {
     })
     expect(probe.status).toBe(200)
     expect(probe.headers.get('X-Credit-Balance')).toBe(String(1000 - 10))
+  })
+})
+
+describe('max_tokens reservation', () => {
+  it('clamps max_tokens to the operator cap, and sets it when absent', async () => {
+    upstream = await startUpstream()
+    const { app } = createTokenTollServer(paidConfig(upstream.url, { authMode: 'open', lightning: undefined, maxTokens: 100 }))
+    await app.request('/v1/chat/completions', chat('', 'hi', { max_tokens: 5000 }))
+    await app.request('/v1/chat/completions', chat('', 'hi'))
+    await app.request('/v1/chat/completions', chat('', 'hi', { max_completion_tokens: 50 }))
+    expect(upstream.bodies.map(b => b.max_tokens)).toEqual([100, 100, 50])
+    expect(upstream.bodies[2].max_completion_tokens).toBe(50)
+  })
+
+  it('reserves the worst case from the balance and refunds down to the actual cost', async () => {
+    upstream = await startUpstream()
+    const { backend, preimages } = createPreimageBackend()
+    // 100 sats per 1k tokens: a 1000-token completion costs 100 sats
+    const { app } = createTokenTollServer(paidConfig(upstream.url, {
+      backend,
+      pricing: { default: 100, models: {} },
+      estimatedCostSats: 10,
+      maxTokens: 4000,
+    }))
+    const auth = await buyL402Credential(app, preimages)
+
+    const res = await app.request('/v1/chat/completions', chat(auth, 'tokens=1000', { max_tokens: 4000 }))
+    expect(res.status).toBe(200)
+    // Charged the actual 1000 tokens (100 sats), not the 10-sat estimate
+    const probe = await app.request('/v1/chat/completions', chat(auth, 'tokens=0', { max_tokens: 1 }))
+    expect(probe.headers.get('X-Credit-Balance')).toBe(String(1000 - 100 - 10))
+  })
+
+  it('refuses a request whose worst case the balance cannot cover', async () => {
+    upstream = await startUpstream()
+    const { backend, preimages } = createPreimageBackend()
+    const { app } = createTokenTollServer(paidConfig(upstream.url, {
+      backend,
+      pricing: { default: 100, models: {} },
+      estimatedCostSats: 10,
+      maxTokens: 20_000,
+    }))
+    const auth = await buyL402Credential(app, preimages)
+
+    // 20k tokens at 100 sats/1k is 2000 sats; the credential holds 1000
+    const res = await app.request('/v1/chat/completions', chat(auth, 'tokens=1', { max_tokens: 20_000 }))
+    expect(res.status).toBe(402)
+    expect(upstream.bodies).toHaveLength(0)
+    const body = await res.json()
+    expect(body.reserve_sats).toBeGreaterThan(1000)
+
+    // Nothing was kept: the next small request sees the full balance less its hold
+    const probe = await app.request('/v1/chat/completions', chat(auth, 'tokens=0', { max_tokens: 1 }))
+    expect(probe.headers.get('X-Credit-Balance')).toBe(String(1000 - 10))
+  })
+
+  it('counts every choice asked for with n', async () => {
+    upstream = await startUpstream()
+    const { backend, preimages } = createPreimageBackend()
+    const { app } = createTokenTollServer(paidConfig(upstream.url, {
+      backend,
+      pricing: { default: 100, models: {} },
+      maxTokens: 3000,
+    }))
+    const auth = await buyL402Credential(app, preimages)
+    // 3000 tokens is 300 sats; four choices is 1200, more than the balance
+    const res = await app.request('/v1/chat/completions', chat(auth, 'hi', { max_tokens: 3000, n: 4 }))
+    expect(res.status).toBe(402)
+    const tooMany = await app.request('/v1/chat/completions', chat(auth, 'hi', { n: 50 }))
+    expect(tooMany.status).toBe(400)
+  })
+})
+
+describe('IETF Payment per-request charges', () => {
+  it('shrinks max_tokens so the completion fits what was paid', async () => {
+    upstream = await startUpstream()
+    const { backend, preimages } = createPreimageBackend()
+    // 10 sats at 1 sat/1k buys 10k tokens in total
+    const { app } = createTokenTollServer(paidConfig(upstream.url, { backend, estimatedCostSats: 10, maxTokens: 20_000 }))
+    const auth = await buyIetfCharge(app, preimages)
+    const res = await app.request('/v1/chat/completions', chat(auth, 'tokens=1', { max_tokens: 20_000 }))
+    expect(res.status).toBe(200)
+    const sent = upstream.bodies[0]
+    const bodyBytes = Buffer.byteLength(JSON.stringify({ model: 'llama3', messages: [{ role: 'user', content: 'tokens=1' }], max_tokens: 20_000 }))
+    expect(sent.max_tokens).toBe(10_000 - bodyBytes)
+  })
+
+  it('refuses a prompt larger than what was paid', async () => {
+    upstream = await startUpstream()
+    const { backend, preimages } = createPreimageBackend()
+    const { app } = createTokenTollServer(paidConfig(upstream.url, { backend, estimatedCostSats: 10 }))
+    const auth = await buyIetfCharge(app, preimages)
+    const res = await app.request('/v1/chat/completions', chat(auth, 'x'.repeat(12_000)))
+    expect(res.status).toBe(402)
+    expect(upstream.bodies).toHaveLength(0)
   })
 })

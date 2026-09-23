@@ -21,6 +21,8 @@ export interface ProxyDeps {
   maxBodySize: number
   /** When true, skip token-based reconciliation — a flat per-request fee was charged upfront. */
   flatPricing?: boolean
+  /** Most completion tokens one request may ask for (default: 2048). */
+  maxTokens?: number
   /** Timeout in ms for upstream requests (default: 120_000). */
   upstreamTimeout?: number
   /**
@@ -31,6 +33,21 @@ export interface ProxyDeps {
   models?: readonly string[]
   /** Logger instance — if omitted, errors are silent. */
   logger?: Logger
+}
+
+/** Default cap on completion tokens when the caller configures none. */
+const DEFAULT_MAX_TOKENS = 2048
+
+/** Most choices (`n` / `best_of`) one request may ask for. */
+const MAX_CHOICES = 8
+
+/** A positive integer, or undefined for anything else. */
+function positiveInt(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : undefined
+}
+
+function jsonError(status: number, body: Record<string, unknown>): Response {
+  return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 }
 
 /**
@@ -179,6 +196,65 @@ export function createProxyHandler(deps: ProxyDeps) {
       )
     }
 
+    // Bound the completion. The client's max_tokens (or max_completion_tokens)
+    // is clamped to the operator cap, and set to it when absent, so no request
+    // can generate without limit. Per-token billing then holds the worst case:
+    // every byte of the body as a prompt token (a token is at least one byte)
+    // plus max_tokens for each choice asked for.
+    const generates = requestPath !== '/v1/embeddings'
+    const cap = deps.maxTokens ?? DEFAULT_MAX_TOKENS
+    let maxTokens = 0
+    let choices = 1
+    if (generates) {
+      const nRaw = body.n ?? 1
+      const bestOfRaw = body.best_of ?? 1
+      const n = positiveInt(nRaw)
+      const bestOf = positiveInt(bestOfRaw)
+      if (n === undefined || bestOf === undefined || n > MAX_CHOICES || bestOf > MAX_CHOICES) {
+        refund()
+        return jsonError(400, { error: `n and best_of must be integers from 1 to ${MAX_CHOICES}` })
+      }
+      choices = Math.max(n, bestOf)
+      const requested = positiveInt(body.max_completion_tokens) ?? positiveInt(body.max_tokens)
+      maxTokens = Math.min(requested ?? cap, cap)
+    }
+
+    if (!deps.flatPricing && hold.metered) {
+      const price = resolveModelPrice(deps.pricing, requestedModel)
+      const promptBound = new TextEncoder().encode(bodyText).byteLength
+      if (hold.ceiling !== undefined) {
+        // Paid for this request alone: shrink the completion to fit what was paid
+        const affordableTokens = Math.floor(hold.ceiling * 1000 / price)
+        if (promptBound + maxTokens * choices > affordableTokens) {
+          maxTokens = Math.floor((affordableTokens - promptBound) / choices)
+          if (promptBound > affordableTokens || (generates && maxTokens < 1)) {
+            refund()
+            return jsonError(402, {
+              error: 'Request is too large for the amount paid per request',
+              paid_sats: hold.ceiling,
+            })
+          }
+        }
+      } else {
+        const worstCase = tokenCostToSats(promptBound + maxTokens * choices, price)
+        if (!hold.reserve(worstCase)) {
+          refund()
+          return jsonError(402, {
+            error: 'Insufficient balance to reserve this request\'s maximum cost. Lower max_tokens or top up.',
+            reserve_sats: worstCase,
+            max_tokens: maxTokens,
+          })
+        }
+      }
+    }
+
+    // max_tokens is always set, since not every upstream honours
+    // max_completion_tokens; a client's max_completion_tokens is clamped too.
+    if (generates) {
+      body.max_tokens = maxTokens
+      if (body.max_completion_tokens !== undefined) body.max_completion_tokens = maxTokens
+    }
+
     // Now acquire capacity — body is validated and parsed, no slow client can hold a slot
     if (!deps.capacity.tryAcquire()) {
       refund()
@@ -191,8 +267,7 @@ export function createProxyHandler(deps: ProxyDeps) {
     const start = Date.now()
     let streamingResponse = false
     try {
-      const model = extractModel(body)
-      const pricePerThousand = resolveModelPrice(deps.pricing, model)
+      const pricePerThousand = resolveModelPrice(deps.pricing, requestedModel)
       const isStreaming = body.stream === true
 
       // Always ask for usage on streams: billing depends on it, so a client

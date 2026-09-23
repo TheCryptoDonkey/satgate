@@ -36,3 +36,22 @@ export async function buyL402Credential(app: Fetchable, preimages: Map<string, s
   if (!preimage) throw new Error('no preimage for challenge invoice')
   return `L402 ${body.l402.macaroon}:${preimage}`
 }
+
+/** Triggers a 402 and returns a paid IETF Payment (charge intent) Authorization header value. */
+export async function buyIetfCharge(app: Fetchable, preimages: Map<string, string>, path = '/v1/chat/completions'): Promise<string> {
+  const res = await app.request(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: 'llama3', messages: [] }),
+  })
+  if (res.status !== 402) throw new Error(`expected 402, got ${res.status}`)
+  const header = res.headers.get('WWW-Authenticate') ?? ''
+  const match = /Payment (id="[^"]+", realm="[^"]+", method="[^"]+", intent="[^"]+", request="[^"]+", expires="[^"]+")/.exec(header)
+  if (!match) throw new Error('no IETF Payment challenge')
+  const challenge: Record<string, string> = {}
+  for (const [, key, value] of match[1].matchAll(/(\w+)="([^"]*)"/g)) challenge[key] = value
+  const body = await res.json() as { ietf_payment: { payment_hash: string } }
+  const preimage = preimages.get(body.ietf_payment.payment_hash)
+  if (!preimage) throw new Error('no preimage for challenge invoice')
+  return `Payment ${Buffer.from(JSON.stringify({ challenge, payload: { preimage } })).toString('base64url')}`
+}

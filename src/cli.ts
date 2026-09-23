@@ -32,6 +32,7 @@ function parseArgs(argv: string[]): CliArgs {
       case '--verbose': args.verbose = true; break
       case '--log-format': args.logFormat = argv[++i]; break
       case '--token-price': args.tokenPrice = parseInt(argv[++i], 10); break
+      case '--max-tokens': args.maxTokens = parseInt(argv[++i], 10); break
       case '--model-price':
         args.modelPrice = [...(args.modelPrice ?? []), argv[++i]]
         break
@@ -100,6 +101,8 @@ function printHelp(): void {
     --price <sats>             Sats per request (flat pricing)
     --token-price <sats>       Sats per 1k tokens (per-token pricing)
     --model-price <model:sats> Per-model token price (repeatable)
+    --max-tokens <n>           Cap on completion tokens per request (default: 2048);
+                               per-token billing reserves the worst case up front
 
   Server:
     --port <number>            Listen port (default: 3000)
