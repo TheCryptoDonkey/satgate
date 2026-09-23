@@ -8,7 +8,7 @@ describe('loadConfig', () => {
     expect(config.port).toBe(3000)
     expect(config.pricing.default).toBe(1)
     expect(config.storage).toBe('memory')
-    expect(config.capacity.maxConcurrent).toBe(0)
+    expect(config.capacity.maxConcurrent).toBe(8)
     expect(config.freeTier.creditsPerDay).toBe(0)
   })
 
@@ -717,5 +717,12 @@ describe('storage defaults', () => {
     expect(loadConfig({ upstream: 'http://x', lightning: 'phoenixd' }).storage).toBe('sqlite')
     expect(loadConfig({ upstream: 'http://x', cashuMints: 'https://mint.example.com' }).storage).toBe('sqlite')
     expect(loadConfig({ upstream: 'http://x', lightning: 'phoenixd', storage: 'memory' }).storage).toBe('memory')
+  })
+})
+
+describe('concurrency limit', () => {
+  it('can still be switched off explicitly', () => {
+    expect(loadConfig({ upstream: 'http://x', maxConcurrent: 0 }).capacity.maxConcurrent).toBe(0)
+    expect(loadConfig({ upstream: 'http://x' }, { MAX_CONCURRENT: '0' }).capacity.maxConcurrent).toBe(0)
   })
 })

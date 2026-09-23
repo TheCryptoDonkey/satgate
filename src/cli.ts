@@ -129,7 +129,8 @@ function printHelp(): void {
 
   Other:
     --config <path>            Config file (JSON or YAML)
-    --max-concurrent <n>       Max concurrent inference requests
+    --max-concurrent <n>       Max concurrent inference requests (default: 8;
+                               0 = unlimited)
     --max-pending-invoices <n> Unpaid invoices per client IP before 429 (default: 20;
                                0 disables)
     --free-tier <n>            Free credits (sats) per IP per day (default: 0)

@@ -199,6 +199,12 @@ export function normaliseMintHost(entry: string): string | undefined {
   }
 }
 
+/**
+ * Default cap on concurrent inference requests. Beyond it clients get a
+ * quick 503 rather than queueing on the GPU; 0 means no limit.
+ */
+export const DEFAULT_MAX_CONCURRENT = 8
+
 /** Default cap on completion tokens per request. */
 export const DEFAULT_MAX_TOKENS = 2048
 
@@ -356,7 +362,7 @@ export function loadConfig(
   const maxConcurrent = args.maxConcurrent
     ?? (env.MAX_CONCURRENT ? parseInt(env.MAX_CONCURRENT, 10) : undefined)
     ?? file.capacity?.maxConcurrent
-    ?? 0
+    ?? DEFAULT_MAX_CONCURRENT
   if (!Number.isFinite(maxConcurrent) || maxConcurrent < 0) {
     throw new Error(`Invalid max concurrent value: ${maxConcurrent} (must be a non-negative integer)`)
   }
