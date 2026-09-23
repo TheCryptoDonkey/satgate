@@ -33,6 +33,7 @@ function parseArgs(argv: string[]): CliArgs {
       case '--verbose': args.verbose = true; break
       case '--log-format': args.logFormat = argv[++i]; break
       case '--token-price': args.tokenPrice = parseInt(argv[++i], 10); break
+      case '--max-pending-invoices': args.maxPendingInvoices = parseInt(argv[++i], 10); break
       case '--max-tokens': args.maxTokens = parseInt(argv[++i], 10); break
       case '--model-price':
         args.modelPrice = [...(args.modelPrice ?? []), argv[++i]]
@@ -122,6 +123,8 @@ function printHelp(): void {
   Other:
     --config <path>            Config file (JSON or YAML)
     --max-concurrent <n>       Max concurrent inference requests
+    --max-pending-invoices <n> Unpaid invoices per client IP before 429 (default: 20;
+                               0 disables)
     --free-tier <n>            Free credits (sats) per IP per day (default: 0)
     --trust-proxy              Trust X-Forwarded-For / X-Real-IP for client IPs
                                (free tier and invoice limits); only behind a proxy

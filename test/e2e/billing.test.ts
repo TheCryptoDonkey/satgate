@@ -371,3 +371,17 @@ describe('client IPs without a proxy', () => {
     }
   })
 })
+
+describe('invoice minting limits', () => {
+  it('stops issuing invoices to a client holding too many unpaid ones', async () => {
+    upstream = await startUpstream()
+    const { backend } = createPreimageBackend()
+    const { app } = createTokenTollServer(paidConfig(upstream.url, { backend, maxPendingInvoicesPerIp: 2 }))
+    const post = () => app.request('/v1/chat/completions', chat('', 'hi'))
+    expect((await post()).status).toBe(402)
+    expect((await post()).status).toBe(402)
+    expect((await post()).status).toBe(429)
+    const direct = await app.request('/create-invoice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+    expect(direct.status).toBe(429)
+  })
+})

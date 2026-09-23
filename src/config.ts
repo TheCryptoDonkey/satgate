@@ -39,6 +39,11 @@ export interface TokenTollConfig {
   maxTokens: number
   /** Maximum request body size in bytes. */
   maxBodySize: number
+  /**
+   * Unpaid invoices one client IP may hold before further challenges and
+   * /create-invoice calls get a 429. 0 disables the limit.
+   */
+  maxPendingInvoicesPerIp: number
   /** Auto-detected model IDs from upstream. */
   models?: string[]
   // New fields:
@@ -110,6 +115,7 @@ export interface CliArgs {
   trustedProxies?: string
   rootKey?: string
   maxTokens?: number
+  maxPendingInvoices?: number
   // New fields:
   lightning?: string
   lightningUrl?: string
@@ -146,6 +152,7 @@ export interface FileConfig {
   estimatedCostSats?: number
   maxTokens?: number
   maxBodySize?: number
+  maxPendingInvoicesPerIp?: number
   // New fields:
   lightning?: string
   lightningUrl?: string
@@ -193,6 +200,9 @@ export function normaliseMintHost(entry: string): string | undefined {
 
 /** Default cap on completion tokens per request. */
 export const DEFAULT_MAX_TOKENS = 2048
+
+/** Default cap on unpaid invoices per client IP. */
+export const DEFAULT_MAX_PENDING_INVOICES_PER_IP = 20
 
 /** Request body size, in bytes, that the default per-request hold is sized to cover. */
 export const PROMPT_ALLOWANCE_BYTES = 4096
@@ -405,6 +415,14 @@ export function loadConfig(
   }
   const maxBodySize = maxBodySizeRaw
 
+  const maxPendingInvoicesPerIp = args.maxPendingInvoices
+    ?? (env.SATGATE_MAX_PENDING_INVOICES ? parseInt(env.SATGATE_MAX_PENDING_INVOICES, 10) : undefined)
+    ?? file.maxPendingInvoicesPerIp
+    ?? DEFAULT_MAX_PENDING_INVOICES_PER_IP
+  if (!Number.isSafeInteger(maxPendingInvoicesPerIp) || maxPendingInvoicesPerIp < 0) {
+    throw new Error(`Invalid max pending invoices: ${maxPendingInvoicesPerIp} (must be a non-negative integer)`)
+  }
+
   // Lightning backend config
   // nwc carries its relay inside the connection URI, so it needs no lightning URL.
   const VALID_BACKENDS = ['phoenixd', 'lnbits', 'lnd', 'cln', 'nwc'] as const
@@ -575,6 +593,7 @@ export function loadConfig(
     estimatedCostSats,
     maxTokens,
     maxBodySize,
+    maxPendingInvoicesPerIp,
     lightning,
     lightningUrl,
     lightningKey,

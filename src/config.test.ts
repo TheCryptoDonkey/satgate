@@ -689,3 +689,13 @@ describe('trusted proxies', () => {
     expect(() => loadConfig({ upstream: 'http://x', trustedProxies: 'proxy.example.com' })).toThrow(/trusted proxy/)
   })
 })
+
+describe('pending invoice limit', () => {
+  it('defaults to 20 and can be set or disabled', () => {
+    expect(loadConfig({ upstream: 'http://x' }).maxPendingInvoicesPerIp).toBe(20)
+    expect(loadConfig({ upstream: 'http://x', maxPendingInvoices: 0 }).maxPendingInvoicesPerIp).toBe(0)
+    expect(loadConfig({ upstream: 'http://x' }, { SATGATE_MAX_PENDING_INVOICES: '5' }).maxPendingInvoicesPerIp).toBe(5)
+    expect(loadConfig({ upstream: 'http://x' }, {}, { maxPendingInvoicesPerIp: 7 }).maxPendingInvoicesPerIp).toBe(7)
+    expect(() => loadConfig({ upstream: 'http://x', maxPendingInvoices: -1 })).toThrow(/pending invoices/)
+  })
+})

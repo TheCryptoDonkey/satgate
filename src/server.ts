@@ -229,6 +229,9 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
       ? {}
       : Object.fromEntries(PAID_PATHS.map(path => [path, pricingEntry])),
     defaultInvoiceAmount: config.tiers[0]?.amountSats ?? 1000,
+    ...(config.maxPendingInvoicesPerIp > 0 && {
+      invoiceRateLimit: { maxPendingPerIp: config.maxPendingInvoicesPerIp },
+    }),
     freeTier: config.freeTier.creditsPerDay > 0 ? { creditsPerDay: config.freeTier.creditsPerDay } : undefined,
     ...(rails.length > 0 && { rails }),
     serviceName: config.serviceName,
@@ -256,8 +259,23 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
     defaultAmount: config.tiers[0]?.amountSats ?? 1000,
     backend: config.backend,
     serviceName: config.serviceName,
+    ...(config.maxPendingInvoicesPerIp > 0 && { maxPendingPerIp: config.maxPendingInvoicesPerIp }),
   })
   app.route('/', paymentApp)
+
+  // createTollBooth has no housekeeping of its own: drop invoices nobody paid
+  // within a day, and expired Cashu claims, so storage and each client's
+  // pending-invoice count do not grow without end.
+  const INVOICE_MAX_AGE_MS = 86_400_000
+  const pruneTimer = setInterval(() => {
+    try {
+      storage.pruneExpiredInvoices(INVOICE_MAX_AGE_MS)
+      storage.pruneStaleRecords(INVOICE_MAX_AGE_MS)
+    } catch (err) {
+      logger.warn(`Storage prune failed: ${err instanceof Error ? err.message : err}`)
+    }
+  }, 3_600_000)
+  pruneTimer.unref()
 
   // Discoverability endpoints (no auth required)
   const models: string[] = config.models ?? []
@@ -465,7 +483,7 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
   return {
     app,
     close: () => {
-      // Cleanup if needed
+      clearInterval(pruneTimer)
     },
   }
 }
