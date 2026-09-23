@@ -11,6 +11,11 @@ export interface AllowlistResult {
 export interface RequestContext {
   url: string
   method: string
+  /**
+   * Other URLs this same request is known by, such as its public URL behind
+   * a TLS-terminating proxy. A NIP-98 `u` tag may match any of them.
+   */
+  alternateUrls?: string[]
 }
 
 const HEX_PUBKEY_RE = /^[0-9a-fA-F]{64}$/
@@ -173,7 +178,9 @@ function verifyNip98(
     // Validate URL and method tags match the actual request
     const urlTag = event.tags.find(t => t[0] === 'u')?.[1]
     const methodTag = event.tags.find(t => t[0] === 'method')?.[1]
-    if (urlTag !== request.url) return { allowed: false }
+    if (urlTag === undefined || (urlTag !== request.url && !request.alternateUrls?.includes(urlTag))) {
+      return { allowed: false }
+    }
     if (methodTag?.toUpperCase() !== request.method.toUpperCase()) return { allowed: false }
 
     // Validate hex field formats before expensive crypto operations

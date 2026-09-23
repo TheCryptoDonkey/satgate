@@ -13,6 +13,8 @@ export interface ModelPricing {
 
 export interface TokenTollConfig {
   upstream: string
+  /** Bearer token sent to the upstream, for hosted OpenAI-compatible APIs. */
+  upstreamKey?: string
   port: number
   rootKey: string
   rootKeyGenerated: boolean
@@ -23,10 +25,27 @@ export interface TokenTollConfig {
   capacity: { maxConcurrent: number }
   tiers: Array<{ amountSats: number; creditSats: number; label: string }>
   trustProxy: boolean
+  /**
+   * IPs or IPv4 CIDRs of the reverse proxies in front of satgate. With these
+   * set, X-Forwarded-For is read right to left skipping them, so a client
+   * cannot pick its own IP by prepending entries.
+   */
+  trustedProxies: string[]
   /** Estimated cost in sats to hold per request (deducted upfront, reconciled after). */
   estimatedCostSats: number
+  /**
+   * Most completion tokens one request may ask for. Requests asking for more
+   * (or naming no limit) are clamped to this, and per-token billing reserves
+   * the worst case up front.
+   */
+  maxTokens: number
   /** Maximum request body size in bytes. */
   maxBodySize: number
+  /**
+   * Unpaid invoices one client IP may hold before further challenges and
+   * /create-invoice calls get a 429. 0 disables the limit.
+   */
+  maxPendingInvoicesPerIp: number
   /** Auto-detected model IDs from upstream. */
   models?: string[]
   // New fields:
@@ -87,6 +106,9 @@ export interface TokenTollConfig {
 
 export interface CliArgs {
   upstream?: string
+  /** Upstream API key, read by the CLI from --upstream-key-file (never a flag value). */
+  upstreamKey?: string
+  upstreamKeyFile?: string
   port?: number
   config?: string
   price?: number
@@ -95,7 +117,10 @@ export interface CliArgs {
   dbPath?: string
   freeTier?: number
   trustProxy?: boolean
+  trustedProxies?: string
   rootKey?: string
+  maxTokens?: number
+  maxPendingInvoices?: number
   // New fields:
   lightning?: string
   lightningUrl?: string
@@ -104,6 +129,7 @@ export interface CliArgs {
   allowlist?: string[]
   allowlistFile?: string
   noTunnel?: boolean
+  tunnel?: boolean
   verbose?: boolean
   logFormat?: string
   tokenPrice?: number
@@ -119,6 +145,8 @@ export interface CliArgs {
 
 export interface FileConfig {
   upstream?: string
+  /** Path to a file holding the upstream API key. */
+  upstreamKeyFile?: string
   port?: number
   rootKey?: string
   storage?: string
@@ -128,8 +156,11 @@ export interface FileConfig {
   capacity?: { maxConcurrent?: number }
   tiers?: Array<{ amountSats: number; creditSats: number; label: string }>
   trustProxy?: boolean
+  trustedProxies?: string[]
   estimatedCostSats?: number
+  maxTokens?: number
   maxBodySize?: number
+  maxPendingInvoicesPerIp?: number
   // New fields:
   lightning?: string
   lightningUrl?: string
@@ -175,6 +206,21 @@ export function normaliseMintHost(entry: string): string | undefined {
   }
 }
 
+/**
+ * Default cap on concurrent inference requests. Beyond it clients get a
+ * quick 503 rather than queueing on the GPU; 0 means no limit.
+ */
+export const DEFAULT_MAX_CONCURRENT = 8
+
+/** Default cap on completion tokens per request. */
+export const DEFAULT_MAX_TOKENS = 2048
+
+/** Default cap on unpaid invoices per client IP. */
+export const DEFAULT_MAX_PENDING_INVOICES_PER_IP = 20
+
+/** Request body size, in bytes, that the default per-request hold is sized to cover. */
+export const PROMPT_ALLOWANCE_BYTES = 4096
+
 const LIGHTNING_URL_DEFAULTS: Record<string, string> = {
   phoenixd: 'http://localhost:9740',
   lnbits: 'https://legend.lnbits.com',
@@ -205,6 +251,8 @@ export function loadConfig(
     throw new Error(`upstream URL is not a valid URL: ${upstream}`)
   }
 
+  const upstreamKey = (args.upstreamKey ?? env.UPSTREAM_API_KEY)?.trim() || undefined
+
   const portRaw = args.port ?? (env.PORT ? parseInt(env.PORT, 10) : undefined) ?? file.port ?? 3000
   if (!Number.isFinite(portRaw) || portRaw < 0 || portRaw > 65535) {
     throw new Error(`Invalid port: ${portRaw} (must be 0–65535)`)
@@ -217,12 +265,6 @@ export function loadConfig(
     throw new Error('rootKey must be exactly 64 hex characters (32 bytes)')
   }
   const rootKey = rootKeyRaw ?? randomBytes(32).toString('hex')
-
-  const storageRaw = args.storage ?? env.STORAGE ?? file.storage ?? 'memory'
-  if (storageRaw !== 'memory' && storageRaw !== 'sqlite') {
-    throw new Error(`Invalid storage type: ${storageRaw} (must be 'memory' or 'sqlite')`)
-  }
-  const storage = storageRaw as 'memory' | 'sqlite'
 
   const dbPathRaw = args.dbPath ?? env.SATGATE_DB_PATH ?? file.dbPath ?? './satgate.db'
   // Canonicalise cwd to handle symlinked working directories
@@ -329,16 +371,28 @@ export function loadConfig(
   const maxConcurrent = args.maxConcurrent
     ?? (env.MAX_CONCURRENT ? parseInt(env.MAX_CONCURRENT, 10) : undefined)
     ?? file.capacity?.maxConcurrent
-    ?? 0
+    ?? DEFAULT_MAX_CONCURRENT
   if (!Number.isFinite(maxConcurrent) || maxConcurrent < 0) {
     throw new Error(`Invalid max concurrent value: ${maxConcurrent} (must be a non-negative integer)`)
   }
 
+  const trustedProxiesRaw = args.trustedProxies ?? env.TRUSTED_PROXIES
+  const trustedProxies = (trustedProxiesRaw !== undefined
+    ? trustedProxiesRaw.split(',')
+    : file.trustedProxies ?? []
+  ).map(p => String(p).trim()).filter(Boolean)
+  for (const entry of trustedProxies) {
+    if (!/^[0-9a-fA-F.:]+(\/\d{1,2})?$/.test(entry)) {
+      throw new Error(`Invalid trusted proxy: ${entry} (expected an IP or IPv4 CIDR)`)
+    }
+  }
+
+  // Naming trusted proxies implies trusting forwarded headers from them
   const trustProxy = args.trustProxy !== undefined
     ? args.trustProxy
     : env.TRUST_PROXY !== undefined
       ? env.TRUST_PROXY === 'true'
-      : file.trustProxy ?? false
+      : file.trustProxy ?? trustedProxies.length > 0
 
   const tiers = file.tiers ?? []
 
@@ -348,14 +402,36 @@ export function loadConfig(
   if (estimatedCostRaw !== undefined && !Number.isFinite(estimatedCostRaw)) {
     throw new Error(`Invalid SATGATE_ESTIMATED_COST: ${env.SATGATE_ESTIMATED_COST}`)
   }
+  const maxTokens = args.maxTokens
+    ?? (env.SATGATE_MAX_TOKENS ? parseInt(env.SATGATE_MAX_TOKENS, 10) : undefined)
+    ?? file.maxTokens
+    ?? DEFAULT_MAX_TOKENS
+  if (!Number.isSafeInteger(maxTokens) || maxTokens < 1) {
+    throw new Error(`Invalid max tokens: ${maxTokens} (must be a positive integer)`)
+  }
+
+  // Default hold: enough for a request body of PROMPT_ALLOWANCE_BYTES plus a
+  // full max_tokens completion at the dearest configured price. Per-request
+  // payments and the free tier are capped at this amount, so it sets how
+  // large a request they can make before max_tokens is clamped further.
+  const dearestPrice = Math.max(pricing.default, ...Object.values(pricing.models))
   const estimatedCostSats = estimatedCostRaw
-    ?? file.estimatedCostSats ?? Math.max(pricing.default * 2, 5)
+    ?? file.estimatedCostSats
+    ?? Math.max(1, Math.ceil((PROMPT_ALLOWANCE_BYTES + maxTokens) * dearestPrice / 1000))
   const maxBodySizeRaw = file.maxBodySize ?? 10 * 1024 * 1024 // 10 MiB
   const MAX_BODY_SIZE_LIMIT = 100 * 1024 * 1024 // 100 MiB hard cap
   if (typeof maxBodySizeRaw !== 'number' || !Number.isFinite(maxBodySizeRaw) || maxBodySizeRaw <= 0 || maxBodySizeRaw > MAX_BODY_SIZE_LIMIT) {
     throw new Error(`Invalid maxBodySize: ${maxBodySizeRaw} (must be 1 byte to ${MAX_BODY_SIZE_LIMIT} bytes)`)
   }
   const maxBodySize = maxBodySizeRaw
+
+  const maxPendingInvoicesPerIp = args.maxPendingInvoices
+    ?? (env.SATGATE_MAX_PENDING_INVOICES ? parseInt(env.SATGATE_MAX_PENDING_INVOICES, 10) : undefined)
+    ?? file.maxPendingInvoicesPerIp
+    ?? DEFAULT_MAX_PENDING_INVOICES_PER_IP
+  if (!Number.isSafeInteger(maxPendingInvoicesPerIp) || maxPendingInvoicesPerIp < 0) {
+    throw new Error(`Invalid max pending invoices: ${maxPendingInvoicesPerIp} (must be a non-negative integer)`)
+  }
 
   // Lightning backend config
   // nwc carries its relay inside the connection URI, so it needs no lightning URL.
@@ -425,6 +501,15 @@ export function loadConfig(
   })
   const lnurlcash = lnurlcashMints ? { mints: lnurlcashMints } : undefined
 
+  // Storage. Paid credits must survive a restart, so any payment rail
+  // defaults to SQLite; memory is for open or allowlist use.
+  const acceptsPayment = Boolean(lightning || cashu || lnurlcash)
+  const storageRaw = args.storage ?? env.STORAGE ?? file.storage ?? (acceptsPayment ? 'sqlite' : 'memory')
+  if (storageRaw !== 'memory' && storageRaw !== 'sqlite') {
+    throw new Error(`Invalid storage type: ${storageRaw} (must be 'memory' or 'sqlite')`)
+  }
+  const storage = storageRaw as 'memory' | 'sqlite'
+
   // Auth mode inference
   const VALID_AUTH_MODES = ['open', 'lightning', 'cashu', 'allowlist'] as const
   const explicitAuth = args.authMode ?? env.AUTH_MODE ?? file.auth
@@ -437,11 +522,13 @@ export function loadConfig(
     if (authMode === 'lightning' && !lightning) {
       throw new Error("auth mode 'lightning' requires --lightning <backend>")
     }
-    if (authMode === 'cashu' && !cashu) {
-      throw new Error("auth mode 'cashu' requires --cashu-mints <urls>")
+    if (authMode === 'cashu' && !cashu && !lnurlcash) {
+      throw new Error("auth mode 'cashu' requires --cashu-mints <urls> or --lnurlcash-mints <hosts>")
     }
   } else {
-    authMode = lightning ? 'lightning' : cashu ? 'cashu' : 'open'
+    // 'cashu' is the bearer-ecash mode: payment without a Lightning backend,
+    // by Cashu tokens or LNURLcash notes
+    authMode = lightning ? 'lightning' : (cashu || lnurlcash) ? 'cashu' : 'open'
   }
 
   // Allowlist
@@ -450,9 +537,12 @@ export function loadConfig(
     throw new Error("auth mode 'allowlist' requires --allowlist <keys> or --allowlist-file <path>")
   }
 
-  // Tunnel
+  // Tunnel. On by default only when requests need payment or an allowlist:
+  // an open-auth proxy is never published to the internet unless asked for.
   const tunnelEnv = env.TUNNEL !== undefined ? env.TUNNEL !== 'false' : undefined
-  const tunnel = args.noTunnel === true ? false : (tunnelEnv ?? file.tunnel ?? true)
+  const tunnel = args.noTunnel === true
+    ? false
+    : (args.tunnel ?? tunnelEnv ?? file.tunnel ?? authMode !== 'open')
 
   // x402 stablecoin config
   const x402Receiver = env.X402_RECEIVER ?? file.x402?.receiverAddress
@@ -513,6 +603,7 @@ export function loadConfig(
 
   return {
     upstream: upstream.replace(/\/+$/, ''),
+    upstreamKey,
     port,
     rootKey,
     rootKeyGenerated,
@@ -523,8 +614,11 @@ export function loadConfig(
     capacity: { maxConcurrent },
     tiers,
     trustProxy,
+    trustedProxies,
     estimatedCostSats,
+    maxTokens,
     maxBodySize,
+    maxPendingInvoicesPerIp,
     lightning,
     lightningUrl,
     lightningKey,

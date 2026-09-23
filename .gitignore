@@ -9,3 +9,6 @@ dist/
 docs/superpowers/
 .superpowers/
 .playwright-mcp/
+satgate.root-key
+pnpm-lock.yaml
+.idea/

@@ -4,12 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>satgate — Lightning-paid AI inference</title>
-<meta name="description" content="Pay-per-token AI inference. No accounts, no API keys. Pay with Lightning or IETF Payment standard. Free tier included.">
+<meta name="description" content="Pay-per-token AI inference. No accounts, no API keys. Pay over Lightning and authenticate with L402 or IETF Payment credentials.">
 <meta property="og:title" content="satgate — Lightning-paid AI inference">
 <meta property="og:description" content="Pay-per-token AI inference over Lightning. Dual-scheme: L402 credits + IETF Payment (draft-ryan-httpauth-payment-01). No accounts. Just sats.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://satgate.trotters.dev">
-<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="satgate — Lightning-paid AI inference">
 <meta name="twitter:description" content="Pay-per-token AI inference over Lightning. Dual-scheme: L402 + IETF Payment standard. No accounts. Just sats.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -598,7 +598,8 @@ body::before {
   var serverTiersRaw = [];     // raw tier data for recalc on model switch
 
   // Free token budget — tracked client-side, resets daily
-  var FREE_TOKEN_BUDGET = 250;
+  // Set from the server's free-tier allowance in init(); 0 when there is none
+  var FREE_TOKEN_BUDGET = 0;
   var freeTokensKey = 'satgate_free_tokens';
   var freeTokensDayKey = 'satgate_free_day';
   function todayStr() { return new Date().toISOString().slice(0, 10); }
@@ -716,9 +717,15 @@ body::before {
       // Build model selector cards
       buildModelCards(models, modelDescriptions);
 
-      // Free tier chip
+      // Free tier chip, from the server's actual allowance (sats of credit per day)
+      var freeCredits = Number(freeTier.credits_per_day) || 0;
+      FREE_TOKEN_BUDGET = freeCredits > 0 && pricePerThousand
+        ? Math.floor(freeCredits * 1000 / pricePerThousand)
+        : 0;
       while (freeChipEl.firstChild) { freeChipEl.removeChild(freeChipEl.firstChild); }
-      freeChipEl.appendChild(el('span', { className: 'chip', textContent: formatTokenCount(FREE_TOKEN_BUDGET) + ' free tokens to start' }));
+      if (freeCredits > 0) {
+        freeChipEl.appendChild(el('span', { className: 'chip', textContent: freeCredits + ' sats of free credit a day' }));
+      }
 
       // Store raw tiers for recalc on model switch
       serverTiersRaw = (data.payment && data.payment.tiers) || [];

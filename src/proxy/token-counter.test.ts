@@ -45,7 +45,7 @@ describe('TokenCounter', () => {
       expect(counter.finalCount()).toBe(11)
     })
 
-    it('excludes reasoning tokens from billing', () => {
+    it('bills reasoning tokens reported in completion_tokens', () => {
       const counter = new TokenCounter()
       // Reasoning chunks (not content)
       counter.ingestSSEChunk('data: {"choices":[{"delta":{"reasoning":"thinking..."}}]}\n\n')
@@ -55,8 +55,24 @@ describe('TokenCounter', () => {
       // Usage includes all tokens (reasoning + content + prompt)
       counter.ingestSSEChunk('data: {"choices":[],"usage":{"prompt_tokens":10,"completion_tokens":50,"total_tokens":60}}\n\n')
       counter.ingestSSEChunk('data: [DONE]\n\n')
-      // Should bill: prompt(10) + max(content_chunks(1), byte_floor(ceil(6/4)=2)) = 12, NOT total_tokens(60)
-      expect(counter.finalCount()).toBe(12)
+      // Bills prompt(10) + completion(50), matching the non-streaming path
+      expect(counter.finalCount()).toBe(60)
+    })
+
+    it('counts reasoning chunks in the fallback estimate when no usage is reported', () => {
+      const counter = new TokenCounter()
+      counter.ingestSSEChunk('data: {"choices":[{"delta":{"reasoning_content":"a long chain of thought here"}}]}\n\n')
+      counter.ingestSSEChunk('data: {"choices":[{"delta":{"content":"ok"}}]}\n\n')
+      counter.ingestSSEChunk('data: [DONE]\n\n')
+      // 2 chunks; byte floor ceil((28 + 2) / 4) = 8
+      expect(counter.finalCount()).toBe(8)
+    })
+
+    it('ignores usage figures that are not non-negative numbers', () => {
+      const counter = new TokenCounter()
+      counter.ingestSSEChunk('data: {"choices":[{"delta":{"content":"Hi"}}]}\n\n')
+      counter.ingestSSEChunk('data: {"choices":[],"usage":{"prompt_tokens":"10","completion_tokens":-5}}\n\n')
+      expect(counter.finalCount()).toBe(1)
     })
 
     it('ignores non-content chunks in count', () => {
@@ -84,14 +100,23 @@ describe('TokenCounter', () => {
       expect(counter.finalCount()).toBe(18)
     })
 
-    it('falls back to chunk count when reasoning chunks detected', () => {
+    it('parses a usage event split across network chunks', () => {
       const counter = new TokenCounter()
-      counter.ingestSSEChunk('data: {"choices":[{"delta":{"reasoning":"thinking..."}}]}\n\n')
-      counter.ingestSSEChunk('data: {"choices":[{"delta":{"content":"answer"}}]}\n\n')
-      counter.ingestSSEChunk('data: {"choices":[],"usage":{"prompt_tokens":10,"completion_tokens":50,"total_tokens":60}}\n\n')
-      counter.ingestSSEChunk('data: [DONE]\n\n')
-      // Should use max(chunk_count(1), byte_floor(ceil(6/4)=2)) not completion_tokens (50) — reasoning excluded
-      expect(counter.finalCount()).toBe(12)
+      counter.ingestSSEChunk('data: {"choices":[{"delta":{"content":"Hi"}}]}\n\ndata: {"choices":[],"usage":{"prompt_tok')
+      counter.ingestSSEChunk('ens":100,"completion_tokens":400}}\n\ndata: [DONE]\n\n')
+      expect(counter.finalCount()).toBe(500)
+    })
+
+    it('parses a final event with no trailing newline', () => {
+      const counter = new TokenCounter()
+      counter.ingestSSEChunk('data: {"choices":[],"usage":{"prompt_tokens":3,"completion_tokens":4}}')
+      expect(counter.finalCount()).toBe(7)
+    })
+
+    it('accepts data fields without a space and CRLF line endings', () => {
+      const counter = new TokenCounter()
+      counter.ingestSSEChunk('data:{"choices":[],"usage":{"prompt_tokens":2,"completion_tokens":2}}\r\n\r\n')
+      expect(counter.finalCount()).toBe(4)
     })
 
     it('handles multi-event chunks', () => {

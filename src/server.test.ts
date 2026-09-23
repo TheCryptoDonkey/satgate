@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { serve } from '@hono/node-server'
-import { createTokenTollServer } from './server.js'
+import { createTokenTollServer, socketClientIp } from './server.js'
 import { Hono } from 'hono'
 
 function mockUpstream() {
@@ -149,5 +149,106 @@ describe('createTokenTollServer', () => {
       body: JSON.stringify({ model: 'llama3', messages: [] }),
     })
     expect(res.status).toBe(402)
+  })
+})
+
+describe('route pricing', () => {
+  const base = {
+    upstream: 'http://127.0.0.1:1',
+    port: 0,
+    rootKey: 'a'.repeat(64),
+    rootKeyGenerated: false,
+    storage: 'memory' as const,
+    dbPath: '',
+    pricing: { default: 1, models: {} },
+    freeTier: { creditsPerDay: 0 },
+    capacity: { maxConcurrent: 0 },
+    tiers: [],
+    trustProxy: false,
+    estimatedCostSats: 10,
+    maxBodySize: 10 * 1024 * 1024,
+    authMode: 'lightning' as const,
+    allowlist: [],
+    tunnel: false,
+  }
+
+  async function probePrice(app: { request: (path: string, init?: RequestInit) => Response | Promise<Response> }) {
+    const res = await app.request('/v1/chat/completions', { method: 'HEAD' })
+    expect(res.status).toBe(402)
+    return res.headers.get('X-L402-Price-Sats')
+  }
+
+  it('advertises the flat --price in flat mode, not the per-token estimate', async () => {
+    const { app } = createTokenTollServer({ ...base, flatPricing: true, price: 3 })
+    expect(await probePrice(app)).toBe('3')
+  })
+
+  it('advertises the estimated cost in per-token mode', async () => {
+    const { app } = createTokenTollServer({ ...base, flatPricing: false, price: 3 })
+    expect(await probePrice(app)).toBe('10')
+  })
+})
+
+describe('free flat pricing', () => {
+  it('serves inference without a challenge when the flat price is 0', async () => {
+    const upstream = new Hono()
+    upstream.post('/v1/chat/completions', (c) => c.json({ choices: [], usage: { prompt_tokens: 1, completion_tokens: 1 } }))
+    let server: ReturnType<typeof serve> | undefined
+    const url = await new Promise<string>((resolve) => {
+      server = serve({ fetch: upstream.fetch, port: 0 }, (info) => resolve(`http://localhost:${info.port}`))
+    })
+    try {
+      const { app } = createTokenTollServer({
+        upstream: url,
+        port: 0,
+        rootKey: 'a'.repeat(64),
+        rootKeyGenerated: false,
+        storage: 'memory',
+        dbPath: '',
+        pricing: { default: 1, models: {} },
+        freeTier: { creditsPerDay: 0 },
+        capacity: { maxConcurrent: 0 },
+        tiers: [],
+        trustProxy: false,
+        estimatedCostSats: 10,
+        maxBodySize: 10 * 1024 * 1024,
+        authMode: 'lightning',
+        allowlist: [],
+        flatPricing: true,
+        price: 0,
+        tunnel: false,
+      })
+      const res = await app.request('/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'llama3', messages: [] }),
+      })
+      expect(res.status).toBe(200)
+    } finally {
+      server?.close()
+    }
+  })
+})
+
+describe('socketClientIp', () => {
+  it('reads the TCP peer address under the Node server', async () => {
+    const probe = new Hono()
+    probe.get('/ip', (c) => c.text(socketClientIp(c)))
+    let server: ReturnType<typeof serve> | undefined
+    const url = await new Promise<string>((resolve) => {
+      server = serve({ fetch: probe.fetch, port: 0, hostname: '127.0.0.1' }, (info) => resolve(`http://127.0.0.1:${info.port}`))
+    })
+    try {
+      const ip = await (await fetch(`${url}/ip`, { headers: { 'X-Forwarded-For': '203.0.113.9' } })).text()
+      expect(ip).toMatch(/127\.0\.0\.1$/)
+    } finally {
+      server?.close()
+    }
+  })
+
+  it('falls back to 0.0.0.0 without a socket', async () => {
+    const probe = new Hono()
+    probe.get('/ip', (c) => c.text(socketClientIp(c)))
+    expect(await (await probe.request('/ip')).text()).toBe('0.0.0.0')
   })
 })

@@ -8,7 +8,7 @@ describe('loadConfig', () => {
     expect(config.port).toBe(3000)
     expect(config.pricing.default).toBe(1)
     expect(config.storage).toBe('memory')
-    expect(config.capacity.maxConcurrent).toBe(0)
+    expect(config.capacity.maxConcurrent).toBe(8)
     expect(config.freeTier.creditsPerDay).toBe(0)
   })
 
@@ -329,6 +329,17 @@ describe('loadConfig', () => {
     })
     expect(withCli.tunnel).toBe(false)
   })
+
+  it('leaves the tunnel off in open mode unless asked for', () => {
+    expect(loadConfig({ upstream: 'http://localhost:11434' }).tunnel).toBe(false)
+    expect(loadConfig({ upstream: 'http://localhost:11434', tunnel: true }).tunnel).toBe(true)
+    expect(loadConfig({ upstream: 'http://localhost:11434' }, { TUNNEL: 'true' }).tunnel).toBe(true)
+  })
+
+  it('turns the tunnel on by default when payment is required', () => {
+    expect(loadConfig({ upstream: 'http://localhost:11434', lightning: 'phoenixd' }).tunnel).toBe(true)
+    expect(loadConfig({ upstream: 'http://localhost:11434', lightning: 'phoenixd', noTunnel: true }).tunnel).toBe(false)
+  })
 })
 
 describe('x402 config', () => {
@@ -540,7 +551,8 @@ describe('per-token CLI pricing', () => {
 
   it('estimatedCostSats reflects CLI tokenPrice when set', () => {
     const config = loadConfig({ upstream: 'http://localhost:11434', tokenPrice: 5 })
-    expect(config.estimatedCostSats).toBe(10)
+    // (4096-byte prompt allowance + 2048 max tokens) at 5 sats/1k, rounded up
+    expect(config.estimatedCostSats).toBe(31)
   })
 
   it('model ID with colon (e.g. qwen3:0.6b) parses correctly', () => {
@@ -650,5 +662,75 @@ describe('lnurlcash mints', () => {
     expect(() =>
       loadConfig({ upstream: 'http://localhost:11434' }, {}, { lnurlcash: { mints: [] } }),
     ).toThrow(/at least one mint host/)
+  })
+})
+
+describe('max tokens', () => {
+  it('defaults to 2048 and sizes the default hold from it and the dearest model', () => {
+    const config = loadConfig({ upstream: 'http://localhost:11434' }, {}, { pricing: { default: 1, models: { big: 10 } } })
+    expect(config.maxTokens).toBe(2048)
+    // (4096 + 2048) tokens at the dearest price, 10 sats/1k
+    expect(config.estimatedCostSats).toBe(62)
+  })
+
+  it('reads --max-tokens, SATGATE_MAX_TOKENS and maxTokens in precedence order', () => {
+    expect(loadConfig({ upstream: 'http://x', maxTokens: 10 }, { SATGATE_MAX_TOKENS: '20' }, { maxTokens: 30 }).maxTokens).toBe(10)
+    expect(loadConfig({ upstream: 'http://x' }, { SATGATE_MAX_TOKENS: '20' }, { maxTokens: 30 }).maxTokens).toBe(20)
+    expect(loadConfig({ upstream: 'http://x' }, {}, { maxTokens: 30 }).maxTokens).toBe(30)
+  })
+
+  it('rejects a non-positive max tokens', () => {
+    expect(() => loadConfig({ upstream: 'http://x', maxTokens: 0 })).toThrow(/max tokens/)
+  })
+})
+
+describe('trusted proxies', () => {
+  it('parses --trusted-proxies and TRUSTED_PROXIES, and implies trustProxy', () => {
+    const fromCli = loadConfig({ upstream: 'http://x', trustedProxies: '10.0.0.0/8, 127.0.0.1' })
+    expect(fromCli.trustedProxies).toEqual(['10.0.0.0/8', '127.0.0.1'])
+    expect(fromCli.trustProxy).toBe(true)
+    const fromEnv = loadConfig({ upstream: 'http://x' }, { TRUSTED_PROXIES: '::1' })
+    expect(fromEnv.trustedProxies).toEqual(['::1'])
+    const fromFile = loadConfig({ upstream: 'http://x' }, {}, { trustedProxies: ['172.16.0.0/12'] })
+    expect(fromFile.trustedProxies).toEqual(['172.16.0.0/12'])
+    expect(loadConfig({ upstream: 'http://x' }).trustProxy).toBe(false)
+  })
+
+  it('rejects entries that are not IPs or CIDRs', () => {
+    expect(() => loadConfig({ upstream: 'http://x', trustedProxies: 'proxy.example.com' })).toThrow(/trusted proxy/)
+  })
+})
+
+describe('pending invoice limit', () => {
+  it('defaults to 20 and can be set or disabled', () => {
+    expect(loadConfig({ upstream: 'http://x' }).maxPendingInvoicesPerIp).toBe(20)
+    expect(loadConfig({ upstream: 'http://x', maxPendingInvoices: 0 }).maxPendingInvoicesPerIp).toBe(0)
+    expect(loadConfig({ upstream: 'http://x' }, { SATGATE_MAX_PENDING_INVOICES: '5' }).maxPendingInvoicesPerIp).toBe(5)
+    expect(loadConfig({ upstream: 'http://x' }, {}, { maxPendingInvoicesPerIp: 7 }).maxPendingInvoicesPerIp).toBe(7)
+    expect(() => loadConfig({ upstream: 'http://x', maxPendingInvoices: -1 })).toThrow(/pending invoices/)
+  })
+})
+
+describe('storage defaults', () => {
+  it('uses SQLite when payments are accepted, memory otherwise', () => {
+    expect(loadConfig({ upstream: 'http://x' }).storage).toBe('memory')
+    expect(loadConfig({ upstream: 'http://x', lightning: 'phoenixd' }).storage).toBe('sqlite')
+    expect(loadConfig({ upstream: 'http://x', cashuMints: 'https://mint.example.com' }).storage).toBe('sqlite')
+    expect(loadConfig({ upstream: 'http://x', lightning: 'phoenixd', storage: 'memory' }).storage).toBe('memory')
+  })
+})
+
+describe('concurrency limit', () => {
+  it('can still be switched off explicitly', () => {
+    expect(loadConfig({ upstream: 'http://x', maxConcurrent: 0 }).capacity.maxConcurrent).toBe(0)
+    expect(loadConfig({ upstream: 'http://x' }, { MAX_CONCURRENT: '0' }).capacity.maxConcurrent).toBe(0)
+  })
+})
+
+describe('LNURLcash without Lightning', () => {
+  it('requires payment rather than falling back to open mode', () => {
+    const config = loadConfig({ upstream: 'http://x', lnurlcashMints: 'mint.example.com' })
+    expect(config.authMode).toBe('cashu')
+    expect(config.tunnel).toBe(true)
   })
 })

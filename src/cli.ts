@@ -7,12 +7,15 @@ import { createLightningBackend } from './lightning.js'
 import { startTunnel, stopTunnel, type TunnelResult } from './tunnel.js'
 import { createLogger } from './logger.js'
 import { resolveModelPrice } from './proxy/pricing.js'
+import { readPackageVersion } from './version.js'
+import { loadOrCreateRootKey } from './root-key.js'
 
 function parseArgs(argv: string[]): CliArgs {
   const args: CliArgs = {}
   for (let i = 2; i < argv.length; i++) {
     switch (argv[i]) {
       case '--upstream': args.upstream = argv[++i]; break
+      case '--upstream-key-file': args.upstreamKeyFile = argv[++i]; break
       case '--port': args.port = parseInt(argv[++i], 10); break
       case '--config': args.config = argv[++i]; break
       case '--price': args.price = parseInt(argv[++i], 10); break
@@ -21,6 +24,7 @@ function parseArgs(argv: string[]): CliArgs {
       case '--db-path': args.dbPath = argv[++i]; break
       case '--free-tier': args.freeTier = parseInt(argv[++i], 10); break
       case '--trust-proxy': args.trustProxy = true; break
+      case '--trusted-proxies': args.trustedProxies = argv[++i]; break
       case '--lightning': args.lightning = argv[++i]; break
       case '--lightning-url': args.lightningUrl = argv[++i]; break
       case '--lightning-key': args.lightningKey = argv[++i]; break
@@ -28,10 +32,13 @@ function parseArgs(argv: string[]): CliArgs {
       case '--allowlist': args.allowlist = argv[++i].split(','); break
       case '--allowlist-file': args.allowlistFile = argv[++i]; break
       case '--no-tunnel': args.noTunnel = true; break
+      case '--tunnel': args.tunnel = true; break
       case '--root-key': args.rootKey = argv[++i]; break
       case '--verbose': args.verbose = true; break
       case '--log-format': args.logFormat = argv[++i]; break
       case '--token-price': args.tokenPrice = parseInt(argv[++i], 10); break
+      case '--max-pending-invoices': args.maxPendingInvoices = parseInt(argv[++i], 10); break
+      case '--max-tokens': args.maxTokens = parseInt(argv[++i], 10); break
       case '--model-price':
         args.modelPrice = [...(args.modelPrice ?? []), argv[++i]]
         break
@@ -77,6 +84,8 @@ function printHelp(): void {
 
   Upstream:
     --upstream <url>           Upstream API URL (default: auto-detect Ollama on :11434)
+    --upstream-key-file <path> File holding a bearer key for the upstream API
+                               (or set UPSTREAM_API_KEY)
 
   Lightning:
     --lightning <backend>      phoenixd | lnbits | lnd | cln | nwc
@@ -100,10 +109,15 @@ function printHelp(): void {
     --price <sats>             Sats per request (flat pricing)
     --token-price <sats>       Sats per 1k tokens (per-token pricing)
     --model-price <model:sats> Per-model token price (repeatable)
+    --max-tokens <n>           Cap on completion tokens per request (default: 2048);
+                               per-token billing reserves the worst case up front
 
   Server:
     --port <number>            Listen port (default: 3000)
-    --no-tunnel                Skip Cloudflare Tunnel
+    --tunnel                   Publish via a Cloudflare quick tunnel (default: on
+                               when payment or an allowlist is required, off in
+                               open mode)
+    --no-tunnel                Skip the Cloudflare tunnel
 
   Announce:
     --announce                 Publish service on Nostr relays for discovery
@@ -112,14 +126,21 @@ function printHelp(): void {
     --public-url <url>         Public URL for announcements (overrides tunnel URL)
 
   Storage:
-    --storage <type>           memory | sqlite (default: memory)
+    --storage <type>           memory | sqlite (default: sqlite when payments are
+                               accepted, memory otherwise)
     --db-path <path>           SQLite path (default: ./satgate.db)
 
   Other:
     --config <path>            Config file (JSON or YAML)
-    --max-concurrent <n>       Max concurrent inference requests
+    --max-concurrent <n>       Max concurrent inference requests (default: 8;
+                               0 = unlimited)
+    --max-pending-invoices <n> Unpaid invoices per client IP before 429 (default: 20;
+                               0 disables)
     --free-tier <n>            Free credits (sats) per IP per day (default: 0)
-    --trust-proxy              Trust X-Forwarded-For headers
+    --trust-proxy              Trust X-Forwarded-For / X-Real-IP for client IPs
+                               (free tier and invoice limits); only behind a proxy
+    --trusted-proxies <ips>    Comma-separated proxy IPs/IPv4 CIDRs to skip when
+                               reading X-Forwarded-For (implies --trust-proxy)
     --root-key <key>           Root key for macaroon minting
     --verbose                  Show extra fields in log output
     --log-format <format>      pretty | json (default: pretty)
@@ -129,12 +150,14 @@ function printHelp(): void {
 }
 
 function printVersion(): void {
-  try {
-    const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf-8'))
-    console.log(`satgate v${pkg.version}`)
-  } catch {
-    console.log('satgate (unknown version)')
-  }
+  const version = readPackageVersion()
+  console.log(version ? `satgate v${version}` : 'satgate (unknown version)')
+}
+
+/** The Lightning line of the startup banner. nwc has no URL: its relay is in the URI. */
+export function lightningLabel(config: Pick<TokenTollConfig, 'lightning' | 'lightningUrl'>): string {
+  if (!config.lightning) return 'none (free mode)'
+  return config.lightningUrl ? `${config.lightning} (${config.lightningUrl})` : config.lightning
 }
 
 /**
@@ -211,6 +234,18 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     args.allowlist = [...(args.allowlist ?? []), ...entries]
   }
 
+  // Upstream API key from a file, so it never appears in argv
+  const upstreamKeyFile = args.upstreamKeyFile
+    ?? (typeof fileConfig.upstreamKeyFile === 'string' ? fileConfig.upstreamKeyFile : undefined)
+  if (upstreamKeyFile) {
+    try {
+      args.upstreamKey = readFileSync(upstreamKeyFile, 'utf-8').trim()
+    } catch {
+      console.error(`[satgate] Could not read upstream key file: ${upstreamKeyFile}`)
+      process.exit(1)
+    }
+  }
+
   // Warn when secrets are passed on the command line (visible in `ps aux`)
   const cliSecrets: string[] = []
   if (args.lightningKey) cliSecrets.push('--lightning-key')
@@ -224,6 +259,24 @@ export async function main(argv: string[] = process.argv): Promise<void> {
   const config = loadConfig(args, process.env as Record<string, string>, fileConfig)
   const logger = createLogger({ format: config.logFormat, verbose: config.verbose })
 
+  // Paid credentials are signed with the root key. With a database to keep
+  // balances in, keep a generated key beside it so credentials survive a
+  // restart; with memory storage both are lost together, loudly.
+  const acceptsPayment = Boolean(config.lightning || config.cashu || config.lnurlcash)
+  if (acceptsPayment && config.rootKeyGenerated) {
+    if (config.storage === 'sqlite') {
+      const { dirname } = await import('node:path')
+      const stored = loadOrCreateRootKey(dirname(config.dbPath))
+      config.rootKey = stored.key
+      config.rootKeyGenerated = false
+      logger.info(`Root key ${stored.created ? 'saved to' : 'loaded from'} ${stored.path} (keep it private)`)
+    }
+  }
+  if (acceptsPayment && config.storage === 'memory') {
+    logger.warn('!!! Payments are enabled with MEMORY storage: every paid balance and credential')
+    logger.warn('!!! is lost when satgate restarts. Use --storage sqlite (the default with payments).')
+  }
+
   if (config.flatPricing && config.price === 0) {
     logger.warn('Flat price is 0 sats — all inference is free')
   }
@@ -234,6 +287,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     try {
       const res = await fetch(`${config.upstream}/v1/models`, {
         signal: AbortSignal.timeout(5000),
+        ...(config.upstreamKey && { headers: { Authorization: `Bearer ${config.upstreamKey}` } }),
       })
       const body = await res.json() as { data?: Array<{ id: string }> }
       models = body.data?.map(m => m.id) ?? []
@@ -253,23 +307,18 @@ export async function main(argv: string[] = process.argv): Promise<void> {
   const backend = createLightningBackend(config)
   const { app } = createTokenTollServer({ ...config, models, backend, logger })
 
-  let version = '0.1.0'
-  try {
-    const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf-8'))
-    version = pkg.version
-  } catch { /* ignore */ }
+  const version = readPackageVersion() ?? 'unknown'
 
   let tunnelResult: TunnelResult | undefined
   let announcement: { close(): void; pubkey: string } | undefined
 
   const server = serve({ fetch: app.fetch, port: config.port }, async () => {
-    const lightningLabel = config.lightning
-      ? `${config.lightning} (${config.lightningUrl})`
-      : 'none (free mode)'
     const authLabel = config.authMode === 'lightning'
       ? 'lightning (pay-per-request)'
       : config.authMode === 'cashu'
-        ? `cashu (${config.cashu!.mints.length} mint${config.cashu!.mints.length > 1 ? 's' : ''})`
+        ? (config.cashu
+            ? `cashu (${config.cashu.mints.length} mint${config.cashu.mints.length > 1 ? 's' : ''})`
+            : 'lnurlcash notes')
         : config.authMode === 'allowlist'
           ? `allowlist (${config.allowlist.length} identities)`
           : 'open'
@@ -280,7 +329,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     logger.info(`satgate v${version}`)
     logger.info(`Upstream:   ${config.upstream}${ollamaAutoDetected ? ' (auto-detected)' : ''}`)
     logger.info(`Models:     ${models.length > 0 ? models.join(', ') : '(none detected)'}`)
-    logger.info(`Lightning:  ${lightningLabel}`)
+    logger.info(`Lightning:  ${lightningLabel(config)}`)
     logger.info(`Auth:       ${authLabel}`)
     logger.info(`Price:      ${priceLabel}`)
     if (config.lnurlcash) {

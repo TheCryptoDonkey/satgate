@@ -2,22 +2,24 @@
 
 [![MIT licence](https://img.shields.io/badge/licence-MIT-blue.svg)](./LICENSE)
 [![Nostr](https://img.shields.io/badge/Nostr-Zap%20me-purple)](https://primal.net/p/npub1mgvlrnf5hm9yf0n5mf9nqmvarhvxkc6remu5ec3vf8r0txqkuk7su0e7q2)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue)](https://www.typescriptlang.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6-blue)](https://www.typescriptlang.org/)
 [![Node](https://img.shields.io/badge/Node-%3E%3D22-green)](https://nodejs.org/)
 
 **Your GPU is burning money. Make it earn money.**
 
-satgate sits in front of Ollama, vLLM, llama.cpp — any OpenAI-compatible backend — and turns it into a pay-per-token API. No accounts. No API keys. No Stripe. Clients pay per token, you earn sats before the response finishes streaming.
+satgate sits in front of Ollama, vLLM, llama.cpp or any other OpenAI-compatible backend (with `UPSTREAM_API_KEY` for one that needs a key) and turns it into a pay-per-token API. No accounts. No API keys. No Stripe. Clients pay per token, you earn sats before the response finishes streaming.
 
 ![satgate demo](demo/token-toll-demo.gif)
 
 ## Quick start
 
 ```bash
-npx satgate --upstream http://localhost:11434
+LIGHTNING_KEY=<phoenixd password> npx satgate --upstream http://localhost:11434 --lightning phoenixd
 ```
 
-That's it. satgate auto-detects your models, starts accepting payments, and proxies inference requests. Clients pay per token, you earn sats.
+satgate auto-detects your models, charges per token over Lightning (here through a local phoenixd; `lnbits`, `lnd`, `cln` and `nwc` work too), and proxies paid inference requests.
+
+Without `--lightning` (or Cashu mints, or an allowlist) satgate runs in open mode: no payment and no authentication. Open mode stays on localhost; it only gets a public tunnel if you pass `--tunnel`.
 
 ---
 
@@ -44,10 +46,10 @@ curl -s https://satgate.trotters.dev/llms.txt
 
 | | The old way | With satgate |
 |---|---|---|
-| **Sell GPU time** | Sign up for a marketplace (OpenRouter, Together). They set the price, take a cut, own the customer. | `npx satgate --upstream http://localhost:11434`. You set the price. You keep 100%. |
+| **Sell GPU time** | Sign up for a marketplace (OpenRouter, Together). They set the price, take a cut, own the customer. | `npx satgate --upstream http://localhost:11434 --lightning phoenixd`. You set the price. You keep 100%. |
 | **Handle billing** | Stripe account, KYC, usage tracking, invoices, chargebacks | Payments settle before the response finishes streaming. No accounts, no disputes. |
 | **Serve AI agents** | OAuth flows, API key management, billing portals — none of which machines can use | Agents discover your endpoint, pay per token from their own wallet, no human in the loop. |
-| **Price fairly** | Flat rate per request, regardless of whether it's 10 tokens or 10,000 | Actual tokens counted from the response. Overpayments credited back. |
+| **Price fairly** | Flat rate per request, regardless of whether it's 10 tokens or 10,000 | Billed from the token counts the upstream reports. Unused holds credited back. |
 
 ---
 
@@ -91,7 +93,7 @@ sequenceDiagram
 
 Everything you just saw — the payment gating, the multi-rail support, the credit system, the free tier, the macaroon credentials — that's not satgate. That's [toll-booth](https://github.com/forgesworn/toll-booth).
 
-satgate is ~400 lines of glue on top of toll-booth. It adds the AI-specific bits: token counting, model pricing, streaming reconciliation, capacity management. Everything else comes from the middleware.
+satgate is a thin layer on top of toll-booth. It adds the AI-specific bits: token counting, model pricing, streaming reconciliation, capacity management. Everything else comes from the middleware.
 
 **You could build your own satgate for your domain in an afternoon.**
 
@@ -101,7 +103,7 @@ Monetise a routing API. Gate a translation service. Sell weather data per reques
 
 ```mermaid
 graph TB
-    subgraph "satgate (~400 lines)"
+    subgraph "satgate"
         TC[Token counting]
         MP[Model pricing]
         SR[Streaming reconciliation]
@@ -126,9 +128,9 @@ graph TB
 
 ## What satgate adds
 
-- **Pay-per-token** — actual token count from the response, not estimated. Streaming and buffered.
+- **Pay-per-token**: billed from the prompt and completion token counts the upstream reports, streaming and buffered, reasoning tokens included. If an upstream reports no usage, satgate falls back to a chunk count with a byte-based floor.
 - **Model-specific pricing** — 1 sat/1k for Llama, 5 sats/1k for DeepSeek. You set the rates.
-- **Streaming reconciliation** — estimated charge upfront, reconciled to actual usage after. Overpayments credited back.
+- **Streaming reconciliation**: the worst case for the request (its size plus `max_tokens`) is held up front and settled to actual usage after. The unused hold goes back to the credit balance.
 - **Capacity management** — limit concurrent inference requests to protect your GPU.
 - **Auto-detect models** — queries your upstream on startup. No manual model list.
 - **Four server-side payment rails** — Lightning, Cashu ecash, LNURLcash
@@ -136,8 +138,8 @@ graph TB
   LNbits, LND, CLN or any NWC wallet (`--lightning nwc`, URI read from a
   file). Callers can pay from their own NWC wallet through 402-mcp without
   disclosing it to satgate.
-- **Privacy by design** — no personal data collected or stored. No accounts, no cookies, no IP logging. GDPR-safe out of the box.
-- **Instant public URL** — auto-spawns a Cloudflare tunnel. Your GPU is reachable from the internet in seconds.
+- **Privacy by design**: no accounts and no cookies, and client IPs are not logged. IPs are used for free-tier and invoice limits and stored only as hashes keyed to the date.
+- **Instant public URL** — when payment or an allowlist is required, satgate spawns a Cloudflare quick tunnel (if `cloudflared` is installed), so your GPU is reachable from the internet in seconds. Open mode never tunnels unless you pass `--tunnel`.
 
 ---
 
@@ -160,7 +162,9 @@ sequenceDiagram
     T->>T: Reconcile: credit back overpayment
 ```
 
-Charges are estimated upfront based on model pricing, then reconciled to actual token usage after the response completes. Operators are never short-changed — costs round up. Overpayments are credited to the client's balance for the next request.
+Before the upstream is called, satgate holds the most the request could cost: every byte of the body counted as a prompt token, plus `max_tokens` (clamped to `--max-tokens`, default 2048) for each choice. A balance that cannot cover that gets a 402. After the response, the charge is settled to the tokens the upstream reported, rounded up to the next sat, and the rest of the hold goes back to the client's balance.
+
+Per-request IETF Payment charges and the free tier cannot be topped up or refunded, so for those `max_tokens` is shrunk to fit what was paid, and the per-request price (`estimatedCostSats`) is sized by default to cover a 4 KiB request plus a full `max_tokens` completion.
 
 ---
 
@@ -214,11 +218,18 @@ pricing:
 freeTier:
   creditsPerDay: 250
 capacity:
-  maxConcurrent: 4
+  maxConcurrent: 4    # default 8; 0 = unlimited
+maxTokens: 2048       # cap on completion tokens per request (default 2048)
+trustProxy: true      # behind a reverse proxy: read client IPs from X-Forwarded-For
+trustedProxies:
+  - 127.0.0.1
+maxPendingInvoicesPerIp: 20   # unpaid invoices per client before a 429 (default 20)
 lnurlcash:
   mints:
     - mint.example.com
 ```
+
+With a payment rail configured, storage defaults to SQLite (`./satgate.db`) and a generated macaroon root key is kept beside it in `satgate.root-key`, so balances and credentials survive a restart. Set `ROOT_KEY` to manage the key yourself.
 
 CLI flags > environment variables > config file > defaults.
 
@@ -269,10 +280,10 @@ including the safety envelope and the limits of what this single run proves.
 
 ```bash
 # Monetise your local Ollama
-npx satgate --upstream http://localhost:11434
+LIGHTNING_KEY=<phoenixd password> npx satgate --upstream http://localhost:11434 --lightning phoenixd
 
-# Or point at any OpenAI-compatible backend
-npx satgate --upstream http://your-vllm-server:8000
+# Or point at another OpenAI-compatible backend
+LIGHTNING_KEY=<phoenixd password> npx satgate --upstream http://your-vllm-server:8000 --lightning phoenixd
 ```
 
 → [**toll-booth**](https://github.com/forgesworn/toll-booth) — the middleware that powers all of this. Build your own.
