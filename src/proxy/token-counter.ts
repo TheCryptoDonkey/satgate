@@ -4,27 +4,31 @@ interface UsageData {
   total_tokens?: number
 }
 
+/** A usage figure, if it is a non-negative finite number; otherwise undefined. */
+function tokenCount(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? Math.ceil(value) : undefined
+}
+
 /**
  * Counts tokens from OpenAI-compatible responses.
  *
  * Priority:
  * 1. Buffered usage (from non-streaming JSON response)
  * 2. Usage from final SSE chunk (stream_options: { include_usage: true })
- * 3. Content chunk count (fallback - 1 chunk ~= 1 token)
+ * 3. Generated chunk count (fallback - 1 chunk ~= 1 token, with a byte floor)
  */
 export class TokenCounter {
   private bufferedUsage: UsageData | null = null
   private sseUsage: UsageData | null = null
   private contentChunkCount = 0
   private totalContentBytes = 0
-  private hasReasoningChunks = false
 
   /** Set usage from a buffered (non-streaming) JSON response. */
   setBufferedUsage(usage: Record<string, unknown>): void {
     this.bufferedUsage = {
-      prompt_tokens: typeof usage.prompt_tokens === 'number' ? usage.prompt_tokens : undefined,
-      completion_tokens: typeof usage.completion_tokens === 'number' ? usage.completion_tokens : undefined,
-      total_tokens: typeof usage.total_tokens === 'number' ? usage.total_tokens : undefined,
+      prompt_tokens: tokenCount(usage.prompt_tokens),
+      completion_tokens: tokenCount(usage.completion_tokens),
+      total_tokens: tokenCount(usage.total_tokens),
     }
   }
 
@@ -40,24 +44,25 @@ export class TokenCounter {
         const parsed = JSON.parse(data)
 
         // Check for usage in this chunk
-        if (parsed.usage) {
+        if (parsed.usage && typeof parsed.usage === 'object') {
           this.sseUsage = {
-            prompt_tokens: parsed.usage.prompt_tokens,
-            completion_tokens: parsed.usage.completion_tokens,
-            total_tokens: parsed.usage.total_tokens,
+            prompt_tokens: tokenCount(parsed.usage.prompt_tokens),
+            completion_tokens: tokenCount(parsed.usage.completion_tokens),
+            total_tokens: tokenCount(parsed.usage.total_tokens),
           }
         }
 
-        // Count content and reasoning chunks
+        // Count generated chunks (content and reasoning). Only used when the
+        // upstream reports no usage, as a floor-backed estimate.
         const choices = parsed.choices
         if (Array.isArray(choices)) {
           for (const choice of choices) {
-            if (choice.delta?.content !== undefined && choice.delta.content !== '') {
-              this.contentChunkCount++
-              this.totalContentBytes += new TextEncoder().encode(choice.delta.content).byteLength
-            }
-            if (choice.delta?.reasoning !== undefined || choice.delta?.reasoning_content !== undefined) {
-              this.hasReasoningChunks = true
+            for (const field of ['content', 'reasoning', 'reasoning_content'] as const) {
+              const text = choice.delta?.[field]
+              if (typeof text === 'string' && text !== '') {
+                this.contentChunkCount++
+                this.totalContentBytes += new TextEncoder().encode(text).byteLength
+              }
             }
           }
         }
@@ -69,13 +74,14 @@ export class TokenCounter {
 
   /** Returns the final token count using the best available source.
    *
-   *  For buffered (non-streaming) responses, uses prompt_tokens + completion_tokens
-   *  from the usage object since there are no SSE chunks to count.
+   *  Reported usage wins: prompt_tokens + completion_tokens. Completion tokens
+   *  include any reasoning/thinking tokens, which the upstream generated and
+   *  the operator paid for in compute, so they are billed like any other.
    *
-   *  For streaming responses, uses prompt_tokens + content chunk count.
-   *  This avoids billing for reasoning/thinking tokens that some models produce. */
+   *  Without reported usage (upstream ignored include_usage), the completion
+   *  is estimated from generated chunks with a byte-based floor. */
   finalCount(): number {
-    // Buffered response — use reported usage directly (no chunks to count)
+    // Buffered response: use reported usage directly (no chunks to count)
     if (this.bufferedUsage) {
       const prompt = this.bufferedUsage.prompt_tokens ?? 0
       const completion = this.bufferedUsage.completion_tokens ?? 0
@@ -85,20 +91,13 @@ export class TokenCounter {
     // Streaming response
     const usage = this.sseUsage
     const promptTokens = usage?.prompt_tokens ?? 0
+    if (usage?.completion_tokens !== undefined) {
+      return promptTokens + usage.completion_tokens
+    }
 
     // Byte-based floor: ~4 bytes per token is a conservative estimate.
     // Prevents a malicious upstream from bundling all content in one chunk to avoid billing.
     const byteFloor = Math.ceil(this.totalContentBytes / 4)
-
-    // If reasoning chunks were detected, use content chunk count to exclude them.
-    // Otherwise, prefer completion_tokens from SSE usage (more accurate than chunk count).
-    if (this.hasReasoningChunks) {
-      const completionEstimate = Math.max(this.contentChunkCount, byteFloor)
-      return promptTokens + completionEstimate
-    }
-    if (usage?.completion_tokens !== undefined) {
-      return promptTokens + usage.completion_tokens
-    }
     return promptTokens + Math.max(this.contentChunkCount, byteFloor)
   }
 }
