@@ -187,10 +187,14 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
     }
   }
 
+  // Route price in sats. Flat mode charges the configured per-request price;
+  // per-token mode holds the estimated cost up front and reconciles it after.
+  const routePriceSats = config.flatPricing ? config.price : config.estimatedCostSats
+
   // Dual-currency pricing entry
   const pricingEntry = config.defaultPriceUsd !== undefined
-    ? { sats: config.estimatedCostSats, usd: config.defaultPriceUsd }
-    : config.estimatedCostSats
+    ? { sats: routePriceSats, usd: config.defaultPriceUsd }
+    : routePriceSats
 
   // Create toll-booth engine
   const engine = createTollBooth({
@@ -198,7 +202,9 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
     storage,
     upstream: config.upstream,
     backend: config.backend,
-    pricing: {
+    // A flat price of 0 means free inference: leave the routes unpriced so
+    // toll-booth passes them through instead of issuing 0-sat invoices.
+    pricing: config.flatPricing && config.price === 0 ? {} : {
       '/v1/chat/completions': pricingEntry,
       '/v1/completions': pricingEntry,
       '/v1/embeddings': pricingEntry,
