@@ -251,12 +251,6 @@ export function loadConfig(
   }
   const rootKey = rootKeyRaw ?? randomBytes(32).toString('hex')
 
-  const storageRaw = args.storage ?? env.STORAGE ?? file.storage ?? 'memory'
-  if (storageRaw !== 'memory' && storageRaw !== 'sqlite') {
-    throw new Error(`Invalid storage type: ${storageRaw} (must be 'memory' or 'sqlite')`)
-  }
-  const storage = storageRaw as 'memory' | 'sqlite'
-
   const dbPathRaw = args.dbPath ?? env.SATGATE_DB_PATH ?? file.dbPath ?? './satgate.db'
   // Canonicalise cwd to handle symlinked working directories
   let canonCwd: string
@@ -491,6 +485,15 @@ export function loadConfig(
     return host
   })
   const lnurlcash = lnurlcashMints ? { mints: lnurlcashMints } : undefined
+
+  // Storage. Paid credits must survive a restart, so any payment rail
+  // defaults to SQLite; memory is for open or allowlist use.
+  const acceptsPayment = Boolean(lightning || cashu || lnurlcash)
+  const storageRaw = args.storage ?? env.STORAGE ?? file.storage ?? (acceptsPayment ? 'sqlite' : 'memory')
+  if (storageRaw !== 'memory' && storageRaw !== 'sqlite') {
+    throw new Error(`Invalid storage type: ${storageRaw} (must be 'memory' or 'sqlite')`)
+  }
+  const storage = storageRaw as 'memory' | 'sqlite'
 
   // Auth mode inference
   const VALID_AUTH_MODES = ['open', 'lightning', 'cashu', 'allowlist'] as const

@@ -8,6 +8,7 @@ import { startTunnel, stopTunnel, type TunnelResult } from './tunnel.js'
 import { createLogger } from './logger.js'
 import { resolveModelPrice } from './proxy/pricing.js'
 import { readPackageVersion } from './version.js'
+import { loadOrCreateRootKey } from './root-key.js'
 
 function parseArgs(argv: string[]): CliArgs {
   const args: CliArgs = {}
@@ -122,7 +123,8 @@ function printHelp(): void {
     --public-url <url>         Public URL for announcements (overrides tunnel URL)
 
   Storage:
-    --storage <type>           memory | sqlite (default: memory)
+    --storage <type>           memory | sqlite (default: sqlite when payments are
+                               accepted, memory otherwise)
     --db-path <path>           SQLite path (default: ./satgate.db)
 
   Other:
@@ -240,6 +242,24 @@ export async function main(argv: string[] = process.argv): Promise<void> {
 
   const config = loadConfig(args, process.env as Record<string, string>, fileConfig)
   const logger = createLogger({ format: config.logFormat, verbose: config.verbose })
+
+  // Paid credentials are signed with the root key. With a database to keep
+  // balances in, keep a generated key beside it so credentials survive a
+  // restart; with memory storage both are lost together, loudly.
+  const acceptsPayment = Boolean(config.lightning || config.cashu || config.lnurlcash)
+  if (acceptsPayment && config.rootKeyGenerated) {
+    if (config.storage === 'sqlite') {
+      const { dirname } = await import('node:path')
+      const stored = loadOrCreateRootKey(dirname(config.dbPath))
+      config.rootKey = stored.key
+      config.rootKeyGenerated = false
+      logger.info(`Root key ${stored.created ? 'saved to' : 'loaded from'} ${stored.path} (keep it private)`)
+    }
+  }
+  if (acceptsPayment && config.storage === 'memory') {
+    logger.warn('!!! Payments are enabled with MEMORY storage: every paid balance and credential')
+    logger.warn('!!! is lost when satgate restarts. Use --storage sqlite (the default with payments).')
+  }
 
   if (config.flatPricing && config.price === 0) {
     logger.warn('Flat price is 0 sats — all inference is free')

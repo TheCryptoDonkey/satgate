@@ -710,3 +710,12 @@ describe('pending invoice limit', () => {
     expect(() => loadConfig({ upstream: 'http://x', maxPendingInvoices: -1 })).toThrow(/pending invoices/)
   })
 })
+
+describe('storage defaults', () => {
+  it('uses SQLite when payments are accepted, memory otherwise', () => {
+    expect(loadConfig({ upstream: 'http://x' }).storage).toBe('memory')
+    expect(loadConfig({ upstream: 'http://x', lightning: 'phoenixd' }).storage).toBe('sqlite')
+    expect(loadConfig({ upstream: 'http://x', cashuMints: 'https://mint.example.com' }).storage).toBe('sqlite')
+    expect(loadConfig({ upstream: 'http://x', lightning: 'phoenixd', storage: 'memory' }).storage).toBe('memory')
+  })
+})
