@@ -15,10 +15,10 @@ A public instance is running at https://satgate.trotters.dev — open it in a br
 ## Getting Started
 
 ```bash
-npx satgate --upstream http://localhost:11434
+LIGHTNING_KEY=<phoenixd password> npx satgate --upstream http://localhost:11434 --lightning phoenixd
 ```
 
-That's all that's needed. satgate queries `/v1/models` on startup, begins accepting payments, and proxies inference traffic to your backend. For production, create `satgate.yaml`:
+satgate queries `/v1/models` on startup, charges per token over Lightning, and proxies paid inference traffic to your backend. Without `--lightning` (or Cashu mints, or an allowlist) it runs in open mode, with no payment or authentication, and stays local unless `--tunnel` is passed. For production, create `satgate.yaml`:
 
 ```yaml
 upstream: http://localhost:11434

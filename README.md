@@ -14,10 +14,12 @@ satgate sits in front of Ollama, vLLM, llama.cpp — any OpenAI-compatible backe
 ## Quick start
 
 ```bash
-npx satgate --upstream http://localhost:11434
+LIGHTNING_KEY=<phoenixd password> npx satgate --upstream http://localhost:11434 --lightning phoenixd
 ```
 
-That's it. satgate auto-detects your models, starts accepting payments, and proxies inference requests. Clients pay per token, you earn sats.
+satgate auto-detects your models, charges per token over Lightning (here through a local phoenixd; `lnbits`, `lnd`, `cln` and `nwc` work too), and proxies paid inference requests.
+
+Without `--lightning` (or Cashu mints, or an allowlist) satgate runs in open mode: no payment and no authentication. Open mode stays on localhost; it only gets a public tunnel if you pass `--tunnel`.
 
 ---
 
@@ -44,7 +46,7 @@ curl -s https://satgate.trotters.dev/llms.txt
 
 | | The old way | With satgate |
 |---|---|---|
-| **Sell GPU time** | Sign up for a marketplace (OpenRouter, Together). They set the price, take a cut, own the customer. | `npx satgate --upstream http://localhost:11434`. You set the price. You keep 100%. |
+| **Sell GPU time** | Sign up for a marketplace (OpenRouter, Together). They set the price, take a cut, own the customer. | `npx satgate --upstream http://localhost:11434 --lightning phoenixd`. You set the price. You keep 100%. |
 | **Handle billing** | Stripe account, KYC, usage tracking, invoices, chargebacks | Payments settle before the response finishes streaming. No accounts, no disputes. |
 | **Serve AI agents** | OAuth flows, API key management, billing portals — none of which machines can use | Agents discover your endpoint, pay per token from their own wallet, no human in the loop. |
 | **Price fairly** | Flat rate per request, regardless of whether it's 10 tokens or 10,000 | Actual tokens counted from the response. Overpayments credited back. |
@@ -137,7 +139,7 @@ graph TB
   file). Callers can pay from their own NWC wallet through 402-mcp without
   disclosing it to satgate.
 - **Privacy by design** — no personal data collected or stored. No accounts, no cookies, no IP logging. GDPR-safe out of the box.
-- **Instant public URL** — auto-spawns a Cloudflare tunnel. Your GPU is reachable from the internet in seconds.
+- **Instant public URL** — when payment or an allowlist is required, satgate spawns a Cloudflare quick tunnel (if `cloudflared` is installed), so your GPU is reachable from the internet in seconds. Open mode never tunnels unless you pass `--tunnel`.
 
 ---
 
@@ -269,10 +271,10 @@ including the safety envelope and the limits of what this single run proves.
 
 ```bash
 # Monetise your local Ollama
-npx satgate --upstream http://localhost:11434
+LIGHTNING_KEY=<phoenixd password> npx satgate --upstream http://localhost:11434 --lightning phoenixd
 
-# Or point at any OpenAI-compatible backend
-npx satgate --upstream http://your-vllm-server:8000
+# Or point at another OpenAI-compatible backend
+LIGHTNING_KEY=<phoenixd password> npx satgate --upstream http://your-vllm-server:8000 --lightning phoenixd
 ```
 
 → [**toll-booth**](https://github.com/forgesworn/toll-booth) — the middleware that powers all of this. Build your own.

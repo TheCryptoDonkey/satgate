@@ -329,6 +329,17 @@ describe('loadConfig', () => {
     })
     expect(withCli.tunnel).toBe(false)
   })
+
+  it('leaves the tunnel off in open mode unless asked for', () => {
+    expect(loadConfig({ upstream: 'http://localhost:11434' }).tunnel).toBe(false)
+    expect(loadConfig({ upstream: 'http://localhost:11434', tunnel: true }).tunnel).toBe(true)
+    expect(loadConfig({ upstream: 'http://localhost:11434' }, { TUNNEL: 'true' }).tunnel).toBe(true)
+  })
+
+  it('turns the tunnel on by default when payment is required', () => {
+    expect(loadConfig({ upstream: 'http://localhost:11434', lightning: 'phoenixd' }).tunnel).toBe(true)
+    expect(loadConfig({ upstream: 'http://localhost:11434', lightning: 'phoenixd', noTunnel: true }).tunnel).toBe(false)
+  })
 })
 
 describe('x402 config', () => {

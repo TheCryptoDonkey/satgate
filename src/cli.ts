@@ -29,6 +29,7 @@ function parseArgs(argv: string[]): CliArgs {
       case '--allowlist': args.allowlist = argv[++i].split(','); break
       case '--allowlist-file': args.allowlistFile = argv[++i]; break
       case '--no-tunnel': args.noTunnel = true; break
+      case '--tunnel': args.tunnel = true; break
       case '--root-key': args.rootKey = argv[++i]; break
       case '--verbose': args.verbose = true; break
       case '--log-format': args.logFormat = argv[++i]; break
@@ -108,7 +109,10 @@ function printHelp(): void {
 
   Server:
     --port <number>            Listen port (default: 3000)
-    --no-tunnel                Skip Cloudflare Tunnel
+    --tunnel                   Publish via a Cloudflare quick tunnel (default: on
+                               when payment or an allowlist is required, off in
+                               open mode)
+    --no-tunnel                Skip the Cloudflare tunnel
 
   Announce:
     --announce                 Publish service on Nostr relays for discovery

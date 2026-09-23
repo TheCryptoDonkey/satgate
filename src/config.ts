@@ -124,6 +124,7 @@ export interface CliArgs {
   allowlist?: string[]
   allowlistFile?: string
   noTunnel?: boolean
+  tunnel?: boolean
   verbose?: boolean
   logFormat?: string
   tokenPrice?: number
@@ -516,9 +517,12 @@ export function loadConfig(
     throw new Error("auth mode 'allowlist' requires --allowlist <keys> or --allowlist-file <path>")
   }
 
-  // Tunnel
+  // Tunnel. On by default only when requests need payment or an allowlist:
+  // an open-auth proxy is never published to the internet unless asked for.
   const tunnelEnv = env.TUNNEL !== undefined ? env.TUNNEL !== 'false' : undefined
-  const tunnel = args.noTunnel === true ? false : (tunnelEnv ?? file.tunnel ?? true)
+  const tunnel = args.noTunnel === true
+    ? false
+    : (args.tunnel ?? tunnelEnv ?? file.tunnel ?? authMode !== 'open')
 
   // x402 stablecoin config
   const x402Receiver = env.X402_RECEIVER ?? file.x402?.receiverAddress
