@@ -31,6 +31,9 @@ import { generateLlmsTxt } from './discovery/llms-txt.js'
 import { generateOpenApiSpec } from './discovery/openapi.js'
 import { createHttpFacilitator } from './x402/facilitator.js'
 
+/** The inference endpoints: the only routes that cost money. */
+const PAID_PATHS = ['/v1/chat/completions', '/v1/completions', '/v1/embeddings'] as const
+
 export interface TokenTollServer {
   app: Hono<TollBoothEnv>
   close: () => void
@@ -209,11 +212,9 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
     backend: config.backend,
     // A flat price of 0 means free inference: leave the routes unpriced so
     // toll-booth passes them through instead of issuing 0-sat invoices.
-    pricing: config.flatPricing && config.price === 0 ? {} : {
-      '/v1/chat/completions': pricingEntry,
-      '/v1/completions': pricingEntry,
-      '/v1/embeddings': pricingEntry,
-    },
+    pricing: config.flatPricing && config.price === 0
+      ? {}
+      : Object.fromEntries(PAID_PATHS.map(path => [path, pricingEntry])),
     defaultInvoiceAmount: config.tiers[0]?.amountSats ?? 1000,
     freeTier: config.freeTier.creditsPerDay > 0 ? { creditsPerDay: config.freeTier.creditsPerDay } : undefined,
     ...(rails.length > 0 && { rails }),
@@ -397,19 +398,16 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
 
   const proxy = (c: Context<TollBoothEnv>) => proxyHandler(c.req.raw, undefined, holdFor(c))
 
-  if (paidAuth) {
-    app.use('/v1/*', tollBooth.authMiddleware)
-  } else {
-    const authMiddleware = createAuthMiddleware({
-      authMode: config.authMode,
-      allowlist: config.allowlist,
-    })
-    app.use('/v1/*', authMiddleware)
-  }
+  // Only the inference endpoints cost money, so only POSTs to them go
+  // through payment or allowlist auth. GET /v1/models stays free, and other
+  // methods and paths fall through to a 404 instead of minting invoices.
+  const authMiddleware = paidAuth
+    ? tollBooth.authMiddleware
+    : createAuthMiddleware({ authMode: config.authMode, allowlist: config.allowlist })
 
   // Forward toll-booth credit/free-tier context as response headers.
   // Must run AFTER next() so c.header() applies to the actual response.
-  app.use('/v1/*', async (c: Context<TollBoothEnv>, next) => {
+  const forwardPaymentHeaders = async (c: Context<TollBoothEnv>, next: () => Promise<void>) => {
     await next()
     const creditBalance = c.get('tollBoothCreditBalance')
     if (creditBalance !== undefined) {
@@ -423,7 +421,25 @@ export function createTokenTollServer(config: TokenTollConfig): TokenTollServer 
     if (freeRemaining !== undefined) {
       c.header('X-Free-Remaining', String(freeRemaining))
     }
-  })
+  }
+
+  // HEAD is a free price probe. It is answered here rather than by
+  // toll-booth, which would verify (and debit) any credential sent with it.
+  // Hono dispatches HEAD to GET routes; a plain GET is still a 404.
+  const priceProbe = (c: Context<TollBoothEnv>) => {
+    if (c.req.method !== 'HEAD') return c.notFound()
+    if (!paidAuth || (config.flatPricing && config.price === 0)) return c.body(null, 200)
+    c.header('X-L402-Price-Sats', String(routePriceSats))
+    if (config.defaultPriceUsd !== undefined) c.header('X-L402-Price-Usd', String(config.defaultPriceUsd))
+    c.header('WWW-Authenticate', 'L402 price-only')
+    c.header('Cache-Control', 'no-store')
+    return c.body(null, 402)
+  }
+
+  for (const path of PAID_PATHS) {
+    app.get(path, priceProbe)
+    app.post(path, authMiddleware, forwardPaymentHeaders)
+  }
 
   app.post('/v1/chat/completions', proxy)
   app.post('/v1/completions', proxy)

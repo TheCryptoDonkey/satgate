@@ -310,3 +310,41 @@ describe('client IPs behind a proxy', () => {
     expect((await app.request('/v1/chat/completions', from('203.0.113.8, 10.1.2.3'))).status).toBe(200)
   })
 })
+
+describe('which routes are paid', () => {
+  function countingBackend() {
+    const { backend, preimages } = createPreimageBackend()
+    let invoices = 0
+    const counted = { ...backend, createInvoice: async (amount: number, memo?: string) => { invoices++; return backend.createInvoice(amount, memo) } }
+    return { backend: counted, preimages, invoices: () => invoices }
+  }
+
+  it('mints no invoice for other methods or unknown /v1 paths', async () => {
+    upstream = await startUpstream()
+    const wallet = countingBackend()
+    const { app } = createTokenTollServer(paidConfig(upstream.url, { backend: wallet.backend }))
+    expect((await app.request('/v1/chat/completions')).status).toBe(404)
+    expect((await app.request('/v1/chat/completions', { method: 'PUT' })).status).toBe(404)
+    expect((await app.request('/v1/anything', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).status).toBe(404)
+    expect(wallet.invoices()).toBe(0)
+  })
+
+  it('keeps GET /v1/models free under allowlist auth', async () => {
+    upstream = await startUpstream()
+    const { app } = createTokenTollServer(paidConfig(upstream.url, { authMode: 'allowlist', allowlist: ['secret'], lightning: undefined }))
+    const res = await app.request('/v1/models')
+    expect(res.status).toBe(200)
+  })
+
+  it('answers a HEAD price probe without touching a credential sent with it', async () => {
+    upstream = await startUpstream()
+    const wallet = countingBackend()
+    const { app } = createTokenTollServer(paidConfig(upstream.url, { backend: wallet.backend }))
+    const auth = await buyL402Credential(app, wallet.preimages)
+    const probe = await app.request('/v1/chat/completions', { method: 'HEAD', headers: { Authorization: auth } })
+    expect(probe.status).toBe(402)
+    expect(probe.headers.get('X-L402-Price-Sats')).toBe('10')
+    const res = await app.request('/v1/chat/completions', chat(auth, 'tokens=0', { max_tokens: 1 }))
+    expect(res.headers.get('X-Credit-Balance')).toBe(String(1000 - 10))
+  })
+})
