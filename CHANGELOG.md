@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.17.4 (2026-09-23)
+
+### Bug Fixes
+
+- test the compiled version lookup without a tsx subprocess (#15)
+
+
+
 ## 1.17.3 (2026-09-23)
 
 ### Bug Fixes
