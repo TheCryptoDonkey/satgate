@@ -36,18 +36,19 @@
   "dependencies": {
     "@forgesworn/toll-booth": "^6.2.0",
     "@hono/node-server": "^2.0.12",
+    "@lnurlcash/kit": "0.20.2",
     "@noble/curves": "^2.0.1",
     "@scure/base": "^2.0.0",
     "402-announce": "^2.2.0",
     "hono": "^4.13.1",
-    "js-yaml": "^4.3.1",
-    "lnurlcash-kit": "^0.2.1"
+    "js-yaml": "^4.3.1"
   },
   "devDependencies": {
-    "@forgesworn/moneyer": "^0.3.1",
+    "@forgesworn/moneyer": "0.17.0",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^25.5.0",
     "402-mcp": "4.0.0",
+    "moneyer-legacy": "npm:@forgesworn/moneyer@0.3.1",
     "tsx": "^4.23.10",
     "typescript": "^6.0.2",
     "vitest": "^4.1.0"
