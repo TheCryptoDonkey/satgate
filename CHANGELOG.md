@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.18.0 (2026-10-06)
+
+### Features
+
+- melt lnurlcash notes with @lnurlcash/kit 0.20.2, keeping older mints and note shapes (#17)
+
+
+
 ## 1.17.5 (2026-09-23)
 
 ### Bug Fixes
