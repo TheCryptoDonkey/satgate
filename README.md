@@ -23,21 +23,23 @@ Without `--lightning` (or Cashu mints, or an allowlist) satgate runs in open mod
 
 ---
 
-## Try it live
+## Try it
 
-A public instance is running at [satgate.forgesworn.dev](https://satgate.forgesworn.dev). Open it in a browser for the chat playground, or use curl:
+The public demo instance was retired in October 2026. Run your own with the
+quick start above, then talk to it on localhost (the default port is 3000;
+open the same address in a browser for the chat playground):
 
 ```bash
-# 250 sats of free usage per day per IP — after that you'll get a 402 + invoice
-curl -s -w '\n%{http_code}\n' https://satgate.forgesworn.dev/v1/chat/completions \
+# Any free tier you configured comes first; after that you'll get a 402 + invoice
+curl -s -w '\n%{http_code}\n' http://localhost:3000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{"model":"qwen3:0.6b","messages":[{"role":"user","content":"What is Bitcoin?"}]}'
 
 # Check pricing
-curl -s https://satgate.forgesworn.dev/.well-known/l402 | jq .
+curl -s http://localhost:3000/.well-known/l402 | jq .
 
 # Machine-readable description
-curl -s https://satgate.forgesworn.dev/llms.txt
+curl -s http://localhost:3000/llms.txt
 ```
 
 ---

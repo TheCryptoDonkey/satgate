@@ -4,13 +4,13 @@
 
 One command turns a local inference server into a billable API endpoint. satgate auto-detects your models, issues HTTP 402 payment challenges, proxies requests once paid, and bills from the token counts the upstream reports, returning any unused hold to the client's credit balance.
 
-## Live Demo
+## Running Instances
 
-A public instance is running at https://satgate.forgesworn.dev — open it in a browser for the chat playground, or point any OpenAI-compatible client at it. Discovery endpoints:
+There is no public demo instance; the one at satgate.forgesworn.dev was retired in October 2026. Run your own (below) and point any OpenAI-compatible client at it. Every instance serves these discovery endpoints:
 
-- https://satgate.forgesworn.dev/.well-known/l402
-- https://satgate.forgesworn.dev/llms.txt
-- https://satgate.forgesworn.dev/openapi.json
+- /.well-known/l402
+- /llms.txt
+- /openapi.json
 
 ## Getting Started
 
